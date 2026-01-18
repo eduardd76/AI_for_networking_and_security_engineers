@@ -42,6 +42,40 @@ cd Chapter-15-LangChain-Integration
 python langchain_basics.py  # Requires ANTHROPIC_API_KEY
 ```
 
+### Chapter 16: Document Retrieval
+**Advanced retrieval techniques for better RAG results**
+
+- `advanced_retrieval.py` - Multiple retrieval strategies
+
+**Techniques covered:**
+- Basic similarity search
+- MMR (Maximum Marginal Relevance) for diverse results
+- Multi-query retrieval (generate multiple queries)
+- Contextual compression (extract only relevant parts)
+
+**Test it:**
+```bash
+cd Chapter-16-Document-Retrieval
+python advanced_retrieval.py  # Requires ANTHROPIC_API_KEY + OPENAI_API_KEY
+```
+
+### Chapter 17: Semantic Search
+**Build a semantic search engine for network documentation**
+
+- `semantic_search.py` - Complete semantic search implementation
+
+**What you'll learn:**
+- Index documentation for semantic search
+- Search by intent, not keywords
+- Category-based filtering
+- Understand keyword vs semantic differences
+
+**Test it:**
+```bash
+cd Chapter-17-Semantic-Search
+python semantic_search.py  # Requires OPENAI_API_KEY
+```
+
 ### Chapter 19: Agent Architecture
 **Build autonomous agents with LangGraph**
 
@@ -57,6 +91,57 @@ python langchain_basics.py  # Requires ANTHROPIC_API_KEY
 ```bash
 cd Chapter-19-Agent-Architecture
 python simple_agent.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 20: Troubleshooting Agent
+**Autonomous agent that diagnoses network problems**
+
+- `troubleshoot_agent.py` - Network troubleshooting agent
+
+**What the agent does:**
+- Analyzes problem descriptions
+- Runs diagnostic commands (simulated)
+- Identifies root causes
+- Suggests fixes with step-by-step solutions
+
+**Test it:**
+```bash
+cd Chapter-20-Troubleshooting-Agent
+python troubleshoot_agent.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 21: Config Generation Agent
+**Generate network configs from high-level requirements**
+
+- `config_gen_agent.py` - Configuration generation agent
+
+**Features:**
+- Parses natural language requirements
+- Validates IP addresses and VLAN ranges
+- Generates production-ready configs
+- Includes security baseline automatically
+
+**Test it:**
+```bash
+cd Chapter-21-Config-Generation-Agent
+python config_gen_agent.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 24: Log Analysis
+**AI-powered network log analysis**
+
+- `log_analyzer.py` - Intelligent log analyzer
+
+**Capabilities:**
+- Detect error patterns automatically
+- Find security events
+- Correlate related events
+- AI-powered root cause analysis
+
+**Test it:**
+```bash
+cd Chapter-24-Log-Analysis
+python log_analyzer.py  # Requires ANTHROPIC_API_KEY
 ```
 
 ## 🚀 Quick Start
@@ -281,36 +366,35 @@ Running all examples once: **~$0.15-0.25**
 
 ## 📚 What's Next?
 
-### Additional Chapters (Coming Soon)
-- Chapter 16: Document Retrieval
-- Chapter 17: Semantic Search
-- Chapter 20: Troubleshooting Agent
-- Chapter 21: Config Generation Agent
-- Chapter 24: Log Analysis
-
-### Advanced Features
-- Multi-document RAG
-- Conversation memory
+### Advanced Features (Future Enhancements)
+- Multi-document RAG with source tracking
+- Conversation memory for agents
 - Tool creation framework
 - Production deployment examples
+- Kubernetes integration
+- Multi-agent collaboration
+- Real-time monitoring dashboards
+- API wrappers for enterprise integration
 
 ## 🎓 Learning Path
 
 ### Beginner (Start Here)
-1. Run `document_loader.py` - Understand document processing
-2. Read `simple_rag.py` - See RAG architecture
-3. Run `langchain_basics.py` Example 1 - Simple chains
+1. **Document Processing** - Run `document_loader.py` (no API needed)
+2. **Basic RAG** - Study and run `simple_rag.py`
+3. **LangChain Basics** - Try `langchain_basics.py` Example 1
 
 ### Intermediate
-1. Study `simple_rag.py` - RAG implementation
-2. Try `langchain_basics.py` Examples 2-4 - Structured outputs
-3. Understand embeddings and vector search
+4. **Advanced Retrieval** - Explore `advanced_retrieval.py` techniques
+5. **Semantic Search** - Build search with `semantic_search.py`
+6. **Simple Agent** - Run `simple_agent.py` to see LangGraph
+7. **Structured Output** - Try `langchain_basics.py` Examples 2-4
 
 ### Advanced
-1. Build custom tools for `simple_agent.py`
-2. Add conversation memory
-3. Deploy RAG system to production
-4. Build multi-agent systems
+8. **Troubleshooting Agent** - Autonomous diagnostics with `troubleshoot_agent.py`
+9. **Config Generation** - Generate configs with `config_gen_agent.py`
+10. **Log Analysis** - Analyze logs with AI using `log_analyzer.py`
+11. **Custom Tools** - Build your own tools for agents
+12. **Production Deployment** - Add error handling, monitoring, rate limiting
 
 ## 🤝 Contributing
 
@@ -354,8 +438,10 @@ View traces at: https://smith.langchain.com
 
 **Author**: Eduard Dulharu
 **Company**: vExpertAI GmbH (Munich, Germany)
-**Version**: 2.0.0
+**Version**: 2.1.0
 **Last Updated**: January 2026
-**Status**: Chapters 14, 15, 19 Complete
+**Status**: All Core Chapters Complete (14, 15, 16, 17, 19, 20, 21, 24)
+
+**Total**: 13 Python files, ~3,500 lines of production-ready code
 
 **Ready to build AI agents?** Start with `document_loader.py` →
