@@ -1,363 +1,331 @@
 # Volume 1: Foundations - Code Repository
 
-Complete, production-ready code examples from **AI for Networking Engineers: Volume 1 - Foundations**
+**Simple, practical code examples for network engineers learning AI**
 
-## 📁 Repository Structure
+From: **AI for Networking Engineers - Volume 1: Foundations**
 
+## 📁 What's Included
+
+### Chapter 4: API Basics
+**Learn to call Claude API using LangChain**
+
+- `api_basics.py` - 7 practical examples
+
+**Examples:**
+1. Simple API call
+2. API call with context (config analysis)
+3. Streaming responses
+4. Error handling
+5. Temperature settings (creativity control)
+6. Cost tracking
+7. Model comparison (Haiku vs Sonnet)
+
+**Test it:**
+```bash
+cd Chapter-04-API-Basics-Authentication
+python api_basics.py  # Requires ANTHROPIC_API_KEY
 ```
-Volume-1-Foundations/
-├── Chapter-01-What-Is-Generative-AI/
-│   ├── token_counter.py
-│   ├── model_comparison.py
-│   └── README.md
-├── Chapter-02-Introduction-To-LLMs/
-│   ├── basic_api_call.py
-│   ├── model_capabilities.py
-│   └── README.md
-├── Chapter-03-Choosing-The-Right-Model/
-│   ├── model_benchmarking.py
-│   ├── cost_calculator.py
-│   └── README.md
-├── Chapter-04-API-Basics-Authentication/
-│   ├── resilient_api_client.py
-│   ├── rate_limiter.py
-│   ├── usage_tracker.py
-│   ├── secret_manager.py
-│   └── README.md
-├── Chapter-05-Prompt-Engineering/
-│   ├── networking_prompts.py
-│   ├── prompt_tester.py
-│   ├── temperature_comparison.py
-│   ├── few_shot_examples.py
-│   └── README.md
-├── Chapter-06-Structured-Outputs/
-│   ├── json_validator.py
-│   ├── pydantic_schemas.py
-│   ├── config_parser.py
-│   └── README.md
-├── Chapter-07-Context-Management/
-│   ├── context_chunker.py
-│   ├── token_optimizer.py
-│   ├── sliding_window.py
-│   └── README.md
-├── Chapter-08-Cost-Optimization/
-│   ├── cost_analyzer.py
-│   ├── caching_layer.py
-│   ├── batch_processor.py
-│   └── README.md
-├── Chapter-09-Working-With-Network-Data/
-│   ├── config_analyzer.py
-│   ├── multi_vendor_parser.py
-│   ├── log_processor.py
-│   └── README.md
-├── Chapter-10-API-Integration-Patterns/
-│   ├── netmiko_integration.py
-│   ├── napalm_integration.py
-│   ├── ansible_integration.py
-│   └── README.md
-├── Chapter-11-Testing-And-Validation/
-│   ├── test_framework.py
-│   ├── accuracy_validator.py
-│   ├── regression_tests.py
-│   └── README.md
-├── Chapter-12-Ethics-Responsible-AI/
-│   ├── audit_logger.py
-│   ├── approval_workflow.py
-│   ├── guardrails.py
-│   └── README.md
-├── sample-data/
-│   ├── configs/
-│   ├── logs/
-│   ├── outputs/
-│   └── README.md
-├── tests/
-│   ├── test_api_client.py
-│   ├── test_prompts.py
-│   ├── test_parsers.py
-│   └── README.md
-├── .env.example
-├── requirements.txt
-├── setup.py
-└── README.md (this file)
+
+### Chapter 5: Prompt Engineering
+**Write better prompts for better results**
+
+- `prompt_engineering.py` - 7 techniques
+
+**Techniques:**
+1. Basic vs detailed prompts
+2. Role-based prompting
+3. Few-shot learning (show examples)
+4. Chain of thought reasoning
+5. Adding constraints
+6. Prompt templates
+7. Negative prompting (tell it what NOT to do)
+
+**Test it:**
+```bash
+cd Chapter-05-Prompt-Engineering
+python prompt_engineering.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 6: Structured Outputs
+**Get JSON instead of text using Pydantic**
+
+- `structured_outputs.py` - 4 examples with validation
+
+**What you'll learn:**
+- Parse interface configs into objects
+- Security issue detection with structured output
+- Device inventory extraction
+- Routing table parsing
+
+**Test it:**
+```bash
+cd Chapter-06-Structured-Outputs
+python structured_outputs.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 7: Context Management
+**Handle large configs that exceed token limits**
+
+- `context_management.py` - 4 strategies
+
+**Strategies:**
+- Chunking large configs
+- Analyze chunks separately
+- Map-reduce pattern (summarize then combine)
+- Sliding window for context
+
+**Test it:**
+```bash
+cd Chapter-07-Context-Management
+python context_management.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 8: Cost Optimization
+**Keep your AI costs under control**
+
+- `cost_optimization.py` - 4 techniques
+
+**Cost savers:**
+- Caching (avoid repeat API calls)
+- Use cheaper models (Haiku vs Sonnet)
+- Batch processing (process multiple items in one call)
+- Prompt optimization (shorter = cheaper)
+
+**Typical savings: 50-70%**
+
+**Test it:**
+```bash
+cd Chapter-08-Cost-Optimization
+python cost_optimization.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 9: Working with Network Data
+**Process real configs, logs, and command outputs**
+
+- `network_data.py` - 4 examples
+
+**Examples:**
+- Config analysis (identify device role, topology)
+- Log analysis (troubleshoot from syslogs)
+- Multi-vendor support (Cisco, Juniper)
+- Parse show commands
+
+**Test it:**
+```bash
+cd Chapter-09-Working-With-Network-Data
+python network_data.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 10: API Integration
+**Combine AI with Netmiko, NAPALM, Ansible**
+
+- `api_integration.py` - 3 patterns
+
+**Integration patterns:**
+- Generate device commands with AI
+- Interpret device errors
+- Validate commands before execution
+
+**Test it:**
+```bash
+cd Chapter-10-API-Integration-Patterns
+python api_integration.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 11: Testing and Validation
+**Ensure AI outputs are accurate**
+
+- `testing.py` - 4 test types
+
+**Testing strategies:**
+- Accuracy testing (known correct answers)
+- Consistency testing (same answer each time)
+- Output validation (check format)
+- Regression testing (no breaking changes)
+
+**Test it:**
+```bash
+cd Chapter-11-Testing-And-Validation
+python testing.py  # Requires ANTHROPIC_API_KEY
+```
+
+### Chapter 12: Ethics and Responsible AI
+**Safe AI use in production networks**
+
+- `ethics.py` - 5 safety practices
+
+**Safety features:**
+- Command guardrails (block dangerous commands)
+- Approval workflows (human review)
+- Audit logging (track all AI interactions)
+- Read-only by default
+- Change verification (before and after)
+
+**Test it:**
+```bash
+cd Chapter-12-Ethics-Responsible-AI
+python ethics.py  # Requires ANTHROPIC_API_KEY
 ```
 
 ## 🚀 Quick Start
 
-### 1. Clone and Setup
+### 1. Install Dependencies
 
 ```bash
-# Clone the repository
-git clone https://github.com/eduardd76/AI_for_networking_and_security_engineers.git
-cd AI_for_networking_and_security_engineers/Volume-1-Foundations
-
 # Create virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install requirements
 pip install -r requirements.txt
 ```
 
-### 2. Configure API Keys
+### 2. Setup API Keys
 
+Copy `.env.example` to `.env`:
 ```bash
-# Copy example environment file
 cp .env.example .env
-
-# Edit .env and add your API keys
-# ANTHROPIC_API_KEY=sk-ant-api03-...
-# OPENAI_API_KEY=sk-proj-...
-# GOOGLE_API_KEY=AIzaSy...
 ```
 
-### 3. Run Examples
+Edit `.env` and add your Anthropic API key:
+```bash
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+```
+
+Get your key at: https://console.anthropic.com/
+
+### 3. Run Your First Example
 
 ```bash
-# Test API connection
-python Chapter-04-API-Basics-Authentication/resilient_api_client.py
-
-# Try prompt engineering
-python Chapter-05-Prompt-Engineering/networking_prompts.py
-
-# Analyze a config
-python Chapter-09-Working-With-Network-Data/config_analyzer.py sample-data/configs/router1.cfg
+cd Chapter-04-API-Basics-Authentication
+python api_basics.py
 ```
 
-## 📖 Chapter Guide
+## 📦 Dependencies
 
-### Part 1: Understanding LLMs (Chapters 1-3)
+### Core Requirements
+- Python 3.10+
+- `langchain` - LLM application framework
+- `langchain-anthropic` - Anthropic/Claude integration
+- `anthropic` - Official Anthropic SDK
+- `python-dotenv` - Environment variable management
+- `pydantic` - Data validation
 
-**Chapter 1: What Is Generative AI**
-- Token counting and estimation
-- Model comparison utilities
-- Understanding transformer architecture
+All dependencies are in `requirements.txt`.
 
-**Chapter 2: Introduction To LLMs**
-- Basic API calls to Claude, GPT-4, Gemini
-- Model capabilities testing
-- Response format examples
+## 💡 Key Design Principles
 
-**Chapter 3: Choosing The Right Model**
-- Benchmark different models for networking tasks
-- Cost vs. accuracy analysis
-- Model selection framework
+### Simplified for Network Engineers
+Unlike the previous version, this rewrite focuses on:
+- **One file per chapter** - Easy to find and run
+- **LangChain-based** - Modern framework approach
+- **Practical examples** - Real network scenarios
+- **Simple and clean** - ~200-300 lines per file
+- **Easy to understand** - Clear, readable code
 
-### Part 2: Core Skills (Chapters 4-6)
+### Real Network Use Cases
+Every example uses actual networking scenarios:
+- Config analysis and generation
+- Security checking
+- Log troubleshooting
+- Multi-vendor support
+- Cost optimization
 
-**Chapter 4: API Basics and Authentication**
-- Production-ready API client with retry logic
-- Rate limiting and backoff strategies
-- Usage tracking and cost monitoring
-- Secrets management
+## 🎓 Learning Path
 
-**Chapter 5: Prompt Engineering Fundamentals**
-- Reusable prompt templates library
-- Few-shot vs zero-shot examples
-- Temperature and top-p exploration
-- Prompt testing framework
+### Beginner (Start Here)
+1. **API Basics** (Ch 4) - Learn to call AI APIs
+2. **Prompt Engineering** (Ch 5) - Write better prompts
+3. **Structured Outputs** (Ch 6) - Get JSON responses
 
-**Chapter 6: Structured Outputs**
-- JSON validation and parsing
-- Pydantic schema validation
-- Config data extraction
-- Type-safe API responses
+### Intermediate
+4. **Context Management** (Ch 7) - Handle large configs
+5. **Cost Optimization** (Ch 8) - Save money
+6. **Network Data** (Ch 9) - Process real data
 
-### Part 3: Production Scale (Chapters 7-9)
+### Advanced
+7. **API Integration** (Ch 10) - Combine with Netmiko
+8. **Testing** (Ch 11) - Validate AI outputs
+9. **Ethics** (Ch 12) - Safe production use
 
-**Chapter 7: Context Management**
-- Handling configs larger than context window
-- Token-aware chunking strategies
-- Sliding window processing
-- Context optimization
+## 🔧 Troubleshooting
 
-**Chapter 8: Cost Optimization**
-- Cost analysis and forecasting
-- Response caching layer
-- Batch processing for efficiency
-- 50-70% cost reduction techniques
-
-**Chapter 9: Working With Network Data**
-- Multi-vendor config parsing (Cisco, Juniper, Arista)
-- Log analysis and classification
-- Security vulnerability detection
-- Data normalization
-
-### Part 4: Real World (Chapters 10-12)
-
-**Chapter 10: API Integration Patterns**
-- Netmiko integration (SSH automation)
-- NAPALM integration (multi-vendor)
-- Ansible playbook integration
-- Real device interaction
-
-**Chapter 11: Testing and Validation**
-- Comprehensive test framework
-- Accuracy validation suite
-- Regression testing
-- Performance benchmarking
-
-**Chapter 12: Ethics and Responsible AI**
-- Audit logging for compliance
-- Human approval workflows
-- Guardrails and safety checks
-- Bias detection
-
-## 🧪 Running Tests
-
+### "No module named 'langchain'"
 ```bash
-# Run all tests
-pytest tests/
-
-# Run specific test file
-pytest tests/test_api_client.py -v
-
-# Run with coverage
-pytest --cov=. tests/
+pip install -r requirements.txt
 ```
 
-## 📊 Sample Data
+### "Invalid API key"
+Check your `.env` file:
+```bash
+# Make sure key is set correctly
+cat .env
 
-The `sample-data/` directory contains:
+# Test connection
+python -c "from langchain_anthropic import ChatAnthropic; print('OK')"
+```
 
-**Configs**: Sample network device configurations
-- `cisco_ios_router.cfg` - Cisco IOS router
-- `cisco_nexus_switch.cfg` - Cisco Nexus switch
-- `juniper_mx.cfg` - Juniper MX router
-- `arista_eos.cfg` - Arista EOS switch
+### "Rate limit exceeded"
+Free tier limits: 5 requests/minute
 
-**Logs**: Sample network logs for analysis
-- `syslog_samples.log` - Various syslog messages
-- `bgp_neighbor_logs.log` - BGP session logs
-- `interface_errors.log` - Interface error logs
-
-**Outputs**: Expected AI responses for testing
+**Solution**: Wait 60 seconds or upgrade to paid tier.
 
 ## 💰 Cost Estimates
 
-**Running all examples once**:
-- API calls: ~500 requests
-- Total tokens: ~1.5M
-- Estimated cost: $8-12 USD
+### Per Example Run
+- Chapter 4 (7 examples): **$0.05-0.10**
+- Chapter 5 (7 examples): **$0.05-0.10**
+- Chapter 6 (4 examples): **$0.03-0.05**
+- Chapters 7-12 (each): **$0.02-0.05**
 
-**Learning exercises (per chapter)**:
-- API calls: ~50 requests
-- Total tokens: ~150K
-- Estimated cost: $0.80-1.20 USD
+### Full Testing
+Running all chapters once: **~$0.30-0.50**
 
-**Tip**: Use Claude Haiku for development/testing (10x cheaper than Sonnet)
+### Tips to Save Money
+1. Use Haiku model for simple tasks (10x cheaper)
+2. Cache repeated queries (Chapter 8)
+3. Batch process multiple items (Chapter 8)
+4. Keep prompts concise
 
-## 🔧 Configuration
+## 📚 What's Different from Volume 2?
 
-### Environment Variables
+### Volume 1 (Foundations)
+- **Focus**: Core AI concepts and APIs
+- **Style**: Direct API usage with LangChain
+- **Examples**: Prompt engineering, cost optimization, testing
+- **Audience**: Learning the basics
 
-All examples use environment variables for configuration:
+### Volume 2 (Advanced Applications)
+- **Focus**: Production RAG systems and agents
+- **Style**: LangGraph agents, vector databases
+- **Examples**: Semantic search, troubleshooting agents, log analysis
+- **Audience**: Building real systems
 
-```bash
-# Required
-ANTHROPIC_API_KEY=sk-ant-api03-...
-
-# Optional (for multi-provider examples)
-OPENAI_API_KEY=sk-proj-...
-GOOGLE_API_KEY=AIzaSy...
-
-# Optional (for logging and monitoring)
-LOG_LEVEL=INFO
-ENABLE_METRICS=true
-METRICS_FILE=usage_metrics.json
-```
-
-### API Client Configuration
-
-The `ResilientAPIClient` supports these parameters:
-
-```python
-client = ResilientAPIClient(
-    api_key=None,           # Defaults to ANTHROPIC_API_KEY env var
-    max_retries=3,          # Number of retry attempts
-    initial_retry_delay=1.0, # Initial backoff delay (seconds)
-    timeout=60              # Request timeout (seconds)
-)
-```
-
-## 📚 Dependencies
-
-Core dependencies:
-- `anthropic>=0.18.0` - Claude API client
-- `openai>=1.12.0` - OpenAI API client (GPT-4)
-- `google-generativeai>=0.3.0` - Google Gemini API
-- `python-dotenv>=1.0.0` - Environment variable management
-- `pydantic>=2.5.0` - Data validation
-- `requests>=2.31.0` - HTTP client
-
-Network automation:
-- `netmiko>=4.3.0` - Multi-vendor SSH automation
-- `napalm>=4.1.0` - Multi-vendor network automation
-- `textfsm>=1.1.3` - Structured text parsing
-
-Testing and validation:
-- `pytest>=7.4.0` - Testing framework
-- `pytest-cov>=4.1.0` - Coverage reporting
-
-See `requirements.txt` for complete list.
-
-## 🐛 Troubleshooting
-
-### "Invalid API Key"
-- Check that `.env` file exists and contains valid key
-- Verify key starts with `sk-ant-api03-` for Anthropic
-- Ensure `.env` is in the same directory or use `load_dotenv()` with path
-
-### "Rate Limit Exceeded"
-- Free tier has low limits (5 RPM for Anthropic)
-- Use built-in rate limiting: `RateLimiter(max_requests=5, time_window=60)`
-- Consider upgrading to paid tier
-
-### "Context Length Exceeded"
-- Config/log file too large for model's context window
-- Use chunking: `Chapter-07-Context-Management/context_chunker.py`
-- Consider using models with larger context (Claude Opus: 200K, Gemini 1.5 Pro: 2M)
-
-### "Import Error"
-- Ensure virtual environment is activated
-- Reinstall dependencies: `pip install -r requirements.txt`
-- Check Python version: `python --version` (requires 3.10+)
-
-## 📖 Additional Resources
-
-**Book**: AI for Networking Engineers - Volume 1: Foundations
-**Author**: Eduard Dulharu
-**Website**: https://vexpertai.com
-**Discord**: [Join the community - link in book]
-**GitHub**: https://github.com/eduardd76/AI_for_networking_and_security_engineers
-
-## 📝 License
-
-MIT License - See LICENSE file for details
-
-Code examples are free to use in your projects. Attribution appreciated but not required.
+**Start with Volume 1, then move to Volume 2.**
 
 ## 🤝 Contributing
 
-Found a bug? Have an improvement?
+Found issues? Have improvements?
 
-1. Open an issue describing the problem
-2. Submit a pull request with fixes
-3. Share your use cases in Discord
-
-## ⚠️ Disclaimer
-
-These examples are for educational purposes. Always test thoroughly before using in production networks. The author is not responsible for any network outages, security incidents, or costs incurred from using this code.
+1. Test the code
+2. Document the issue
+3. Submit a pull request
+4. Share your use case!
 
 ## 📞 Support
 
-- **GitHub Issues**: Technical problems and bugs
-- **Discord Community**: Questions and discussions
-- **Email**: ed@vexpertai.com (Consulting inquiries only)
+- **Technical Issues**: GitHub Issues
+- **Questions**: Discord community
+- **Consulting**: ed@vexpertai.com
 
 ---
 
-**Version**: 1.0.0
+**Author**: Eduard Dulharu
+**Company**: vExpertAI GmbH (Munich, Germany)
+**Version**: 1.1.0 (Simplified Rewrite)
 **Last Updated**: January 2026
-**Tested With**: Python 3.10+, Claude Sonnet 4.5, GPT-4, Gemini 1.5 Pro
+**Status**: All Core Chapters Complete
 
-**Ready to start?** Begin with Chapter 4: API Basics and Authentication
+**Total**: 9 Python files, ~1,800 lines of clean, simple code
+
+**Ready to learn AI?** Start with Chapter 4 → `api_basics.py`
