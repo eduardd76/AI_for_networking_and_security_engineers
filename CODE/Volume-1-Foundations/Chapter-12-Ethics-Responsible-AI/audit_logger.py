@@ -5,7 +5,7 @@ Audit Logger - Track All AI Decisions for Compliance
 Log all AI-powered decisions, changes, and analysis for audit trails.
 
 From: AI for Networking Engineers - Volume 1, Chapter 12
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from audit_logger import AuditLogger

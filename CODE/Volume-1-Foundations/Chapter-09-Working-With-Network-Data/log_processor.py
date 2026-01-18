@@ -5,7 +5,7 @@ Log Processor - AI-Powered Network Log Analysis
 Process and analyze network logs using AI to identify patterns, anomalies, and issues.
 
 From: AI for Networking Engineers - Volume 1, Chapter 9
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from log_processor import LogProcessor

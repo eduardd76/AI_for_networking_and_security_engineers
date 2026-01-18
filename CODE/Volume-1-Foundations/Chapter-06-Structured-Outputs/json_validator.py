@@ -6,7 +6,7 @@ Extract and validate JSON from LLM responses, handling common issues like
 markdown code blocks, extra text, and malformed JSON.
 
 From: AI for Networking Engineers - Volume 1, Chapter 6
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from json_validator import JSONValidator

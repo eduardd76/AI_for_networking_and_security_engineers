@@ -5,7 +5,7 @@ Netmiko Integration - AI-Powered Network Automation
 Combine Netmiko (SSH automation) with AI analysis for intelligent network operations.
 
 From: AI for Networking Engineers - Volume 1, Chapter 10
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from netmiko_integration import AINetworkDevice

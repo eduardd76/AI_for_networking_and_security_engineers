@@ -6,7 +6,7 @@ Comprehensive configuration analysis using AI to identify issues, best practices
 and optimization opportunities.
 
 From: AI for Networking Engineers - Volume 1, Chapter 9
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from config_analyzer import ConfigAnalyzer

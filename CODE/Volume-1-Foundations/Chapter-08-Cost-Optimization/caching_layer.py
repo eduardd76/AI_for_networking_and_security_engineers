@@ -5,7 +5,7 @@ Caching Layer - Reduce API Costs with Response Caching
 Cache AI responses to avoid redundant API calls. Typical savings: 50-70% of costs.
 
 From: AI for Networking Engineers - Volume 1, Chapter 8
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from caching_layer import CachedAPIClient

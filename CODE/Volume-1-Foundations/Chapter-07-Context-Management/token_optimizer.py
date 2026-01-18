@@ -5,7 +5,7 @@ Token Optimizer - Reduce Token Usage and Costs
 Optimize prompts and responses to use fewer tokens while maintaining quality.
 
 From: AI for Networking Engineers - Volume 1, Chapter 7
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from token_optimizer import TokenOptimizer

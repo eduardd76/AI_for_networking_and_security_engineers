@@ -5,7 +5,7 @@ Cost Analyzer - Analyze and Forecast AI API Costs
 Track, analyze, and forecast API costs. Identify cost optimization opportunities.
 
 From: AI for Networking Engineers - Volume 1, Chapter 8
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from cost_analyzer import CostAnalyzer

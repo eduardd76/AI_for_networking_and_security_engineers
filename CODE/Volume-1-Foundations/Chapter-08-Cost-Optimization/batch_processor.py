@@ -5,7 +5,7 @@ Batch Processor - Process Multiple Configs Efficiently
 Batch API calls to reduce overhead and costs. Process multiple configs in parallel.
 
 From: AI for Networking Engineers - Volume 1, Chapter 8
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from batch_processor import BatchProcessor

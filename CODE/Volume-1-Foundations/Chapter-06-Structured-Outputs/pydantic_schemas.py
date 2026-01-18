@@ -6,7 +6,7 @@ Type-safe data models for network configurations, security findings,
 and analysis results from AI systems.
 
 From: AI for Networking Engineers - Volume 1, Chapter 6
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from pydantic_schemas import InterfaceConfig, DeviceConfig

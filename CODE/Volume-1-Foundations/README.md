@@ -325,7 +325,7 @@ See `requirements.txt` for complete list.
 ## 📖 Additional Resources
 
 **Book**: AI for Networking Engineers - Volume 1: Foundations
-**Author**: Eduard Dulharu (Ed Harmoosh)
+**Author**: Eduard Dulharu
 **Website**: https://vexpertai.com
 **Discord**: [Join the community - link in book]
 **GitHub**: https://github.com/eduardd76/AI_for_networking_and_security_engineers

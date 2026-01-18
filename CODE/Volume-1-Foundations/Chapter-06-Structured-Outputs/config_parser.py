@@ -5,7 +5,7 @@ Configuration Parser with AI and Structured Outputs
 Parse network device configurations using AI and validate with Pydantic schemas.
 
 From: AI for Networking Engineers - Volume 1, Chapter 6
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from config_parser import AIConfigParser

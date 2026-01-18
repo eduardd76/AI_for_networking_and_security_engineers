@@ -5,7 +5,7 @@ Networking Prompt Templates Library
 Reusable prompts for common networking tasks with AI.
 
 From: AI for Networking Engineers - Volume 1, Chapter 5
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 This library provides battle-tested prompt templates for:
 - Configuration security analysis

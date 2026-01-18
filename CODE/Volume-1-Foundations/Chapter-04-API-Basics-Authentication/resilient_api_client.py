@@ -3,7 +3,7 @@
 Production-grade API client with built-in retry, rate limiting, and monitoring.
 
 From: AI for Networking Engineers - Volume 1, Chapter 4
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Features:
 - Exponential backoff retry logic

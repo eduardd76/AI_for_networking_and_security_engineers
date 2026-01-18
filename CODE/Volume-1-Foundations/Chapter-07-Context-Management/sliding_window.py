@@ -5,7 +5,7 @@ Sliding Window Processor - Process Large Configs Incrementally
 Process large configurations using a sliding window approach with context carryover.
 
 From: AI for Networking Engineers - Volume 1, Chapter 7
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from sliding_window import SlidingWindowProcessor

@@ -6,7 +6,7 @@ Combine NAPALM's multi-vendor support with AI analysis for intelligent
 network operations across different platforms.
 
 From: AI for Networking Engineers - Volume 1, Chapter 10
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from napalm_integration import AINetworkManager

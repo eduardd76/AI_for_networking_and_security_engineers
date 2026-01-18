@@ -23,7 +23,7 @@ requirements = [
 setup(
     name="ai-networking-volume1",
     version="1.0.0",
-    author="Eduard Dulharu (Ed Harmoosh)",
+    author="Eduard Dulharu",
     author_email="ed@vexpertai.com",
     description="Code examples from AI for Networking Engineers - Volume 1: Foundations",
     long_description=long_description,

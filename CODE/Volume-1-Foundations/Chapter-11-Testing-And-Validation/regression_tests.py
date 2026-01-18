@@ -6,7 +6,7 @@ Track system performance over time and detect regressions in accuracy, latency,
 cost, or other key metrics.
 
 From: AI for Networking Engineers - Volume 1, Chapter 11
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from regression_tests import RegressionTester

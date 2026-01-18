@@ -3,7 +3,7 @@
 API usage tracker with cost monitoring and analysis.
 
 From: AI for Networking Engineers - Volume 1, Chapter 4
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Track API usage, costs, and generate reports for budgeting and optimization.
 

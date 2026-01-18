@@ -6,7 +6,7 @@ Handle network configurations larger than model context windows by intelligently
 chunking them into processable segments.
 
 From: AI for Networking Engineers - Volume 1, Chapter 7
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from context_chunker import ContextChunker

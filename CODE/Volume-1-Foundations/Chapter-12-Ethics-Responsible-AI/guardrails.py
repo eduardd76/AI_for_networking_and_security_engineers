@@ -6,7 +6,7 @@ Implement safety guardrails to prevent AI from making dangerous or
 policy-violating changes to network infrastructure.
 
 From: AI for Networking Engineers - Volume 1, Chapter 12
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from guardrails import SafetyGuardrails

@@ -5,7 +5,7 @@ Multi-Vendor Config Parser - Universal Network Config Analysis
 Parse configurations from Cisco, Juniper, Arista, and other vendors using AI.
 
 From: AI for Networking Engineers - Volume 1, Chapter 9
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from multi_vendor_parser import MultiVendorParser

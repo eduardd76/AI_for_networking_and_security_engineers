@@ -3,7 +3,7 @@
 Client-side rate limiter using token bucket algorithm.
 
 From: AI for Networking Engineers - Volume 1, Chapter 4
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Prevents exceeding API provider rate limits by throttling requests on the client side.
 

@@ -5,7 +5,7 @@ AI System Testing Framework
 Test and validate AI-powered network automation systems.
 
 From: AI for Networking Engineers - Volume 1, Chapter 11
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from test_framework import AITestFramework

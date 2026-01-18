@@ -5,7 +5,7 @@ Ansible Integration - AI-Powered Playbook Generation and Execution
 Generate Ansible playbooks with AI and execute them safely with validation.
 
 From: AI for Networking Engineers - Volume 1, Chapter 10
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from ansible_integration import AIAnsibleManager

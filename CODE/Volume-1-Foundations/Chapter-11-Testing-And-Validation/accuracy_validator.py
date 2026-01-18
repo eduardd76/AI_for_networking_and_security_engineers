@@ -5,7 +5,7 @@ Accuracy Validator - Measure AI System Accuracy
 Test AI systems against ground truth data to measure and improve accuracy.
 
 From: AI for Networking Engineers - Volume 1, Chapter 11
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from accuracy_validator import AccuracyValidator

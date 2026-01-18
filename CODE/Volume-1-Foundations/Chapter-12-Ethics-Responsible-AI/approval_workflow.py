@@ -5,7 +5,7 @@ Approval Workflow - Human-in-the-Loop AI Decisions
 Implement approval workflow for high-risk AI-generated changes.
 
 From: AI for Networking Engineers - Volume 1, Chapter 12
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Usage:
     from approval_workflow import ApprovalWorkflow

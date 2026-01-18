@@ -1,6 +1,6 @@
 # AI for Networking and Security Engineers - Code Repository
 
-**Complete, production-ready code from the book series by Eduard Dulharu (Ed Harmoosh)**
+**Complete, production-ready code from the book series by Eduard Dulharu**
 
 This repository contains all working code examples, libraries, and tools from the "AI for Networking Engineers" book series. Every code file is tested, documented, and ready to use in your network automation projects.
 
@@ -319,7 +319,7 @@ pip install -r requirements.txt
 ## 📚 Additional Resources
 
 - **Book**: Purchase at [vexpertai.com](https://vexpertai.com)
-- **Author**: Eduard Dulharu (Ed Harmoosh)
+- **Author**: Eduard Dulharu
   - LinkedIn: [Eduard Dulharu](https://www.linkedin.com/in/eduarddulharu/)
   - Email: ed@vexpertai.com
 - **Company**: vExpertAI GmbH (Munich, Germany)
@@ -361,7 +361,7 @@ MIT License - See LICENSE file
 
 ## 🎓 About the Author
 
-**Eduard Dulharu (Ed Harmoosh)**
+**Eduard Dulharu**
 - 20+ years in network infrastructure (AT&T, Infosys, Kyndryl)
 - CTO & Founder, vExpertAI GmbH
 - CCNA to CCIE level experience
