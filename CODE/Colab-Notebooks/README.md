@@ -12,21 +12,32 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 
 ## 📚 Available Notebooks
 
-### Volume 1: Foundations
+### Volume 1: Foundations (Complete!)
 
 | Chapter | Topic | Notebook | Difficulty |
 |---------|-------|----------|------------|
 | Chapter 4 | API Basics | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch4_API_Basics.ipynb) | Beginner |
 | Chapter 5 | Prompt Engineering | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch5_Prompt_Engineering.ipynb) | Beginner |
 | Chapter 6 | Structured Outputs | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch6_Structured_Outputs.ipynb) | Intermediate |
+| Chapter 7 | Context Management | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch7_Context_Management.ipynb) | Intermediate |
+| Chapter 8 | Cost Optimization | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch8_Cost_Optimization.ipynb) | Intermediate |
+| Chapter 9 | Network Data | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch9_Network_Data.ipynb) | Intermediate |
+| Chapter 10 | API Integration | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch10_API_Integration.ipynb) | Advanced |
+| Chapter 11 | Testing | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch11_Testing.ipynb) | Advanced |
+| Chapter 12 | Ethics | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol1_Ch12_Ethics.ipynb) | Advanced |
 
-### Volume 2: Advanced Applications
+### Volume 2: Advanced Applications (Complete!)
 
 | Chapter | Topic | Notebook | Difficulty |
 |---------|-------|----------|------------|
-| Chapter 14 | RAG Basics | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch14_RAG_Basics.ipynb) | Intermediate |
+| Chapter 14 | RAG Fundamentals | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch14_RAG_Basics.ipynb) | Intermediate |
 | Chapter 15 | LangChain Integration | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch15_LangChain.ipynb) | Intermediate |
-| Chapter 19 | Simple Agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch19_Agent.ipynb) | Advanced |
+| Chapter 16 | Document Retrieval | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch16_Retrieval.ipynb) | Intermediate |
+| Chapter 17 | Semantic Search | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch17_Semantic_Search.ipynb) | Intermediate |
+| Chapter 19 | Agent Architecture | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch19_Agent.ipynb) | Advanced |
+| Chapter 20 | Troubleshooting Agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch20_Troubleshoot.ipynb) | Advanced |
+| Chapter 21 | Config Generation | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch21_ConfigGen.ipynb) | Advanced |
+| Chapter 24 | Log Analysis | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch24_Logs.ipynb) | Advanced |
 
 ## 🎯 Quick Start (3 Steps)
 
