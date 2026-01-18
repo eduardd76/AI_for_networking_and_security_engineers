@@ -46,6 +46,15 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 | Chapter 23 | Network Fine-Tuning | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch23_Network_Fine_Tuning.ipynb) | Advanced |
 | Chapter 24 | Log Analysis | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch24_Logs.ipynb) | Advanced |
 
+### Bonus Chapters (Production-Ready!)
+
+| Chapter | Topic | Notebook | Difficulty |
+|---------|-------|----------|------------|
+| Chapter 38 | FastAPI + MCP Integration | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch38_FastAPI_MCP.ipynb) | Advanced |
+| Chapter 52 | Local LLM Inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch52_Local_Inference.ipynb) | Advanced |
+| Chapter 54 | AI Troubleshooting Agent | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch54_Troubleshooting.ipynb) | Advanced |
+| Chapter 55 | AI Threat Hunting | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch55_Threat_Hunting.ipynb) | Advanced |
+
 ## 🎯 Quick Start (3 Steps)
 
 ### Step 1: Click a Badge Above
