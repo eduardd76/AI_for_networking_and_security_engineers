@@ -5,7 +5,7 @@ Prompt Testing Framework
 Systematically test and evaluate prompt effectiveness.
 
 From: AI for Networking Engineers - Volume 1, Chapter 5
-Author: Eduard Dulharu (Ed Harmoosh)
+Author: Eduard Dulharu
 
 Test prompts against known inputs/outputs to measure accuracy and reliability.
 
