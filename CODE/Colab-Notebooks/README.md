@@ -65,6 +65,16 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 | Chapter 56 | Predictive Maintenance | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch56_Predictive_Maintenance.ipynb) | Advanced |
 | Chapter 58 | Compliance Auditor | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch58_Compliance_Auditor.ipynb) | Advanced |
 
+### Advanced RAG (NEW! 🔥)
+
+| Chapter | Topic | Notebook | Difficulty |
+|---------|-------|----------|------------|
+| Chapter 29 | Knowledge Graphs | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch29_Knowledge_Graphs.ipynb) | Advanced |
+| Chapter 30 | Graph RAG | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch30_Graph_RAG.ipynb) | Advanced |
+| Chapter 31 | Document Extraction | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch31_Document_Extraction.ipynb) | Advanced |
+| Chapter 32 | Agentic RAG | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch32_Agentic_RAG.ipynb) | Advanced |
+| Chapter 35 | Vector Log Analysis | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch35_Vector_Log_Analysis.ipynb) | Advanced |
+
 ### Bonus Chapters (Production-Ready!)
 
 | Chapter | Topic | Notebook | Difficulty |
