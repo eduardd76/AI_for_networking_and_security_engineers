@@ -56,6 +56,15 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 | Chapter 44 | Observability & Tracing | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch44_Observability_Tracing.ipynb) | Advanced |
 | Chapter 46 | Integration Hub (Ansible/NetBox) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch46_Integration_Hub.ipynb) | Advanced |
 
+### Cost & Architecture (NEW! 🔥)
+
+| Chapter | Topic | Notebook | Difficulty |
+|---------|-------|----------|------------|
+| Chapter 42 | Deployment Architectures | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch42_Deployment_Architectures.ipynb) | Advanced |
+| Chapter 45 | Token Economics | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch45_Token_Economics.ipynb) | Advanced |
+| Chapter 56 | Predictive Maintenance | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch56_Predictive_Maintenance.ipynb) | Advanced |
+| Chapter 58 | Compliance Auditor | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch58_Compliance_Auditor.ipynb) | Advanced |
+
 ### Bonus Chapters (Production-Ready!)
 
 | Chapter | Topic | Notebook | Difficulty |
