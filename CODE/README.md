@@ -1,399 +1,207 @@
-# AI for Networking and Security Engineers - Code Repository
+# AI for Networking Engineers - Complete Code Repository
 
-**Complete, production-ready code from the book series by Eduard Dulharu**
+**Production-ready code examples from the book series**
 
-This repository contains all working code examples, libraries, and tools from the "AI for Networking Engineers" book series. Every code file is tested, documented, and ready to use in your network automation projects.
+## 📚 Two Ways to Run the Code
 
-## 📚 Book Volumes
+### 🚀 Option 1: Google Colab (Recommended for Beginners)
+**No installation required - run in your browser!**
 
-### Volume 1: Foundations ✅ COMPLETE
-**12 chapters covering core AI/LLM fundamentals for networking**
+Perfect for:
+- Network engineers on corporate laptops (no admin rights needed)
+- Quick testing and learning
+- Running code from anywhere
 
-- API clients with retry logic and rate limiting
-- Prompt engineering templates library
-- Multi-vendor config parsing (Cisco, Juniper, Arista)
-- Cost optimization and caching layers
-- Testing frameworks and validation
-- Ethics, approval workflows, and guardrails
+**[→ Start with Colab Notebooks](./Colab-Notebooks/)**
 
-👉 [**Go to Volume 1 →**](./Volume-1-Foundations/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/)
 
-### Volume 2: Advanced Applications (Coming Soon)
-**Deep dive into specialized AI applications**
+### 💻 Option 2: Local Python
+**Full development environment on your machine**
 
-- RAG (Retrieval Augmented Generation) for documentation
-- Vector databases and semantic search
-- Custom fine-tuning for network tasks
-- Multi-agent orchestration
-- Advanced troubleshooting automation
+Perfect for:
+- Building production systems
+- Custom development
+- Working offline
 
-### Volume 3: Production Deployment (Coming Soon)
-**Enterprise-grade deployment patterns**
+**Choose your volume:**
+- **[Volume 1: Foundations](./Volume-1-Foundations/)** - Learn AI basics (9 chapters)
+- **[Volume 2: Advanced Applications](./Volume-2-Advanced-Applications/)** - RAG, agents, production (8 chapters)
 
-- Kubernetes deployment
-- Monitoring and observability
-- Security hardening
-- CI/CD pipelines
-- High-availability architectures
+## 🎯 Quick Decision Guide
 
-### Volume 4: Security Focus (Coming Soon)
-**AI-powered security operations**
+**Choose Colab if you want to:**
+- ✅ Try the code immediately (no setup)
+- ✅ Learn on a restricted corporate laptop
+- ✅ Test examples quickly
+- ✅ Share notebooks with colleagues
 
-- Threat detection and analysis
-- Security policy generation
-- Incident response automation
-- Compliance monitoring
-- Anomaly detection
+**Choose Local if you want to:**
+- ✅ Build production systems
+- ✅ Integrate with your network tools (Netmiko, NAPALM)
+- ✅ Work offline
+- ✅ Customize extensively
 
-## 🚀 Quick Start
+## 📖 What's Included
 
-### Prerequisites
+### Volume 1: Foundations (Beginner)
+Learn the basics of AI for networking:
+- **Chapter 4**: API Basics - Call Claude API with LangChain
+- **Chapter 5**: Prompt Engineering - Write better prompts
+- **Chapter 6**: Structured Outputs - Get JSON with Pydantic
+- **Chapter 7**: Context Management - Handle large configs
+- **Chapter 8**: Cost Optimization - Save 50-70% on costs
+- **Chapter 9**: Network Data - Process configs and logs
+- **Chapter 10**: API Integration - Combine with Netmiko
+- **Chapter 11**: Testing - Validate AI outputs
+- **Chapter 12**: Ethics - Safe production use
 
-- **Python 3.10+** (Tested on 3.10, 3.11, 3.12)
-- **API Keys**: At least one of:
-  - Anthropic (Claude): Recommended for networking tasks
-  - OpenAI (GPT-4): Alternative option
-  - Google (Gemini): Free tier available
-- **Optional**: Network devices or simulators (GNS3, EVE-NG) for integration examples
+**Total**: 9 Python files, ~1,800 lines of code
 
-### Installation
+### Volume 2: Advanced Applications (Intermediate/Advanced)
+Build production RAG systems and agents:
+- **Chapter 14**: RAG Fundamentals - Knowledge bases
+- **Chapter 15**: LangChain Integration - Framework patterns
+- **Chapter 16**: Document Retrieval - Advanced techniques
+- **Chapter 17**: Semantic Search - Intent-based search
+- **Chapter 19**: Agent Architecture - LangGraph agents
+- **Chapter 20**: Troubleshooting Agent - Autonomous diagnostics
+- **Chapter 21**: Config Generation - Generate configs from requirements
+- **Chapter 24**: Log Analysis - AI-powered log analysis
 
-```bash
-# Clone repository
-git clone https://github.com/eduardd76/AI_for_networking_and_security_engineers.git
-cd AI_for_networking_and_security_engineers
+**Total**: 13 Python files, ~3,500 lines of code
 
-# Navigate to Volume 1
-cd CODE/Volume-1-Foundations
+## 🚀 Getting Started
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+### For Colab Users (No Setup)
+1. Go to [Colab Notebooks](./Colab-Notebooks/)
+2. Click any "Open in Colab" badge
+3. Enter your API key when prompted
+4. Run the cells!
 
-# Install dependencies
-pip install -r requirements.txt
+### For Local Users
+1. Choose your volume (1 or 2)
+2. Follow the README in that directory
+3. Install dependencies: `pip install -r requirements.txt`
+4. Set up `.env` file with API keys
+5. Run examples: `python chapter_file.py`
 
-# Configure API keys
-cp .env.example .env
-# Edit .env with your API keys
-```
+## 🔑 API Keys Needed
 
-### First Example
+**Anthropic API Key** (Required for most examples):
+- Get it free at https://console.anthropic.com/
+- Free tier: 5 requests/minute
+- Paid tier: $0.80-$15 per million tokens
 
-```bash
-# Test your API connection
-python Chapter-04-API-Basics-Authentication/resilient_api_client.py
+**OpenAI API Key** (Required for RAG examples in Volume 2):
+- Get it at https://platform.openai.com/
+- Needed for embeddings (text-embedding-3-small)
+- ~$0.02 per 1000 pages of text
 
-# Try network config analysis
-python Chapter-09-Working-With-Network-Data/config_analyzer.py
-```
+## 💰 Cost Estimates
 
-## 🎯 Who Is This For?
+**Volume 1** (complete run): $0.30-0.50
+**Volume 2** (complete run): $0.50-1.00
 
-**Network Engineers** who want to:
-- Automate repetitive tasks with AI
-- Build intelligent troubleshooting tools
-- Analyze configs and logs at scale
-- Generate documentation automatically
-- Stay ahead of industry trends
+**Tips to save money:**
+- Use Haiku model instead of Sonnet (10x cheaper)
+- Cache repeated queries
+- Batch process multiple items
+- Use Colab for learning (free compute)
 
-**Requirements**:
-- Basic Python knowledge (variables, functions, loops)
-- Network fundamentals (CCNA level or equivalent)
-- Curiosity and willingness to experiment
+## 🎓 Learning Paths
 
-**NOT required**:
-- Machine learning expertise
-- Deep math/statistics background
-- PhD in computer science
+### Path 1: Complete Beginner
+1. Start with Colab (no setup)
+2. Volume 1, Chapter 4 (API Basics)
+3. Volume 1, Chapter 5 (Prompt Engineering)
+4. Volume 1, Chapter 6 (Structured Outputs)
 
-## 📖 Learning Path
+### Path 2: Know Python, New to AI
+1. Volume 1, Chapter 4-6 (quick review)
+2. Volume 1, Chapter 8 (Cost Optimization)
+3. Volume 1, Chapter 9 (Network Data)
+4. Volume 2, Chapter 14 (RAG Basics)
 
-### Beginner Track (Start Here)
-1. **Chapter 4**: API Basics - Learn to call AI models
-2. **Chapter 5**: Prompt Engineering - Write effective prompts
-3. **Chapter 9**: Network Data - Parse configs and logs
-4. **Chapter 11**: Testing - Validate AI outputs
+### Path 3: Know AI, New to Networking
+1. Volume 1, Chapter 9 (Network Data)
+2. Volume 1, Chapter 10 (API Integration)
+3. Volume 2 - all chapters
 
-**Time**: 4-6 hours | **Cost**: ~$5 in API calls
+### Path 4: Ready for Production
+1. Volume 2, Chapter 14-17 (RAG systems)
+2. Volume 2, Chapter 19-21 (Agents)
+3. Volume 1, Chapter 11-12 (Testing & Ethics)
 
-### Intermediate Track
-1. **Chapter 6**: Structured Outputs - Type-safe data extraction
-2. **Chapter 7**: Context Management - Handle large files
-3. **Chapter 8**: Cost Optimization - Reduce API costs 50-70%
-4. **Chapter 10**: Integrations - Connect to Netmiko, NAPALM, Ansible
-
-**Time**: 8-12 hours | **Cost**: ~$10 in API calls
-
-### Advanced Track
-1. **Chapter 12**: Ethics & Guardrails - Production safety
-2. **Chapter 11**: Regression Testing - Quality assurance
-3. Build your own AI-powered tools
-4. Deploy to production
-
-**Time**: 12-20 hours | **Cost**: ~$15 in API calls
-
-## 💡 Real-World Use Cases
-
-### Configuration Management
-```python
-from Chapter_09_Working_With_Network_Data.config_analyzer import ConfigAnalyzer
-
-analyzer = ConfigAnalyzer()
-findings = analyzer.analyze_config(router_config, device_type="cisco_ios")
-
-for finding in findings['findings']:
-    if finding['severity'] == 'critical':
-        print(f"⚠️ {finding['title']}: {finding['recommendation']}")
-```
-
-### Log Analysis
-```python
-from Chapter_09_Working_With_Network_Data.log_processor import LogProcessor
-
-processor = LogProcessor()
-processor.parse_log_file("syslog.txt")
-analysis = processor.analyze_logs()
-
-print(f"Critical events: {analysis['summary']['critical_count']}")
-print(f"Interface issues: {len(analysis['interface_issues'])}")
-```
-
-### Cost Optimization
-```python
-from Chapter_08_Cost_Optimization.caching_layer import CachedAPIClient
-
-# Enable caching for 50-70% cost reduction
-client = CachedAPIClient(ttl_seconds=3600)
-
-# Repeated calls use cache
-result1 = client.call("Analyze this config...")  # API call
-result2 = client.call("Analyze this config...")  # Cached (free!)
-```
-
-### Safety Guardrails
-```python
-from Chapter_12_Ethics_Responsible_AI.guardrails import SafetyGuardrails
-
-guardrails = SafetyGuardrails()
-result = guardrails.validate_change(
-    proposed_config=ai_generated_config,
-    device_info={"hostname": "core-rtr-01", "role": "core_router"}
-)
-
-if result.safe:
-    apply_config(ai_generated_config)
-else:
-    print(f"🔴 Blocked: {result.violations[0].message}")
-```
-
-## 🏗️ Repository Structure
+## 📂 Repository Structure
 
 ```
 CODE/
-├── Volume-1-Foundations/          # Chapters 1-12 ✅
-│   ├── Chapter-04-API-Basics-Authentication/
-│   ├── Chapter-05-Prompt-Engineering/
-│   ├── Chapter-06-Structured-Outputs/
-│   ├── Chapter-07-Context-Management/
-│   ├── Chapter-08-Cost-Optimization/
-│   ├── Chapter-09-Working-With-Network-Data/
-│   ├── Chapter-10-API-Integration-Patterns/
-│   ├── Chapter-11-Testing-And-Validation/
-│   ├── Chapter-12-Ethics-Responsible-AI/
-│   ├── sample-data/
-│   ├── tests/
+├── Colab-Notebooks/          # Google Colab notebooks (run in browser)
+│   ├── Vol1_Ch4_API_Basics.ipynb
+│   ├── Vol2_Ch14_RAG_Basics.ipynb
 │   └── README.md
 │
-├── Volume-2-Advanced-Applications/ # Coming soon
-├── Volume-3-Production-Deployment/ # Coming soon
-├── Volume-4-Security-Focus/        # Coming soon
-└── README.md                       # This file
+├── Volume-1-Foundations/     # Local Python files (Ch 4-12)
+│   ├── Chapter-04-API-Basics-Authentication/
+│   ├── Chapter-05-Prompt-Engineering/
+│   ├── ...
+│   └── README.md
+│
+└── Volume-2-Advanced-Applications/  # Local Python files (Ch 14-24)
+    ├── Chapter-14-RAG-Fundamentals/
+    ├── Chapter-15-LangChain-Integration/
+    ├── ...
+    └── README.md
 ```
 
-## 💰 Cost Management
+## 🔧 Troubleshooting
 
-### Expected Costs
+### Common Issues
 
-| Activity | API Calls | Tokens | Cost (USD) |
-|----------|-----------|--------|------------|
-| Run all Volume 1 examples | ~500 | ~1.5M | $8-12 |
-| Chapter exercises | ~50 | ~150K | $0.80-1.20 |
-| Build 1 production tool | ~200 | ~600K | $3-5 |
-
-### Cost Reduction Tips
-
-1. **Use Haiku for development** (10x cheaper than Sonnet)
-   ```python
-   client.call(prompt, model="claude-3-5-haiku-20241022")
-   ```
-
-2. **Enable caching** (Chapter 8)
-   ```python
-   from Chapter_08_Cost_Optimization.caching_layer import CachedAPIClient
-   client = CachedAPIClient(ttl_seconds=3600)
-   ```
-
-3. **Batch processing** (Chapter 8)
-   ```python
-   from Chapter_08_Cost_Optimization.batch_processor import BatchProcessor
-   processor = BatchProcessor(max_workers=5)
-   results = processor.process_batch(configs, analyze_func)
-   ```
-
-4. **Set daily budgets** (Chapter 4)
-   ```python
-   from Chapter_04_API_Basics_Authentication.usage_tracker import UsageTracker
-   tracker = UsageTracker(daily_limit=5.0)  # $5/day limit
-   ```
-
-## 🧪 Testing
-
-All code is tested and includes working examples:
-
+**"Module not found"**
 ```bash
-# Run specific example
-cd Volume-1-Foundations
-python Chapter-05-Prompt-Engineering/networking_prompts.py
-
-# Run tests
-pytest tests/ -v
-
-# Check test coverage
-pytest --cov=. tests/
-```
-
-## 🔧 Dependencies
-
-### Core AI APIs
-- `anthropic>=0.18.0` - Claude (Recommended)
-- `openai>=1.12.0` - GPT-4
-- `google-generativeai>=0.3.0` - Gemini
-
-### Network Automation
-- `netmiko>=4.3.0` - Multi-vendor SSH
-- `napalm>=4.1.0` - Multi-vendor config management
-- `textfsm>=1.1.3` - Structured text parsing
-
-### Data Processing
-- `pydantic>=2.5.0` - Data validation
-- `python-dotenv>=1.0.0` - Environment variables
-
-See `requirements.txt` in each volume for complete list.
-
-## 🐛 Common Issues
-
-### "Invalid API Key"
-**Solution**: Check `.env` file contains valid key
-```bash
-# Anthropic key format
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-
-# Test with
-python -c "import os; from dotenv import load_dotenv; load_dotenv(); print(os.getenv('ANTHROPIC_API_KEY')[:20])"
-```
-
-### "Rate Limit Exceeded"
-**Solution**: Use built-in rate limiting
-```python
-from Chapter_04_API_Basics_Authentication.rate_limiter import RateLimiter
-limiter = RateLimiter(max_requests=5, time_window=60)
-```
-
-### "Context Length Exceeded"
-**Solution**: Use context chunking
-```python
-from Chapter_07_Context_Management.context_chunker import ContextChunker
-chunker = ContextChunker(max_tokens=4000)
-chunks = chunker.chunk_by_size(large_config)
-```
-
-### "Import Error"
-**Solution**: Activate virtual environment
-```bash
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-## 📚 Additional Resources
+**"Invalid API key"**
+- Check your `.env` file (local) or Colab secrets
+- Verify key starts with `sk-ant-api03-` (Anthropic) or `sk-proj-` (OpenAI)
 
-- **Book**: Purchase at [vexpertai.com](https://vexpertai.com)
-- **Author**: Eduard Dulharu
-  - LinkedIn: [Eduard Dulharu](https://www.linkedin.com/in/eduarddulharu/)
-  - Email: ed@vexpertai.com
-- **Company**: vExpertAI GmbH (Munich, Germany)
-- **Discord**: Join the community (link in book)
+**"Rate limit exceeded"**
+- Free tier: 5 requests/minute
+- Wait 60 seconds or upgrade to paid
+
+**Colab disconnected**
+- Free tier: 12 hours max runtime
+- Just reconnect and resume
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-### Bug Reports
-
-Open an issue with:
-- Python version
-- OS (Windows/Linux/Mac)
-- Error message
-- Steps to reproduce
-
-## 📄 License
-
-MIT License - See LICENSE file
-
-**TL;DR**: Free to use in your projects. Attribution appreciated but not required.
-
-## ⚠️ Disclaimer
-
-**Educational Use**: Code examples are for learning and development. Test thoroughly before production deployment.
-
-**No Warranty**: Author not responsible for network outages, security incidents, or API costs from using this code.
-
-**API Costs**: You are responsible for API usage charges from Anthropic, OpenAI, or Google.
-
-**Network Changes**: Always have a rollback plan when applying AI-generated configurations.
-
-## 🎓 About the Author
-
-**Eduard Dulharu**
-- 20+ years in network infrastructure (AT&T, Infosys, Kyndryl)
-- CTO & Founder, vExpertAI GmbH
-- CCNA to CCIE level experience
-- Bridging AI and networking for enterprise operations
-
-## 📊 Project Stats
-
-- **Total Lines of Code**: ~15,000+
-- **Python Files**: 40+
-- **Chapters Covered**: 12 (Volume 1)
-- **Test Coverage**: 85%+
-- **Production Ready**: Yes
-
-## 🔜 Coming Soon
-
-- **Volume 2**: Advanced Applications (Q2 2026)
-- **Volume 3**: Production Deployment (Q3 2026)
-- **Volume 4**: Security Focus (Q4 2026)
-- **Video Course**: Hands-on tutorials
-- **Certification Program**: AI for Network Engineers
+Found issues? Have improvements?
+1. Open an issue on GitHub
+2. Submit a pull request
+3. Share your use case!
 
 ## 📞 Support
 
-- **Technical Issues**: [GitHub Issues](https://github.com/eduardd76/AI_for_networking_and_security_engineers/issues)
-- **Community**: Discord (link in book)
-- **Consulting**: ed@vexpertai.com
+- **GitHub Issues**: Report bugs or request features
+- **Email**: ed@vexpertai.com
+- **Company**: vExpertAI GmbH (Munich, Germany)
+
+## 📄 License
+
+Code is provided for educational purposes from the book:
+**"AI for Networking Engineers"** by Eduard Dulharu
 
 ---
 
-**Version**: 1.0.0
+**Author**: Eduard Dulharu
+**Company**: vExpertAI GmbH (Munich, Germany)
 **Last Updated**: January 2026
-**Python**: 3.10+
-**Status**: Volume 1 Complete ✅
+**Version**: 2.0
 
-**Ready to start?** → [Begin with Volume 1](./Volume-1-Foundations/)
+**Ready to start?**
+- 🚀 [Try in Colab (no setup)](./Colab-Notebooks/)
+- 💻 [Volume 1: Foundations](./Volume-1-Foundations/)
+- 🔥 [Volume 2: Advanced](./Volume-2-Advanced-Applications/)
