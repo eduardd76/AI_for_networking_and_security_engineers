@@ -1,0 +1,21 @@
+# Chapter 34: Multi-Agent Orchestration - Requirements
+# AI for Networking Engineers - Volume 3
+
+# Core LLM API
+anthropic>=0.18.0
+
+# LangChain Ecosystem
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-community>=0.0.20
+langgraph>=0.0.20
+
+# Data Validation
+pydantic>=2.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Optional: Network automation (for production use)
+netmiko>=4.3.0
+napalm>=4.1.0

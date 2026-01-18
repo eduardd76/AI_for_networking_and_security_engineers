@@ -75,6 +75,17 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 | Chapter 32 | Agentic RAG | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch32_Agentic_RAG.ipynb) | Advanced |
 | Chapter 35 | Vector Log Analysis | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch35_Vector_Log_Analysis.ipynb) | Advanced |
 
+### Volume 3: Production Systems (NEW! 🔥)
+
+| Chapter | Topic | Notebook | Difficulty |
+|---------|-------|----------|------------|
+| Chapter 32 | Fine-Tuning Models (Training Data & ROI) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch32_Fine_Tuning.ipynb) | Advanced |
+| Chapter 34 | Multi-Agent Orchestration | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch34_Multi_Agent.ipynb) | Advanced |
+| Chapter 37 | Graph RAG for Network Topology | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch37_Graph_RAG_Topology.ipynb) | Advanced |
+| Chapter 48 | Production Monitoring & Observability | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch48_Production_Monitoring.ipynb) | Advanced |
+| Chapter 51 | Scaling AI Systems | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch51_Scaling_Systems.ipynb) | Advanced |
+| Chapter 61 | NetOps AI Case Study (Complete Deployment) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol3_Ch61_NetOps_AI_Case_Study.ipynb) | Advanced |
+
 ### Bonus Chapters (Production-Ready!)
 
 | Chapter | Topic | Notebook | Difficulty |
