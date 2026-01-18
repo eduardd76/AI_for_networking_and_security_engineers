@@ -46,6 +46,16 @@ Google Colab is a free cloud-based Jupyter notebook environment. Perfect for:
 | Chapter 23 | Network Fine-Tuning | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch23_Network_Fine_Tuning.ipynb) | Advanced |
 | Chapter 24 | Log Analysis | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch24_Logs.ipynb) | Advanced |
 
+### Production Operations (NEW! 🔥)
+
+| Chapter | Topic | Notebook | Difficulty |
+|---------|-------|----------|------------|
+| Chapter 26 | Evaluation & Testing Harness | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch26_Evaluation_Testing_Harness.ipynb) | Advanced |
+| Chapter 27 | Log Triage & Classification | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch27_Log_Triage_Classification.ipynb) | Advanced |
+| Chapter 43 | LLMOps Pipeline & CI/CD | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch43_LLMOps_Pipeline.ipynb) | Advanced |
+| Chapter 44 | Observability & Tracing | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch44_Observability_Tracing.ipynb) | Advanced |
+| Chapter 46 | Integration Hub (Ansible/NetBox) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/CODE/Colab-Notebooks/Vol2_Ch46_Integration_Hub.ipynb) | Advanced |
+
 ### Bonus Chapters (Production-Ready!)
 
 | Chapter | Topic | Notebook | Difficulty |

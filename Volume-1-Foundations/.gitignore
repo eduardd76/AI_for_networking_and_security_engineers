@@ -1,0 +1,98 @@
+# AI for Networking Engineers - Volume 1
+# Git ignore file
+
+# Environment variables (CRITICAL - contains API keys)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Logs and metrics
+logs/
+*.log
+metrics/
+*.jsonl
+api_usage.jsonl
+
+# API call recordings (may contain sensitive data)
+api-calls/
+
+# Sample data outputs
+sample-data/outputs/*.txt
+sample-data/outputs/*.json
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Documentation builds
+docs/_build/
+site/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.temp/
+temp/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Security (don't commit secrets)
+secrets.yaml
+credentials.json
+*.pem
+*.key
+*.p12
