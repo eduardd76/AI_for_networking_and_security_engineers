@@ -41,7 +41,7 @@ Run these notebooks directly in your browser:
 ## 📄 Chapter Content
 
 Full chapter markdown files:
-- [Chapters/](Chapters/) - All 6 chapters in markdown format (plus advanced content)
+- [Chapters/](Chapters/) - All 6 chapters in markdown format
 
 ## 🚀 Getting Started
 
@@ -77,7 +77,7 @@ Production-ready systems:
 
 ```
 Volume-3-Advanced-Techniques-Production/
-├── Chapters/                  # Full chapter content (7 chapters)
+├── Chapters/                  # Full chapter content (6 chapters)
 │   ├── Chapter-32-Fine-Tuning-Models.md
 │   ├── Chapter-34-Multi-Agent-Orchestration.md
 │   ├── Chapter-37-Graph-RAG.md

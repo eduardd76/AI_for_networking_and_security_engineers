@@ -177,7 +177,7 @@ AI_for_networking_and_security_engineers/
 │   └── README.md
 │
 ├── Volume-3-Advanced-Techniques-Production/
-│   ├── Chapters/                     # 7 chapter markdown files
+│   ├── Chapters/                     # 6 chapter markdown files
 │   ├── Colab-Notebooks/              # 6 interactive notebooks
 │   └── README.md
 │
