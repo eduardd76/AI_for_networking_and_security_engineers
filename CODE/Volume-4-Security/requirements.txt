@@ -1,0 +1,40 @@
+# Volume 4: Security Operations - Python Dependencies
+
+# Core AI APIs
+anthropic>=0.18.0
+openai>=1.12.0
+
+# LangChain for orchestration
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-openai>=0.0.5
+
+# Data processing
+python-dateutil>=2.8.2
+
+# Optional dependencies for production use
+# Uncomment if needed:
+
+# For geolocation in credential compromise detection
+# geopy>=2.4.1
+
+# For SIEM integration
+# requests>=2.31.0
+# elasticsearch>=8.12.0
+# splunk-sdk>=1.7.3
+
+# For data analysis and visualization
+# pandas>=2.2.0
+# numpy>=1.26.0
+# matplotlib>=3.8.0
+
+# For async operations in production
+# aiohttp>=3.9.0
+# asyncio
+
+# For testing
+# pytest>=8.0.0
+# pytest-asyncio>=0.23.0
+
+# For logging and monitoring
+# structlog>=24.1.0
