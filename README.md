@@ -26,17 +26,20 @@ This repository contains the complete 4-volume series "AI for Networking Enginee
 ### [Volume 2: Practical Applications](./Volume-2-Practical-Applications/) ✅
 **Build RAG systems, agents, and automation**
 
-12 chapters covering:
+14 chapters covering:
 - RAG (Retrieval Augmented Generation)
 - Vector databases and semantic search
 - LangChain for network automation
 - Building intelligent agents
 - Automated troubleshooting
 - Configuration generation
-- Log collection and processing
-- AI-powered log analysis at scale
+- Log collection, processing, and AI-powered analysis
+- Anomaly detection with ML
+- Security analysis and threat detection
 
-📓 **27 Colab Notebooks** | 📄 **12 Chapters**
+📓 **30 Colab Notebooks** | 📄 **14 Chapters**
+
+*Note: Chapters 26, 28-31 are detailed in the repository's comprehensive outlines for future expansion.*
 
 ### [Volume 3: Advanced Techniques & Production](./Volume-3-Advanced-Techniques-Production/) ✅
 **Deploy AI at enterprise scale**
@@ -174,8 +177,8 @@ AI_for_networking_and_security_engineers/
 │   └── README.md
 │
 ├── Volume-2-Practical-Applications/
-│   ├── Chapters/                     # 12 chapter markdown files
-│   ├── Colab-Notebooks/              # 27 interactive notebooks
+│   ├── Chapters/                     # 14 chapter markdown files
+│   ├── Colab-Notebooks/              # 30 interactive notebooks
 │   └── README.md
 │
 ├── Volume-3-Advanced-Techniques-Production/
@@ -232,9 +235,9 @@ AI_for_networking_and_security_engineers/
 | Metric | Count |
 |--------|-------|
 | **Total Volumes** | 4 |
-| **Total Chapters** | 43 |
-| **Colab Notebooks** | 58 |
-| **Chapter Files** | 43 markdown files |
+| **Total Chapters** | 45 |
+| **Colab Notebooks** | 61 |
+| **Chapter Files** | 45 markdown files |
 | **Production Code** | 15,000+ lines |
 | **Test Coverage** | 85%+ |
 
@@ -306,8 +309,10 @@ MIT License - Free to use in your projects. Attribution appreciated but not requ
 
 ---
 
-**Version**: 2.2.0 (Complete Series - All Volume 3 Notebooks Added)
+**Version**: 2.3.0 (Gap Resolved - Chapters 25 & 27 Added)
 **Last Updated**: January 20, 2026
-**Status**: All 4 Volumes Complete ✅ (43 chapters, 58 notebooks)
+**Status**: All 4 Volumes Complete ✅ (45 chapters, 61 notebooks)
+
+*Chapters 26, 28-31 are outlined in REMAINING-CHAPTERS-COMPREHENSIVE-OUTLINES.md for future expansion*
 
 **Ready to start?** → [Begin with Volume 1](./Volume-1-Foundations/)
