@@ -26,21 +26,22 @@ This repository contains the complete 4-volume series "AI for Networking Enginee
 ### [Volume 2: Practical Applications](./Volume-2-Practical-Applications/) ✅
 **Build RAG systems, agents, and automation**
 
-11 chapters covering:
+12 chapters covering:
 - RAG (Retrieval Augmented Generation)
 - Vector databases and semantic search
 - LangChain for network automation
 - Building intelligent agents
 - Automated troubleshooting
 - Configuration generation
-- Log analysis at scale
+- Log collection and processing
+- AI-powered log analysis at scale
 
-📓 **21 Colab Notebooks** | 📄 **11 Chapters**
+📓 **27 Colab Notebooks** | 📄 **12 Chapters**
 
 ### [Volume 3: Advanced Techniques & Production](./Volume-3-Advanced-Techniques-Production/) ✅
 **Deploy AI at enterprise scale**
 
-6 chapters covering:
+13 chapters covering:
 - Fine-tuning models for network data
 - Multi-agent orchestration
 - Graph RAG for network topology
@@ -172,12 +173,12 @@ AI_for_networking_and_security_engineers/
 │   └── README.md
 │
 ├── Volume-2-Practical-Applications/
-│   ├── Chapters/                     # 11 chapter markdown files
-│   ├── Colab-Notebooks/              # 21 interactive notebooks
+│   ├── Chapters/                     # 12 chapter markdown files
+│   ├── Colab-Notebooks/              # 27 interactive notebooks
 │   └── README.md
 │
 ├── Volume-3-Advanced-Techniques-Production/
-│   ├── Chapters/                     # 6 chapter markdown files
+│   ├── Chapters/                     # 13 chapter markdown files
 │   ├── Colab-Notebooks/              # 6 interactive notebooks
 │   └── README.md
 │
@@ -230,9 +231,9 @@ AI_for_networking_and_security_engineers/
 | Metric | Count |
 |--------|-------|
 | **Total Volumes** | 4 |
-| **Total Chapters** | 36 |
-| **Colab Notebooks** | 45 |
-| **Chapter Files** | 36 markdown files |
+| **Total Chapters** | 43 |
+| **Colab Notebooks** | 51 |
+| **Chapter Files** | 43 markdown files |
 | **Production Code** | 15,000+ lines |
 | **Test Coverage** | 85%+ |
 
@@ -304,8 +305,8 @@ MIT License - Free to use in your projects. Attribution appreciated but not requ
 
 ---
 
-**Version**: 2.0.0 (Complete Series)
-**Last Updated**: January 2026
-**Status**: All 4 Volumes Complete ✅
+**Version**: 2.1.0 (Complete Series - Chapter 23 Added)
+**Last Updated**: January 20, 2026
+**Status**: All 4 Volumes Complete ✅ (43 chapters, 51 notebooks)
 
 **Ready to start?** → [Begin with Volume 1](./Volume-1-Foundations/)
