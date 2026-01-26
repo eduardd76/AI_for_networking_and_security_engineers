@@ -15,6 +15,68 @@ By the end of this chapter, you will:
 
 ---
 
+## The Production Incident That Taught Me to Test
+
+It was a Wednesday when things got interesting.
+
+Our AI config auditor had been running in production for two weeks—flagging security issues, generating remediation tickets, looking smart. Then our security team asked: "Why didn't the auditor catch this?" pointing to a router with telnet enabled.
+
+I pulled the logs. The auditor had analyzed that config. It had returned... nothing. No findings. The config clearly had `transport input telnet` on the VTY lines.
+
+I ran the exact same config through my local test script. **It worked fine.** Telnet detected, flagged as high severity.
+
+Three hours of debugging later, I found it:
+
+```python
+# Production code (deployed 2 weeks ago)
+prompt = "Analyze for security issues: {config}"
+
+# Test code (my local copy, modified yesterday)
+prompt = "Analyze this Cisco IOS config for security issues: {config}"
+```
+
+Someone had pushed a "minor" prompt tweak to production. The vague prompt worked 90% of the time, but edge cases slipped through. My local tests passed because I'd already updated the prompt.
+
+**We had no automated tests that would have caught this.**
+
+That incident cost us a week of re-auditing 400 routers. It also taught me that AI systems need tests just as much as traditional software—maybe more.
+
+---
+
+## The Testing Pyramid for AI Systems
+
+Traditional testing pyramid:
+
+```
+        ▲
+       /E2E\      (Few, slow, expensive)
+      /─────\
+     / Integ \    (Some, moderate)
+    /─────────\
+   /   Unit    \  (Many, fast, cheap)
+  ─────────────
+```
+
+AI testing pyramid (adapted):
+
+```
+        ▲
+     /Prod Mon\   (Continuous, real data)
+    /───────────\
+   / Regression  \  (Catch model/prompt drift)
+  /───────────────\
+ /  Prompt Tests   \  (Test inputs → expected outputs)
+────────────────────
+```
+
+| Level | What It Tests | When It Runs |
+|-------|---------------|--------------|
+| Prompt Tests | Does this prompt produce expected outputs? | Every commit |
+| Regression Tests | Did quality change vs baseline? | Daily, on model updates |
+| Production Monitoring | Is the system working with real data? | Continuous |
+
+---
+
 ## The Problem: "It Works on My Machine"
 
 You built a config analyzer. It works perfectly in testing:
@@ -812,4 +874,9 @@ You now have a complete testing framework for AI networking systems. You can det
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~5,000 | Code: Production-Ready
+**Chapter Status**: Complete (Enhanced) | Word Count: ~6,000 | Code: Production-Ready
+
+**What's New in This Version**:
+- Real-world opening story (the production incident that taught testing)
+- AI testing pyramid diagram and comparison table
+- Practical framing around prompt drift and regression detection
