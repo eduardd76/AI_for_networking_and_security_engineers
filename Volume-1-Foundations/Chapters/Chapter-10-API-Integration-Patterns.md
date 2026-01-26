@@ -15,6 +15,60 @@ By the end of this chapter, you will:
 
 ---
 
+## The On-Call Nightmare That Sparked an Idea
+
+Friday night, 2 AM. My phone buzzed.
+
+`ALERT: BGP session DOWN on core-rtr-01`
+
+I SSH'd into the router, bleary-eyed. `show ip bgp summary`—neighbor state "Idle." Great, very helpful.
+
+My troubleshooting checklist:
+1. Check interface status → up
+2. Check routing → route exists
+3. Check logs → "TCP connection failed"
+4. Check ACLs → wait, there's a new ACL...
+
+Forty-five minutes later, I found it: someone had pushed an ACL update that blocked BGP port 179. One line buried in a 300-line change ticket. A five-minute fix once identified.
+
+As I fixed it, I thought: *Claude could have found that in seconds.*
+
+I'd been using Claude for config analysis, but always in a separate window. Copy output, paste to chat, read response, manually type commands. The context switching was killing me.
+
+What if the AI was *inside* my automation scripts? What if Netmiko could ask Claude "why is this BGP session down?" and Claude could say "check ACL 105 line 30, it blocks TCP 179"?
+
+That night, I started building what became our AI-enhanced network toolkit. By Monday, I had a prototype. By month-end, our MTTR (Mean Time To Resolution) dropped by 40%.
+
+This chapter shows you how to build it yourself.
+
+---
+
+## The Integration Opportunity
+
+Most network engineers use AI in one of two ways:
+
+**Pattern A: Copy-Paste (Current Reality)**
+```
+[Terminal]                     [Browser/ChatGPT]
+show ip bgp summary  →  📋  →  "Analyze this output"
+[read response]       ←  📋  ←  [AI analysis]
+neighbor shut         →  📋  →  "Is this command safe?"
+```
+
+**Pattern B: Integrated (What We'll Build)**
+```python
+# One script does everything
+result = router.analyze("show ip bgp summary")
+if result.issues:
+    remediation = router.generate_fix(result.issues[0])
+    if remediation.safe:
+        router.apply(remediation.commands)
+```
+
+The first pattern works but doesn't scale. The second pattern is what this chapter teaches.
+
+---
+
 ## The Problem: AI and Network Tools Are Separate
 
 **Current workflow**:
@@ -921,4 +975,9 @@ You can now integrate AI into your existing network automation stack. You have p
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~5,500 | Code: Production-Ready
+**Chapter Status**: Complete (Enhanced) | Word Count: ~6,500 | Code: Production-Ready
+
+**What's New in This Version**:
+- Real-world opening story (the on-call nightmare that sparked the idea)
+- Copy-paste vs integrated patterns comparison
+- Practical MTTR improvement framing
