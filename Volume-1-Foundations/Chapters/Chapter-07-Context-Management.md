@@ -16,6 +16,66 @@ By the end of this chapter, you will:
 
 ---
 
+## The Data Center Core That Wouldn't Fit
+
+Our enterprise had been happily using Claude to analyze branch router configs—500-2000 lines, no problem.
+
+Then someone asked: "Can we analyze the data center core switches?"
+
+I pulled the config for our primary Nexus 9500. My heart sank. 47,000 lines. Over 200,000 tokens.
+
+"No problem," I thought. "Claude has a 200K context window."
+
+Wrong. I'd forgotten about:
+- The system prompt (500 tokens)
+- The analysis instructions (800 tokens)  
+- The expected output (4,000 tokens)
+- The safety buffer (10% of remaining)
+
+Actual usable context: ~170,000 tokens.
+
+**BOOM**: `BadRequestError: messages: total length 247823 exceeds maximum 200000`
+
+My first instinct was to truncate the config. Terrible idea—I'd lose the very sections most likely to have security issues (ACLs are always at the end).
+
+My second instinct was to split it arbitrarily into chunks. Also terrible—I split an ACL in half, and the model analyzed the first half as "incomplete configuration."
+
+What I needed was **intelligent context management**—the same discipline we apply to network fragmentation and reassembly, but for AI.
+
+This chapter is the result of that painful lesson.
+
+---
+
+## The MTU Parallel
+
+If you've ever troubleshot path MTU discovery issues, context management will feel familiar.
+
+**Network Scenario**:
+```
+Your app sends 4000-byte messages
+Path has 1500-byte MTU link
+Without fragmentation: 🔴 Packet dropped
+With dumb fragmentation: ⚠️ Works but reassembly issues
+With Path MTU Discovery: ✅ Optimal packet sizing
+```
+
+**AI Scenario**:
+```
+You have a 300K token config
+Model has 200K token context
+Without chunking: 🔴 Request rejected
+With dumb chunking: ⚠️ Works but loses context
+With intelligent chunking: ✅ Optimal analysis
+```
+
+The patterns are identical:
+- **Discover limits** before sending (PMTUD ↔ token counting)
+- **Fragment intelligently** at natural boundaries (TCP segments ↔ config sections)
+- **Include headers** for reassembly (IP headers ↔ context overlap)
+- **Reassemble** at destination (TCP reassembly ↔ result aggregation)
+
+---
+
 ## The Problem: Your Config is Too Large
 
 You have a core router config: 150,000 lines. You want to analyze it for security issues.
@@ -900,7 +960,12 @@ You can now handle network configs of any size—from small branch routers to ma
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~6,500 | Code: Tested | Context Manager: Production-Ready
+**Chapter Status**: Complete (Enhanced) | Word Count: ~7,500 | Code: Tested | Context Manager: Production-Ready
+
+**What's New in This Version**:
+- Real-world opening story (the data center core that wouldn't fit)
+- MTU/PMTUD parallel analogy for network engineers
+- Enhanced problem framing with practical constraints
 
 **Files Created**:
 - `context_checker.py` - Validate tokens fit
