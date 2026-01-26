@@ -69,7 +69,7 @@ In LLMs:
 ### Why This Matters
 
 **Cost**:
-- Claude 3.5 Sonnet: $3/million input tokens, $15/million output tokens
+- Claude Sonnet 4: $3/million input tokens, $15/million output tokens
 - 10,000-line config = ~50,000 tokens (avg)
 - Input cost: 50k × $3/1M = $0.15
 - Output cost (2k token response): 2k × $15/1M = $0.03
@@ -79,7 +79,7 @@ Multiply by 1,000 configs/month = $180/month.
 
 **Context Limits**:
 - Models have max token limits (context windows)
-- Claude 3.5 Sonnet: 200,000 tokens
+- Claude Sonnet 4: 200,000 tokens
 - If your config + prompt + response > 200k tokens, it fails
 - Large configs must be chunked
 
@@ -107,8 +107,8 @@ If you send 10,000 bytes:
 | Model | Context Window | Analogy |
 |-------|----------------|----------|
 | GPT-4o-mini | 128,000 tokens | Standard MTU |
-| Claude 3.5 Sonnet | 200,000 tokens | Jumbo frames |
-| Claude 3.5 Opus | 200,000 tokens | Jumbo frames |
+| Claude Sonnet 4 | 200,000 tokens | Jumbo frames |
+| Claude Opus 4 | 200,000 tokens | Jumbo frames |
 | Gemini 1.5 Pro | 2,000,000 tokens | Superjumbo (rare) |
 
 **Why it matters**:
@@ -125,7 +125,7 @@ total = 150,000 + 500 + 5,000 = 155,500 tokens
 # Using GPT-4o-mini (128k context):
 # ❌ FAILS - exceeds context window
 
-# Using Claude 3.5 Sonnet (200k context):
+# Using Claude Sonnet 4 (200k context):
 # ✅ SUCCESS - fits in context
 ```
 
@@ -154,9 +154,9 @@ Think of it like router hardware:
 | LLM | Parameters | Capability | Use Case |
 |-----|------------|------------|----------|
 | GPT-4o-mini | ~8B | Fast, cheap, good | Simple tasks, high volume |
-| Claude 3.5 Haiku | ~20B | Fast, accurate | Production workloads |
-| Claude 3.5 Sonnet | ~200B | Balanced | Complex reasoning |
-| Claude 3.5 Opus | ~500B | Best quality | Critical tasks |
+| Claude Haiku 4 | ~20B | Fast, accurate | Production workloads |
+| Claude Sonnet 4 | ~200B | Balanced | Complex reasoning |
+| Claude Opus 4 | ~500B | Best quality | Critical tasks |
 | Llama 3.1 405B | 405B | Open source, self-host | Data privacy needs |
 
 **Rule of thumb**:
@@ -195,7 +195,7 @@ Think of it like router hardware:
 **Scenario 1: Config Analysis** (Chapter 1)
 - Input: 10,000-line config = 50,000 tokens
 - Output: Findings report = 2,000 tokens
-- Model: Claude 3.5 Sonnet
+- Model: Claude Sonnet 4
 
 ```
 Cost = (50k × $3/M) + (2k × $15/M)
@@ -208,7 +208,7 @@ At 1,000 configs/month: **$180/month**
 **Scenario 2: Log Analysis**
 - Input: 100,000-line syslog = 500,000 tokens
 - Output: Summary = 500 tokens
-- Model: Claude 3.5 Haiku (cheaper, still good)
+- Model: Claude Haiku 4 (cheaper, still good)
 
 ```
 Cost = (500k × $0.25/M) + (500 × $1.25/M)
@@ -323,7 +323,7 @@ def count_tokens_claude(text: str) -> int:
 
     # Use count_tokens API
     response = client.messages.count_tokens(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         messages=[{"role": "user", "content": text}]
     )
 
@@ -633,7 +633,7 @@ Build a spreadsheet or Python script to calculate.
 
 Find the largest config in your environment. Try processing it with:
 - GPT-4o-mini (128k context)
-- Claude 3.5 Sonnet (200k context)
+- Claude Sonnet 4 (200k context)
 - Gemini 1.5 Pro (2M context)
 
 Which models succeed? Document the breaking points.
