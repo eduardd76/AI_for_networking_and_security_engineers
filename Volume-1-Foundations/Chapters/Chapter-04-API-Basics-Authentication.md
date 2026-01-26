@@ -16,105 +16,131 @@ By the end of this chapter, you will:
 
 ---
 
-## The Problem: APIs Fail in Production
+## The 3 AM Wake-Up Call
 
-You deployed the config analyzer from Chapter 1. It works perfectly in testing. Then production happens:
+It was supposed to be a quiet deployment weekend.
 
-**Day 1**: 50 requests succeed
-**Day 2**: Request #51 fails with "Rate limit exceeded"
-**Day 3**: Request fails with "Connection timeout"
-**Day 4**: Request fails with "Invalid API key" (key was rotated)
-**Day 5**: Request succeeds but costs 10x expected (prompt was accidentally duplicated)
+My team had built an AI-powered config compliance checker. It worked flawlessly in testing—scanning hundreds of router configs against our security baseline, flagging violations, generating remediation commands. Management loved the demo. We got approval to run it against production.
 
-**The reality**: APIs are unreliable. Networks are unreliable. Your code must handle:
-- Rate limits and quotas
-- Transient failures (timeouts, 5xx errors)
-- Authentication issues
-- Cost overruns
-- API provider outages
+Saturday at 11 PM, I kicked off the batch job: 2,847 routers across three data centers. I watched the first hundred complete successfully, felt satisfied, and went to bed.
 
-**This chapter shows you how to build resilient API clients that handle these issues gracefully.**
+At 3:17 AM, my phone exploded.
+
+Not the compliance checker failing—that would have been manageable. No, the *entire* AI-assisted operations pipeline was down. The chatbot that helped NOC handle tickets? Dead. The log analyzer catching anomalies? Dead. The documentation generator? You guessed it.
+
+The culprit: my batch job had burned through our API rate limit. Every subsequent request from every tool got a 429 "Too Many Requests" response. And none of our code handled that error gracefully—they all just crashed.
+
+It took four hours to restore service. The postmortem was embarrassing. We'd built clever AI tools without understanding the fundamental reliability engineering that APIs require.
+
+This chapter exists so you don't learn these lessons at 3 AM.
 
 ---
 
-## API Authentication: The Mental Model
+## APIs Fail: Accept This Truth
 
-### Networking Analogy: API Keys = Pre-Shared Keys (PSK)
+Here's what nobody tells you when you start building with AI APIs:
 
-In IPsec VPNs, you use Pre-Shared Keys for authentication:
-```
+**They are not as reliable as you think.**
+
+We're used to calling internal APIs that we control. Database queries that either work or throw a sensible exception. Network devices that respond consistently to CLI commands.
+
+Cloud AI APIs are different:
+
+**Rate limits are real and aggressive.** Free tier Anthropic allows 5 requests per minute. That's one request every 12 seconds. Miss that window and you get a 429. GPT-4's free tier is even stingier—3 requests per minute.
+
+**Latency varies wildly.** The same Claude Sonnet request might take 3 seconds at 2 PM and 15 seconds at 2 AM when batch jobs worldwide are running.
+
+**Services have outages.** Anthropic, OpenAI, Google—they all have had multi-hour outages. Your code needs to handle "the API is simply gone" gracefully.
+
+**Costs can spiral.** A bug that retries infinitely can run up hundreds of dollars before you notice. A prompt that accidentally includes duplicate data can 10x your token costs.
+
+The difference between a demo that works and a production system that stays up is all in how you handle these realities.
+
+---
+
+## API Authentication: A Networking Perspective
+
+### The Mental Model: API Keys Are Like Pre-Shared Keys
+
+If you've configured IPsec VPNs, you understand pre-shared keys (PSK):
+
+```cisco
 crypto isakmp key MySecretKey123 address 203.0.113.5
 ```
 
-API keys work the same way:
-- **Client** (your code) presents a key
-- **Server** (Anthropic, OpenAI) validates it
-- If valid → process request
-- If invalid → reject (401 Unauthorized)
+API keys work exactly the same way:
 
-**Security principles** (same as PSK):
-1. **Never hardcode** in source code
-2. **Rotate regularly** (90 days)
-3. **Use secrets management** (environment variables, Vault)
-4. **Limit scope** (read-only keys when possible)
-5. **Monitor usage** (detect compromise)
+1. **You generate a secret** (the API key) during registration
+2. **Every request includes this secret** (typically in a header)
+3. **The server validates** before processing
+4. **If invalid → rejected** (HTTP 401 Unauthorized)
+
+And just like PSKs, the security rules are identical:
+
+| PSK Best Practice | API Key Equivalent |
+|-------------------|-------------------|
+| Never put in running-config that gets backed up unencrypted | Never commit to Git |
+| Rotate every 90 days | Rotate every 90 days |
+| Different keys per peer/site | Different keys per environment (dev/staging/prod) |
+| Store in secure vault | Use secrets manager |
+| Monitor for unauthorized use | Set up usage alerts |
+
+If you'd never hardcode a VPN PSK directly in a script, don't hardcode an API key either.
 
 ---
 
-## Setting Up API Keys Securely
+## The Three Levels of API Key Security
 
-### ❌ NEVER Do This
+### Level 1: The Dangerous Way (Don't Do This)
 
 ```python
-# DANGER: Hardcoded secrets
+# ⛔ DANGER: Hardcoded secret
 import anthropic
 
-client = anthropic.Anthropic(api_key="sk-ant-api03-abcdef123456")  # WRONG!
+client = anthropic.Anthropic(api_key="sk-ant-api03-abcdef123456")
 ```
 
-**Why this is bad**:
-- Code goes into Git → key is leaked
-- Anyone with repo access has your key
-- Rotating keys requires code changes
-- Can't have different keys for dev/staging/prod
+I've seen this in production code. I've seen it committed to public GitHub repos. I've seen companies get their API keys scraped by bots within minutes of pushing to GitHub.
 
-### ✅ Use Environment Variables
+**What happens**: Your code goes into version control. Someone (or some bot) finds the key. They run up your bill mining crypto prompts or testing exploits. You find out when you get a $10,000 invoice or when your account gets suspended.
+
+### Level 2: Environment Variables (Minimum Acceptable)
 
 ```python
-# CORRECT: Environment variables
+# ✅ Acceptable: Environment variables
 import os
 from anthropic import Anthropic
 
 api_key = os.getenv("ANTHROPIC_API_KEY")
 if not api_key:
-    raise ValueError("ANTHROPIC_API_KEY environment variable not set")
+    raise ValueError("ANTHROPIC_API_KEY not set")
 
 client = Anthropic(api_key=api_key)
 ```
 
-**Set the variable**:
+**Setting the variable**:
 
 ```bash
-# Linux/macOS
-export ANTHROPIC_API_KEY="sk-ant-api03-abcdef123456"
+# Linux/macOS - add to ~/.bashrc or ~/.zshrc for persistence
+export ANTHROPIC_API_KEY="sk-ant-api03-your-key-here"
 
-# Windows (PowerShell)
-$env:ANTHROPIC_API_KEY="sk-ant-api03-abcdef123456"
+# Windows PowerShell
+$env:ANTHROPIC_API_KEY = "sk-ant-api03-your-key-here"
 
-# Windows (CMD)
-set ANTHROPIC_API_KEY=sk-ant-api03-abcdef123456
+# Windows CMD (persistent via System Properties → Environment Variables)
+setx ANTHROPIC_API_KEY "sk-ant-api03-your-key-here"
 ```
 
-### ✅ Better: Use .env Files
+**Better: Use a `.env` file**
 
-Create `.env` file:
-```bash
-ANTHROPIC_API_KEY=sk-ant-api03-abcdef123456
-OPENAI_API_KEY=sk-proj-xyz789
-GOOGLE_API_KEY=AIzaSy...
+Create `.env` in your project root:
+```
+ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+OPENAI_API_KEY=sk-proj-your-key-here
+GOOGLE_API_KEY=AIzaSy-your-key-here
 ```
 
-**Important**: Add to `.gitignore`:
+**Critical: Add to `.gitignore` immediately**:
 ```bash
 echo ".env" >> .gitignore
 ```
@@ -124,47 +150,68 @@ Load in Python:
 from dotenv import load_dotenv
 import os
 
-# Load .env file
-load_dotenv()
+load_dotenv()  # Load .env file
 
-# Access keys
 anthropic_key = os.getenv("ANTHROPIC_API_KEY")
 openai_key = os.getenv("OPENAI_API_KEY")
 ```
 
-### ✅ Best: Use Secrets Manager (Production)
+This is secure enough for development and small-scale production. But for enterprise...
 
-For production systems, use:
+### Level 3: Secrets Manager (Production Standard)
+
+In production systems—especially anything handling customer data or running in cloud infrastructure—use a proper secrets manager:
+
 - **AWS Secrets Manager**
 - **HashiCorp Vault**
 - **Azure Key Vault**
 - **Google Secret Manager**
 
-Example with AWS:
+Example with AWS Secrets Manager:
+
 ```python
 import boto3
 import json
 
-def get_secret(secret_name):
-    """Fetch secret from AWS Secrets Manager."""
+def get_api_keys():
+    """Retrieve API keys from AWS Secrets Manager."""
     client = boto3.client('secretsmanager', region_name='us-east-1')
-    response = client.get_secret_value(SecretId=secret_name)
-    return json.loads(response['SecretString'])
+    
+    try:
+        response = client.get_secret_value(SecretId='prod/ai-tools/api-keys')
+        secrets = json.loads(response['SecretString'])
+        return {
+            'anthropic': secrets['anthropic_api_key'],
+            'openai': secrets['openai_api_key'],
+        }
+    except Exception as e:
+        raise RuntimeError(f"Failed to retrieve secrets: {e}")
 
-secrets = get_secret('prod/ai-networking/api-keys')
-anthropic_key = secrets['anthropic_api_key']
+# Usage
+keys = get_api_keys()
+client = Anthropic(api_key=keys['anthropic'])
 ```
+
+**Why this matters**:
+- Keys are never on disk
+- Rotation doesn't require code deploys
+- Access is audited
+- Permissions are granular (IAM policies)
+- Works across multiple services automatically
 
 ---
 
-## Making Your First API Call
+## Your First API Calls
 
-### Claude API (Anthropic)
+Let's make real API calls to the three major providers. Same task—explain a networking concept—to see how each API works.
+
+### Claude (Anthropic)
 
 ```python
 #!/usr/bin/env python3
 """
-Basic Claude API call with proper error handling.
+Basic Claude API call.
+The foundation for everything in this book.
 """
 
 import os
@@ -173,43 +220,39 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def call_claude_basic(prompt: str) -> str:
+def ask_claude(question: str) -> str:
     """
-    Make a basic API call to Claude.
-
+    Ask Claude a question and get a response.
+    
     Args:
-        prompt: User prompt/question
-
+        question: What you want to know
+        
     Returns:
-        Claude's response text
+        Claude's response as a string
     """
-    # Initialize client
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-    # Make API call
+    
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
-        max_tokens=1000,
-        temperature=0,
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        temperature=0,  # Deterministic output
         messages=[
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": question}
         ]
     )
-
-    # Extract text from response
+    
     return response.content[0].text
 
 
-# Test it
 if __name__ == "__main__":
-    result = call_claude_basic("Explain BGP in one sentence.")
-    print(result)
-    # Output: "BGP (Border Gateway Protocol) is the routing protocol that
-    # exchanges routing information between autonomous systems to determine
-    # the best paths for data across the internet."
+    answer = ask_claude("Explain BGP in one sentence for a network engineer.")
+    print(answer)
+    # BGP (Border Gateway Protocol) is the path-vector routing protocol that 
+    # exchanges routing information between autonomous systems to determine 
+    # the best paths for traffic across the internet.
 ```
 
-### OpenAI API (GPT-4)
+### GPT-4 (OpenAI)
 
 ```python
 #!/usr/bin/env python3
@@ -223,40 +266,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def call_gpt_basic(prompt: str) -> str:
+def ask_gpt(question: str) -> str:
     """
-    Make a basic API call to GPT-4.
-
+    Ask GPT-4 a question and get a response.
+    
     Args:
-        prompt: User prompt/question
-
+        question: What you want to know
+        
     Returns:
-        GPT's response text
+        GPT's response as a string
     """
-    # Initialize client
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    # Make API call
+    
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": question}
         ],
         temperature=0,
-        max_tokens=1000
+        max_tokens=1024
     )
-
-    # Extract text from response
+    
     return response.choices[0].message.content
 
 
-# Test it
 if __name__ == "__main__":
-    result = call_gpt_basic("Explain OSPF in one sentence.")
-    print(result)
+    answer = ask_gpt("Explain OSPF in one sentence for a network engineer.")
+    print(answer)
 ```
 
-### Google Gemini API
+### Gemini (Google)
 
 ```python
 #!/usr/bin/env python3
@@ -270,197 +309,203 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def call_gemini_basic(prompt: str) -> str:
+def ask_gemini(question: str) -> str:
     """
-    Make a basic API call to Gemini.
-
+    Ask Gemini a question and get a response.
+    
     Args:
-        prompt: User prompt/question
-
+        question: What you want to know
+        
     Returns:
-        Gemini's response text
+        Gemini's response as a string
     """
-    # Configure API key
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
-    # Initialize model
+    
     model = genai.GenerativeModel('gemini-1.5-pro')
-
-    # Make API call
-    response = model.generate_content(prompt)
-
-    # Extract text from response
+    response = model.generate_content(question)
+    
     return response.text
 
 
-# Test it
 if __name__ == "__main__":
-    result = call_gemini_basic("Explain EIGRP in one sentence.")
-    print(result)
+    answer = ask_gemini("Explain EIGRP in one sentence for a network engineer.")
+    print(answer)
 ```
+
+Each provider has slightly different API structures, but the pattern is the same:
+1. Initialize client with API key
+2. Create a message/request with your prompt
+3. Extract the text from the response
 
 ---
 
 ## Understanding Rate Limits
 
-### What Are Rate Limits?
+### The QoS Analogy
 
-**Rate limits** = Maximum requests per time period.
+In networking, we use QoS to prevent any single flow from consuming all bandwidth:
 
-Think of it like QoS (Quality of Service) policies on routers:
-```
-Router: Allow 100 Mbps per user
-API: Allow 50 requests per minute per API key
-```
-
-### Why Rate Limits Exist
-
-1. **Prevent abuse**: Stop one user from consuming all resources
-2. **Cost control**: Limit infrastructure costs
-3. **Fairness**: Ensure all users get reasonable access
-4. **Stability**: Prevent overload and outages
-
-### Rate Limit Types
-
-| Provider | Tier | RPM | RPD | TPM |
-|----------|------|-----|-----|-----|
-| **Anthropic** | Free | 5 | 100 | 10,000 |
-| | Tier 1 | 50 | 500 | 40,000 |
-| | Tier 2 | 1,000 | 10,000 | 400,000 |
-| **OpenAI** | Free | 3 | 200 | 40,000 |
-| | Tier 1 | 500 | - | 200,000 |
-| | Tier 2 | 5,000 | - | 2,000,000 |
-
-**Definitions**:
-- **RPM** = Requests Per Minute
-- **RPD** = Requests Per Day
-- **TPM** = Tokens Per Minute
-
-### Rate Limit Errors
-
-When you exceed limits:
-
-```python
-# Anthropic
-anthropic.RateLimitError: rate_limit_error:
-  You have exceeded your rate limit. Please try again later.
-
-# OpenAI
-openai.RateLimitError: Rate limit reached for requests
-
-# Gemini
-google.api_core.exceptions.ResourceExhausted:
-  429 Resource has been exhausted (e.g., quota exceeded)
+```cisco
+policy-map RATE-LIMIT
+ class VOICE
+  police 128000 conform-action transmit exceed-action drop
 ```
 
-**HTTP Status Code**: 429 (Too Many Requests)
+API rate limits work identically:
+
+| QoS Concept | API Equivalent |
+|-------------|----------------|
+| Committed Information Rate (CIR) | Requests Per Minute (RPM) |
+| Burst size | Token bucket |
+| Exceed action: drop | 429 Too Many Requests |
+| Police per-flow | Limit per API key |
+
+When you exceed your rate limit, you don't get "slow responses"—you get rejected. Just like traffic policing drops packets that exceed the rate.
+
+### Real Rate Limit Numbers
+
+| Provider | Tier | Requests/Min | Tokens/Min |
+|----------|------|--------------|------------|
+| **Anthropic** | Free | 5 | 10,000 |
+| | Tier 1 ($5 spend) | 50 | 40,000 |
+| | Tier 2 ($40 spend) | 1,000 | 400,000 |
+| **OpenAI** | Free | 3 | 40,000 |
+| | Tier 1 | 500 | 200,000 |
+| | Tier 2 | 5,000 | 2,000,000 |
+
+**The trap**: You build and test on paid tier limits (1,000 RPM). You give the tool to a colleague who's on free tier (5 RPM). Their requests fail constantly and they think your tool is broken.
+
+Always test with the lowest tier your users might have.
 
 ---
 
-## Error Handling: The Right Way
+## Error Handling Done Right
 
-### Categories of Errors
+### The Two Types of Errors
 
-**1. Transient Errors** (Retry):
-- 429 Rate Limit
+**Transient errors** (retry these):
+- 429 Rate Limit Exceeded
 - 500 Internal Server Error
 - 502 Bad Gateway
 - 503 Service Unavailable
 - Network timeouts
+- Connection resets
 
-**2. Permanent Errors** (Don't Retry):
-- 400 Bad Request (malformed prompt)
-- 401 Unauthorized (invalid API key)
-- 403 Forbidden (no permission)
+**Permanent errors** (don't retry):
+- 400 Bad Request (your prompt is malformed)
+- 401 Unauthorized (bad API key)
+- 403 Forbidden (no permission for this model)
 - 404 Not Found (model doesn't exist)
 
-**3. Client Errors** (Fix Your Code):
-- Invalid parameters
-- Malformed JSON
-- Missing required fields
+The critical insight: **retrying a permanent error is pointless and expensive**. Retrying a transient error is essential for reliability.
 
-### Comprehensive Error Handler
+### Exponential Backoff: The TCP Analogy
+
+You know how TCP congestion control works:
+1. Packet loss detected (congestion signal)
+2. Reduce sending rate
+3. Gradually probe for more capacity
+4. Repeat
+
+API retry logic works the same way:
+
+```
+Attempt 1: Request fails (rate limit)
+→ Wait 1 second
+
+Attempt 2: Request fails (still rate limited)
+→ Wait 2 seconds (1 × 2¹)
+
+Attempt 3: Request fails (still rate limited)
+→ Wait 4 seconds (1 × 2²)
+
+Attempt 4: Request succeeds!
+```
+
+This is **exponential backoff**. The delay doubles after each failure, giving the system time to recover without hammering it with retry attempts.
+
+### Production-Grade Error Handler
 
 ```python
 #!/usr/bin/env python3
 """
-Production-grade API call with comprehensive error handling.
+Production API client with comprehensive error handling.
 """
 
 import os
 import time
+import logging
+from typing import Optional
 from anthropic import Anthropic, APIError, RateLimitError, APIConnectionError
 from dotenv import load_dotenv
-from typing import Optional
-import logging
 
-# Set up logging
+load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
 
-
-def call_claude_with_retry(
+def call_with_retry(
     prompt: str,
     max_retries: int = 3,
-    initial_delay: float = 1.0
+    initial_delay: float = 1.0,
+    max_delay: float = 60.0
 ) -> Optional[str]:
     """
-    Call Claude API with exponential backoff retry logic.
-
+    Make API call with exponential backoff retry logic.
+    
     Args:
-        prompt: User prompt
+        prompt: The prompt to send
         max_retries: Maximum number of retry attempts
-        initial_delay: Initial delay between retries (doubles each time)
-
+        initial_delay: Starting delay between retries (seconds)
+        max_delay: Maximum delay between retries (seconds)
+    
     Returns:
-        Response text, or None if all retries failed
+        Response text, or None if all retries exhausted
     """
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
+    
     for attempt in range(max_retries + 1):
         try:
-            logger.info(f"API call attempt {attempt + 1}/{max_retries + 1}")
-
+            logger.info(f"Attempt {attempt + 1}/{max_retries + 1}")
+            
             response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=1000,
+                model="claude-sonnet-4-20250514",
+                max_tokens=1024,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}]
             )
-
-            logger.info("API call succeeded")
+            
+            logger.info("Request succeeded")
             return response.content[0].text
-
-        except RateLimitError as e:
-            # Rate limit hit - wait and retry
-            delay = initial_delay * (2 ** attempt)  # Exponential backoff
-            logger.warning(f"Rate limit exceeded. Retrying in {delay}s...")
-
+            
+        except RateLimitError:
+            # Rate limit - definitely retry with backoff
+            delay = min(initial_delay * (2 ** attempt), max_delay)
+            logger.warning(f"Rate limited. Waiting {delay:.1f}s before retry...")
+            
             if attempt < max_retries:
                 time.sleep(delay)
             else:
                 logger.error("Max retries exceeded for rate limit")
                 return None
-
+                
         except APIConnectionError as e:
-            # Network/connection error - retry
-            delay = initial_delay * (2 ** attempt)
-            logger.warning(f"Connection error: {e}. Retrying in {delay}s...")
-
+            # Network error - retry with backoff
+            delay = min(initial_delay * (2 ** attempt), max_delay)
+            logger.warning(f"Connection error: {e}. Waiting {delay:.1f}s...")
+            
             if attempt < max_retries:
                 time.sleep(delay)
             else:
                 logger.error("Max retries exceeded for connection error")
                 return None
-
+                
         except APIError as e:
-            # Check if it's a transient 5xx error
+            # Check if it's a retryable server error (5xx)
             if hasattr(e, 'status_code') and 500 <= e.status_code < 600:
-                delay = initial_delay * (2 ** attempt)
-                logger.warning(f"Server error {e.status_code}. Retrying in {delay}s...")
-
+                delay = min(initial_delay * (2 ** attempt), max_delay)
+                logger.warning(f"Server error ({e.status_code}). Waiting {delay:.1f}s...")
+                
                 if attempt < max_retries:
                     time.sleep(delay)
                 else:
@@ -470,143 +515,128 @@ def call_claude_with_retry(
                 # Permanent error - don't retry
                 logger.error(f"Permanent API error: {e}")
                 return None
-
+                
         except Exception as e:
             # Unexpected error - log and fail
-            logger.error(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {type(e).__name__}: {e}")
             return None
-
+    
     return None
-
-
-# Test the error handler
-if __name__ == "__main__":
-    # Test normal call
-    result = call_claude_with_retry("What is VLAN?")
-    if result:
-        print(f"Success: {result[:100]}...")
-
-    # Test with deliberately long prompt to potentially trigger rate limit
-    # (Don't actually run this in production - it's expensive!)
-    # huge_prompt = "Explain networking " * 50000
-    # result = call_claude_with_retry(huge_prompt)
 ```
-
-### Exponential Backoff Explained
-
-**The Problem**: If you retry immediately after rate limit, you'll hit it again.
-
-**The Solution**: Wait longer after each failure.
-
-```
-Attempt 1: Fails → Wait 1 second
-Attempt 2: Fails → Wait 2 seconds (1 * 2^1)
-Attempt 3: Fails → Wait 4 seconds (1 * 2^2)
-Attempt 4: Fails → Wait 8 seconds (1 * 2^3)
-```
-
-**Why it works**:
-- Gives API time to recover
-- Reduces thundering herd (many clients retrying simultaneously)
-- Standard practice (RFC 2616)
-
-**Networking analogy**: Like TCP congestion control—back off when network is congested.
 
 ---
 
-## Building a Reusable API Client
+## Building a Production API Client
 
-Let's build a production-ready API client class:
+Let's assemble everything into a reusable client class:
 
 ```python
 #!/usr/bin/env python3
 """
-Production-grade API client with built-in retry, rate limiting, and monitoring.
+ResilientAPIClient - Production-grade API client for network automation.
+
+Features:
+- Automatic retry with exponential backoff
+- Rate limit handling
+- Usage tracking and cost monitoring
+- Comprehensive error handling
+- Multi-provider support ready
 """
 
 import os
 import time
 import logging
 from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from anthropic import Anthropic, APIError, RateLimitError, APIConnectionError
 from dotenv import load_dotenv
 
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class APIMetrics:
-    """Track API usage metrics."""
+class UsageMetrics:
+    """Track API usage statistics."""
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
-    rate_limit_errors: int = 0
-    total_tokens_used: int = 0
-    total_cost: float = 0.0
+    rate_limit_hits: int = 0
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_cost_usd: float = 0.0
+    total_latency_seconds: float = 0.0
 
 
 class ResilientAPIClient:
     """
-    Production-ready API client with retry logic, rate limiting, and monitoring.
-
-    Features:
-    - Exponential backoff retry
-    - Rate limit handling
-    - Usage tracking
-    - Cost monitoring
-    - Comprehensive error handling
+    Production-ready API client with built-in resilience.
+    
+    This is the foundation for all AI networking tools.
     """
-
+    
+    # Pricing per million tokens (update as needed)
+    PRICING = {
+        "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+        "claude-haiku-4-20250514": {"input": 0.25, "output": 1.25},
+        "claude-opus-4-20250514": {"input": 15.00, "output": 75.00},
+    }
+    
     def __init__(
         self,
         api_key: Optional[str] = None,
         max_retries: int = 3,
-        initial_retry_delay: float = 1.0,
-        timeout: int = 60
+        initial_delay: float = 1.0,
+        max_delay: float = 60.0,
+        timeout: int = 120
     ):
         """
-        Initialize API client.
-
+        Initialize the resilient API client.
+        
         Args:
-            api_key: Anthropic API key (defaults to env var)
-            max_retries: Maximum retry attempts
-            initial_retry_delay: Initial delay between retries
+            api_key: Anthropic API key (defaults to ANTHROPIC_API_KEY env var)
+            max_retries: Maximum retry attempts for transient failures
+            initial_delay: Starting delay for exponential backoff
+            max_delay: Maximum delay between retries
             timeout: Request timeout in seconds
         """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
-            raise ValueError("ANTHROPIC_API_KEY not set")
-
+            raise ValueError(
+                "API key required. Set ANTHROPIC_API_KEY environment variable "
+                "or pass api_key parameter."
+            )
+        
         self.client = Anthropic(api_key=self.api_key, timeout=timeout)
         self.max_retries = max_retries
-        self.initial_retry_delay = initial_retry_delay
-        self.metrics = APIMetrics()
-
+        self.initial_delay = initial_delay
+        self.max_delay = max_delay
+        self.metrics = UsageMetrics()
+    
     def call(
         self,
         prompt: str,
-        model: str = "claude-3-5-sonnet-20241022",
-        max_tokens: int = 1000,
+        model: str = "claude-sonnet-4-20250514",
+        max_tokens: int = 1024,
         temperature: float = 0.0,
-        system_prompt: Optional[str] = None
+        system: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Make API call with retry logic.
-
+        Make an API call with automatic retry and monitoring.
+        
         Args:
-            prompt: User prompt
-            model: Model identifier
-            max_tokens: Maximum tokens in response
-            temperature: Randomness (0-1)
-            system_prompt: Optional system instructions
-
+            prompt: User message/prompt
+            model: Model to use
+            max_tokens: Maximum response tokens
+            temperature: Randomness (0 = deterministic)
+            system: Optional system prompt
+            
         Returns:
-            Dictionary with response and metadata, or None on failure
+            Dict with response and metadata, or None on failure
         """
+        # Build request
         messages = [{"role": "user", "content": prompt}]
         kwargs = {
             "model": model,
@@ -614,598 +644,425 @@ class ResilientAPIClient:
             "temperature": temperature,
             "messages": messages
         }
-
-        if system_prompt:
-            kwargs["system"] = system_prompt
-
+        if system:
+            kwargs["system"] = system
+        
+        # Attempt with retries
         for attempt in range(self.max_retries + 1):
+            self.metrics.total_requests += 1
+            
             try:
-                self.metrics.total_requests += 1
-
-                logger.info(f"API call attempt {attempt + 1}/{self.max_retries + 1}")
                 start_time = time.time()
-
                 response = self.client.messages.create(**kwargs)
-
                 latency = time.time() - start_time
-                self.metrics.successful_requests += 1
-
-                # Track token usage
+                
+                # Extract data
                 input_tokens = response.usage.input_tokens
                 output_tokens = response.usage.output_tokens
-                self.metrics.total_tokens_used += (input_tokens + output_tokens)
-
-                # Calculate cost (Sonnet pricing)
-                cost = (input_tokens / 1_000_000) * 3.0
-                cost += (output_tokens / 1_000_000) * 15.0
-                self.metrics.total_cost += cost
-
-                logger.info(f"API call succeeded in {latency:.2f}s")
-                logger.info(f"Tokens: {input_tokens} in, {output_tokens} out")
-                logger.info(f"Cost: ${cost:.6f}")
-
+                text = response.content[0].text
+                
+                # Calculate cost
+                pricing = self.PRICING.get(model, {"input": 3.0, "output": 15.0})
+                cost = (input_tokens / 1_000_000) * pricing["input"]
+                cost += (output_tokens / 1_000_000) * pricing["output"]
+                
+                # Update metrics
+                self.metrics.successful_requests += 1
+                self.metrics.total_input_tokens += input_tokens
+                self.metrics.total_output_tokens += output_tokens
+                self.metrics.total_cost_usd += cost
+                self.metrics.total_latency_seconds += latency
+                
+                logger.info(
+                    f"Success: {input_tokens} in, {output_tokens} out, "
+                    f"${cost:.4f}, {latency:.1f}s"
+                )
+                
                 return {
-                    "text": response.content[0].text,
-                    "model": response.model,
+                    "text": text,
+                    "model": model,
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
-                    "latency": latency,
-                    "cost": cost,
+                    "cost_usd": cost,
+                    "latency_seconds": latency,
                     "timestamp": datetime.utcnow().isoformat()
                 }
-
-            except RateLimitError as e:
-                self.metrics.rate_limit_errors += 1
-                delay = self._calculate_backoff(attempt)
-                logger.warning(f"Rate limit hit. Retrying in {delay}s...")
-
-                if attempt < self.max_retries:
-                    time.sleep(delay)
-                else:
+                
+            except RateLimitError:
+                self.metrics.rate_limit_hits += 1
+                if not self._handle_retry(attempt, "Rate limit exceeded"):
                     self.metrics.failed_requests += 1
-                    logger.error("Max retries exceeded for rate limit")
                     return None
-
+                    
             except APIConnectionError as e:
-                delay = self._calculate_backoff(attempt)
-                logger.warning(f"Connection error. Retrying in {delay}s...")
-
-                if attempt < self.max_retries:
-                    time.sleep(delay)
-                else:
+                if not self._handle_retry(attempt, f"Connection error: {e}"):
                     self.metrics.failed_requests += 1
-                    logger.error("Max retries exceeded for connection error")
                     return None
-
+                    
             except APIError as e:
-                if self._is_retryable(e):
-                    delay = self._calculate_backoff(attempt)
-                    logger.warning(f"Retryable error. Retrying in {delay}s...")
-
-                    if attempt < self.max_retries:
-                        time.sleep(delay)
-                    else:
+                if hasattr(e, 'status_code') and 500 <= e.status_code < 600:
+                    if not self._handle_retry(attempt, f"Server error: {e.status_code}"):
                         self.metrics.failed_requests += 1
                         return None
                 else:
-                    self.metrics.failed_requests += 1
                     logger.error(f"Permanent error: {e}")
+                    self.metrics.failed_requests += 1
                     return None
-
+                    
             except Exception as e:
+                logger.error(f"Unexpected error: {type(e).__name__}: {e}")
                 self.metrics.failed_requests += 1
-                logger.error(f"Unexpected error: {e}")
                 return None
-
+        
         return None
-
-    def _calculate_backoff(self, attempt: int) -> float:
-        """Calculate exponential backoff delay."""
-        return self.initial_retry_delay * (2 ** attempt)
-
-    def _is_retryable(self, error: APIError) -> bool:
-        """Check if error is retryable."""
-        if hasattr(error, 'status_code'):
-            # Retry on 5xx server errors
-            return 500 <= error.status_code < 600
-        return False
-
+    
+    def _handle_retry(self, attempt: int, reason: str) -> bool:
+        """Handle retry logic with exponential backoff."""
+        if attempt >= self.max_retries:
+            logger.error(f"{reason} - max retries exceeded")
+            return False
+        
+        delay = min(self.initial_delay * (2 ** attempt), self.max_delay)
+        logger.warning(f"{reason} - retrying in {delay:.1f}s (attempt {attempt + 1}/{self.max_retries})")
+        time.sleep(delay)
+        return True
+    
     def get_metrics(self) -> Dict[str, Any]:
-        """Get usage metrics."""
-        success_rate = 0.0
-        if self.metrics.total_requests > 0:
-            success_rate = (self.metrics.successful_requests /
-                          self.metrics.total_requests * 100)
-
+        """Get usage metrics summary."""
+        m = self.metrics
+        success_rate = (m.successful_requests / max(m.total_requests, 1)) * 100
+        avg_latency = m.total_latency_seconds / max(m.successful_requests, 1)
+        
         return {
-            "total_requests": self.metrics.total_requests,
-            "successful_requests": self.metrics.successful_requests,
-            "failed_requests": self.metrics.failed_requests,
+            "total_requests": m.total_requests,
+            "successful": m.successful_requests,
+            "failed": m.failed_requests,
             "success_rate": f"{success_rate:.1f}%",
-            "rate_limit_errors": self.metrics.rate_limit_errors,
-            "total_tokens": self.metrics.total_tokens_used,
-            "total_cost": f"${self.metrics.total_cost:.4f}"
+            "rate_limit_hits": m.rate_limit_hits,
+            "total_tokens": m.total_input_tokens + m.total_output_tokens,
+            "total_cost": f"${m.total_cost_usd:.4f}",
+            "avg_latency": f"{avg_latency:.2f}s"
         }
-
+    
     def reset_metrics(self):
-        """Reset metrics counters."""
-        self.metrics = APIMetrics()
+        """Reset usage metrics."""
+        self.metrics = UsageMetrics()
 
 
-# Example usage
+# Example usage and testing
 if __name__ == "__main__":
-    # Initialize client
+    print("🔧 Testing ResilientAPIClient")
+    print("=" * 60)
+    
+    # Initialize
     client = ResilientAPIClient(max_retries=3)
-
-    # Make some calls
-    prompts = [
-        "Explain BGP in one sentence",
-        "What is OSPF?",
-        "Describe VLANs briefly"
+    
+    # Test prompts
+    tests = [
+        "What is a VLAN? One sentence.",
+        "Explain BGP in 20 words or less.",
+        "What does OSPF stand for?"
     ]
-
-    for prompt in prompts:
-        print(f"\n{'='*60}")
-        print(f"Prompt: {prompt}")
-        print('='*60)
-
-        result = client.call(prompt, max_tokens=200)
-
+    
+    for prompt in tests:
+        print(f"\n📤 Prompt: {prompt}")
+        result = client.call(prompt, max_tokens=100)
+        
         if result:
-            print(f"Response: {result['text']}")
-            print(f"Tokens: {result['input_tokens']} in, {result['output_tokens']} out")
-            print(f"Cost: ${result['cost']:.6f}")
+            print(f"📥 Response: {result['text']}")
+            print(f"   Tokens: {result['input_tokens']} → {result['output_tokens']}")
+            print(f"   Cost: ${result['cost_usd']:.4f} | Latency: {result['latency_seconds']:.1f}s")
         else:
-            print("Request failed after all retries")
-
-    # Print metrics
-    print(f"\n{'='*60}")
-    print("SESSION METRICS")
-    print('='*60)
-    metrics = client.get_metrics()
-    for key, value in metrics.items():
-        print(f"{key:20s}: {value}")
-```
-
-**Test this code**:
-
-```bash
-python resilient_api_client.py
-```
-
-**Expected Output**:
-
-```
-============================================================
-Prompt: Explain BGP in one sentence
-============================================================
-INFO:__main__:API call attempt 1/4
-INFO:__main__:API call succeeded in 3.24s
-INFO:__main__:Tokens: 24 in, 38 out
-INFO:__main__:Cost: $0.000642
-Response: BGP (Border Gateway Protocol) is the routing protocol...
-Tokens: 24 in, 38 out
-Cost: $0.000642
-
-============================================================
-SESSION METRICS
-============================================================
-total_requests      : 3
-successful_requests : 3
-failed_requests     : 0
-success_rate        : 100.0%
-rate_limit_errors   : 0
-total_tokens        : 186
-total_cost          : $0.0019
+            print("❌ Request failed")
+    
+    # Print session summary
+    print("\n" + "=" * 60)
+    print("📊 Session Metrics")
+    print("=" * 60)
+    for key, value in client.get_metrics().items():
+        print(f"   {key}: {value}")
 ```
 
 ---
 
-## Rate Limiting on Client Side
+## Client-Side Rate Limiting
 
-Sometimes you want to limit your own request rate to avoid hitting provider limits.
+Sometimes you want to throttle yourself to avoid hitting provider limits:
 
 ```python
-#!/usr/bin/env python3
-"""
-Client-side rate limiter.
-"""
-
 import time
 from collections import deque
-from typing import Callable, Any
+from functools import wraps
 
 
 class RateLimiter:
     """
     Token bucket rate limiter.
-
-    Limits requests per time window.
+    Prevents exceeding API rate limits by throttling requests client-side.
     """
-
-    def __init__(self, max_requests: int, time_window: float = 60.0):
+    
+    def __init__(self, requests_per_minute: int):
         """
         Initialize rate limiter.
-
+        
         Args:
-            max_requests: Maximum requests per time window
-            time_window: Time window in seconds
+            requests_per_minute: Maximum requests allowed per minute
         """
-        self.max_requests = max_requests
-        self.time_window = time_window
-        self.requests = deque()
-
-    def acquire(self) -> None:
+        self.max_requests = requests_per_minute
+        self.window_seconds = 60.0
+        self.request_times = deque()
+    
+    def acquire(self):
         """
         Acquire permission to make a request.
         Blocks if rate limit would be exceeded.
         """
         now = time.time()
-
-        # Remove requests outside time window
-        while self.requests and self.requests[0] < now - self.time_window:
-            self.requests.popleft()
-
+        
+        # Remove requests outside the time window
+        while self.request_times and self.request_times[0] < now - self.window_seconds:
+            self.request_times.popleft()
+        
         # If at limit, wait
-        if len(self.requests) >= self.max_requests:
-            sleep_time = self.time_window - (now - self.requests[0])
-            if sleep_time > 0:
-                print(f"Rate limit reached. Sleeping {sleep_time:.1f}s...")
-                time.sleep(sleep_time)
-                return self.acquire()  # Try again
-
+        if len(self.request_times) >= self.max_requests:
+            wait_time = self.window_seconds - (now - self.request_times[0])
+            if wait_time > 0:
+                print(f"⏳ Rate limit: waiting {wait_time:.1f}s...")
+                time.sleep(wait_time)
+                return self.acquire()
+        
         # Record this request
-        self.requests.append(time.time())
-
-    def __call__(self, func: Callable) -> Callable:
-        """Decorator to rate-limit a function."""
-        def wrapper(*args, **kwargs) -> Any:
+        self.request_times.append(time.time())
+    
+    def __call__(self, func):
+        """Use as decorator."""
+        @wraps(func)
+        def wrapper(*args, **kwargs):
             self.acquire()
             return func(*args, **kwargs)
         return wrapper
 
 
-# Example usage
-if __name__ == "__main__":
-    # Allow 5 requests per 10 seconds
-    limiter = RateLimiter(max_requests=5, time_window=10.0)
+# Usage example
+limiter = RateLimiter(requests_per_minute=50)
 
-    @limiter
-    def make_api_call(i: int):
-        print(f"Request {i} at {time.time():.1f}")
-        return i
-
-    # This will rate-limit automatically
-    for i in range(10):
-        make_api_call(i)
+@limiter
+def make_api_call(prompt):
+    # Your API call here
+    pass
 ```
 
 ---
 
-## Monitoring API Usage
+## Monitoring and Cost Tracking
 
-Track your spending in real-time:
+Track every API call for debugging and cost management:
 
 ```python
-#!/usr/bin/env python3
-"""
-API usage tracker with cost monitoring.
-"""
-
-import os
 import json
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from datetime import datetime
 
 
-class UsageTracker:
-    """Track API usage and costs."""
-
+class APIUsageLogger:
+    """Log all API calls for monitoring and debugging."""
+    
     def __init__(self, log_file: str = "api_usage.jsonl"):
-        """
-        Initialize tracker.
-
-        Args:
-            log_file: Path to log file (JSONL format)
-        """
-        self.log_file = Path(log_file)
-
-    def log_request(
-        self,
-        model: str,
-        input_tokens: int,
-        output_tokens: int,
-        cost: float,
-        latency: float,
-        success: bool,
-        task: str = "unknown"
-    ) -> None:
-        """
-        Log an API request.
-
-        Args:
-            model: Model used
-            input_tokens: Input token count
-            output_tokens: Output token count
-            cost: Cost in USD
-            latency: Response time in seconds
-            success: Whether request succeeded
-            task: Description of task
-        """
+        self.log_path = Path(log_file)
+    
+    def log(self, **kwargs):
+        """Log an API call."""
         entry = {
             "timestamp": datetime.utcnow().isoformat(),
-            "model": model,
-            "input_tokens": input_tokens,
-            "output_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-            "cost": cost,
-            "latency": latency,
-            "success": success,
-            "task": task
+            **kwargs
         }
-
-        with open(self.log_file, 'a') as f:
+        with open(self.log_path, 'a') as f:
             f.write(json.dumps(entry) + '\n')
-
-    def get_summary(self, hours: int = 24) -> Dict[str, Any]:
-        """
-        Get usage summary for last N hours.
-
-        Args:
-            hours: Hours to look back
-
-        Returns:
-            Summary statistics
-        """
-        if not self.log_file.exists():
-            return {"error": "No usage data"}
-
-        cutoff = datetime.utcnow().timestamp() - (hours * 3600)
-
+    
+    def get_daily_summary(self) -> dict:
+        """Get today's usage summary."""
+        today = datetime.utcnow().date().isoformat()
         total_cost = 0.0
         total_requests = 0
-        total_tokens = 0
-        successful = 0
-
-        with open(self.log_file, 'r') as f:
+        
+        if not self.log_path.exists():
+            return {"date": today, "requests": 0, "cost": "$0.00"}
+        
+        with open(self.log_path) as f:
             for line in f:
                 entry = json.loads(line)
-                timestamp = datetime.fromisoformat(entry['timestamp']).timestamp()
-
-                if timestamp > cutoff:
+                if entry["timestamp"].startswith(today):
                     total_requests += 1
-                    total_cost += entry['cost']
-                    total_tokens += entry['total_tokens']
-                    if entry['success']:
-                        successful += 1
-
+                    total_cost += entry.get("cost_usd", 0)
+        
         return {
-            "time_period": f"Last {hours} hours",
-            "total_requests": total_requests,
-            "successful_requests": successful,
-            "total_cost": f"${total_cost:.4f}",
-            "total_tokens": total_tokens,
-            "avg_cost_per_request": f"${total_cost/max(total_requests,1):.6f}"
+            "date": today,
+            "requests": total_requests,
+            "cost": f"${total_cost:.2f}"
         }
-
-
-# Example: Integrate with ResilientAPIClient
-if __name__ == "__main__":
-    tracker = UsageTracker()
-
-    # Log some sample requests
-    tracker.log_request(
-        model="claude-3-5-sonnet",
-        input_tokens=100,
-        output_tokens=200,
-        cost=0.003,
-        latency=2.5,
-        success=True,
-        task="config_analysis"
-    )
-
-    # Get summary
-    summary = tracker.get_summary(hours=24)
-    print("Usage Summary:")
-    for key, value in summary.items():
-        print(f"  {key}: {value}")
 ```
 
 ---
 
-## What Can Go Wrong
+## Common Errors and Fixes
 
-### Error 1: "Invalid API Key"
-
-```
+### "Invalid API Key"
+```python
 anthropic.AuthenticationError: Invalid API key
 ```
 
-**Causes**:
-- Key not set in environment
-- Typo in key
-- Key was revoked/rotated
-- Using wrong environment (dev key in prod)
+**Diagnosis checklist**:
+1. Is the key set? `echo $ANTHROPIC_API_KEY`
+2. Does it start with `sk-ant-api03-`?
+3. Was it copy-pasted correctly (no extra spaces)?
+4. Has it been revoked?
 
-**Fix**:
+### "Rate Limit Exceeded"
 ```python
-# Add validation on startup
-api_key = os.getenv("ANTHROPIC_API_KEY")
-if not api_key or not api_key.startswith("sk-ant-"):
-    raise ValueError("Invalid or missing ANTHROPIC_API_KEY")
+anthropic.RateLimitError: rate_limit_error
 ```
 
-### Error 2: "Request Timeout"
+**Solutions**:
+- Implement exponential backoff (see above)
+- Add client-side rate limiting
+- Upgrade your tier
+- Spread requests over time
 
+### "Context Length Exceeded"
+```python
+anthropic.BadRequestError: prompt is too long
 ```
+
+**Solutions**:
+- Count tokens before sending (Chapter 2)
+- Chunk large inputs (Chapter 7)
+- Use a model with larger context
+
+### "Request Timeout"
+```python
 anthropic.APIConnectionError: Connection timeout
 ```
 
-**Causes**:
-- Network issues
-- API provider slow/overloaded
-- Prompt too large
-
-**Fix**: Increase timeout
-```python
-client = Anthropic(api_key=key, timeout=120)  # 2 minutes
-```
-
-### Error 3: "Context Length Exceeded"
-
-```
-anthropic.BadRequestError: messages: total length exceeds maximum
-```
-
-**Fix**: Check token count before sending (Chapter 2)
-
-### Error 4: "Unexpected Costs"
-
-Your bill is 10x what you expected.
-
-**Causes**:
-- Infinite retry loop
-- Prompt accidentally duplicated
-- Output tokens expensive (15x input)
-
-**Fix**:
-- Set max retries
-- Log all requests
-- Monitor costs in real-time
-- Set budget alerts with provider
-
----
-
-## Best Practices Checklist
-
-✅ **Security**:
-- [ ] Never hardcode API keys
-- [ ] Use environment variables or secrets manager
-- [ ] Add `.env` to `.gitignore`
-- [ ] Rotate keys every 90 days
-- [ ] Use separate keys for dev/staging/prod
-
-✅ **Error Handling**:
-- [ ] Implement exponential backoff
-- [ ] Handle rate limits gracefully
-- [ ] Distinguish transient vs permanent errors
-- [ ] Log all errors with context
-
-✅ **Monitoring**:
-- [ ] Track request success rate
-- [ ] Monitor token usage
-- [ ] Track costs in real-time
-- [ ] Set up budget alerts
-
-✅ **Performance**:
-- [ ] Set reasonable timeouts
-- [ ] Implement client-side rate limiting
-- [ ] Use connection pooling for high volume
-- [ ] Cache responses when appropriate
+**Solutions**:
+- Increase timeout: `Anthropic(timeout=120)`
+- Check network connectivity
+- Retry with backoff
 
 ---
 
 ## Lab Exercises
 
-### Lab 1: Test Error Scenarios (30 min)
+### Lab 1: Error Simulation (30 minutes)
+Create a test harness that simulates various API errors. Verify your retry logic handles each correctly.
 
-Modify the `ResilientAPIClient` to:
-1. Simulate rate limit errors (use a fake API)
-2. Test exponential backoff timing
-3. Verify it gives up after max retries
+### Lab 2: Cost Dashboard (45 minutes)
+Build a simple dashboard that reads from `api_usage.jsonl` and displays:
+- Requests per hour
+- Cost per day
+- Most expensive prompts
+- Error rate
 
-### Lab 2: Build a Cost Monitor (45 min)
-
-Create a dashboard that shows:
-- Requests per hour (last 24 hours)
-- Cost per hour
-- Most expensive tasks
-- Error rate over time
-
-Use the `UsageTracker` class as a starting point.
-
-### Lab 3: Multi-Provider Client (60 min)
-
-Extend `ResilientAPIClient` to support multiple providers:
-- Claude (Anthropic)
-- GPT-4 (OpenAI)
-- Gemini (Google)
-
-Use a factory pattern:
+### Lab 3: Multi-Provider Client (60 minutes)
+Extend `ResilientAPIClient` to support OpenAI and Gemini. Use a factory pattern:
 ```python
-client = APIClientFactory.create(provider="anthropic")
+client = APIClient.create(provider="openai")
 ```
 
-### Lab 4: Budget Enforcer (60 min)
+### Lab 4: Budget Enforcer (45 minutes)
+Add a daily budget limit to the client. When 80% of budget is used, log a warning. When 100% is reached, reject new requests.
 
-Add a budget check to the client:
-- Set daily budget ($10)
-- Track spending
-- Reject requests if budget exceeded
-- Send alert when 80% of budget used
-
-### Lab 5: Production Deployment (90 min)
-
-Deploy your API client to handle:
-- 1,000 requests/day
-- Proper logging
-- Metrics to Prometheus/CloudWatch
-- Cost alerts
-- Key rotation without downtime
+### Lab 5: Metrics to Prometheus (90 minutes)
+Export the usage metrics in Prometheus format so they can be scraped and displayed in Grafana.
 
 ---
 
 ## Key Takeaways
 
-1. **Never hardcode secrets**
-   - Use environment variables (.env files)
-   - Use secrets managers in production
-   - Rotate keys regularly
+### 1. Security First
+- Never hardcode API keys
+- Use environment variables minimum, secrets manager for production
+- Rotate keys regularly
+- Monitor for unauthorized usage
 
-2. **APIs fail—plan for it**
-   - Implement retry with exponential backoff
-   - Handle rate limits gracefully
-   - Distinguish permanent vs transient errors
+### 2. APIs Fail—Plan for It
+- Implement retry with exponential backoff
+- Distinguish transient vs permanent errors
+- Set reasonable timeouts
+- Have fallback behavior
 
-3. **Monitor everything**
-   - Track costs in real-time
-   - Log all requests
-   - Set budget alerts
-   - Measure success rate
+### 3. Monitor Everything
+- Log every request
+- Track costs in real-time
+- Set budget alerts
+- Measure latency and success rate
 
-4. **Rate limits are real**
-   - Understand provider limits
-   - Implement client-side limiting
-   - Use exponential backoff
-   - Queue requests if needed
+### 4. Rate Limits Are Real
+- Know your tier's limits
+- Implement client-side throttling
+- Use backoff on 429 errors
+- Test with lower-tier limits
 
-5. **Build reusable clients**
-   - Encapsulate retry logic
-   - Abstract provider differences
-   - Make it easy to swap models
-   - Include metrics from day one
+### 5. Build Reusable Infrastructure
+- The `ResilientAPIClient` pattern works everywhere
+- Consistent error handling across tools
+- Centralized metrics and logging
+- Easy to swap providers
 
 ---
 
-## Next Steps
+## What's Next
 
-You now have production-ready API client code that handles authentication, retries, rate limiting, and monitoring. This is the foundation for all AI networking tools you'll build.
+You now have production-grade API client code that handles the real-world challenges of working with AI APIs. This is the foundation everything else builds on.
 
-**Next chapter**: Prompt Engineering Fundamentals—how to write prompts that actually work for networking tasks. The difference between "generate ACL" and a prompt that generates correct, secure ACLs every time.
+But making API calls is only half the battle. The other half is crafting prompts that actually work. A bad prompt to a great API client still gives bad results.
+
+Chapter 5 covers prompt engineering—the art and science of getting AI models to do exactly what you need for networking tasks.
 
 **Ready?** → Chapter 5: Prompt Engineering Fundamentals
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~7,500 | Code: Tested | API Client: Production-Ready
+## Quick Reference
 
-**Files Created**:
-- `resilient_api_client.py` - Full production API client
-- `rate_limiter.py` - Client-side rate limiting
-- `usage_tracker.py` - Cost monitoring
-
-**Test Command**:
+### API Key Setup
 ```bash
-python resilient_api_client.py
+# .env file
+ANTHROPIC_API_KEY=sk-ant-api03-...
+OPENAI_API_KEY=sk-proj-...
+GOOGLE_API_KEY=AIzaSy...
 ```
+
+### Basic Call Pattern
+```python
+from anthropic import Anthropic
+client = Anthropic()
+response = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": prompt}]
+)
+text = response.content[0].text
+```
+
+### Retry with Backoff
+```python
+for attempt in range(max_retries):
+    try:
+        return make_request()
+    except RateLimitError:
+        delay = initial_delay * (2 ** attempt)
+        time.sleep(delay)
+```
+
+### Rate Limit Tiers
+| Provider | Free | Paid |
+|----------|------|------|
+| Anthropic | 5 RPM | 50-1000 RPM |
+| OpenAI | 3 RPM | 500-5000 RPM |
+
+---
+
+**Chapter Status**: Complete  
+**Word Count**: ~5,200  
+**Code**: Production-ready `ResilientAPIClient`  
+**Estimated Reading Time**: 30 minutes
