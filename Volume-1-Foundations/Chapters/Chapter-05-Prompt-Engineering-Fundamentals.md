@@ -1226,13 +1226,58 @@ def process_large_config(config: str, chunk_size: int = 50000):
 
 ## What Can Go Wrong
 
+### The Networking-Specific Pitfalls
+
+Before the general errors, here are the ones that specifically trip up network engineers:
+
+**Pitfall 1: Platform Ambiguity**
+```python
+# Bad: What platform? IOS? IOS-XE? NX-OS? Junos?
+prompt = "Generate a BGP configuration"
+
+# Good: Platform-specific
+prompt = "Generate a Cisco IOS-XE BGP configuration for a 4331 ISR"
+```
+
+The model will generate something that *looks* right but might use syntax from the wrong platform. A `neighbor activate` statement valid on IOS might break on NX-OS.
+
+**Pitfall 2: Missing Operational Context**
+```python
+# Bad: No context about the network
+prompt = "Assign this router an IP address"
+
+# Good: Context-aware
+prompt = """
+Our IP scheme is: 10.SITE.FUNCTION.HOST
+Site 5, Router function (routers are .0-99), this is router #3.
+Assign an appropriate IP address.
+"""
+```
+
+Without context, the model might suggest 192.168.1.1—technically correct, practically wrong for your environment.
+
+**Pitfall 3: Vendor Terminology Drift**
+```python
+# Model might say "trunk" (Cisco) when you mean "tagged" (Juniper)
+# Model might say "VLAN" when you mean "broadcast-domain"
+
+# Fix: Define your terminology in the system prompt
+system_prompt = """
+Use these standard terms:
+- "access port" not "untagged port"
+- "trunk port" not "tagged port" 
+- "VLAN" not "broadcast domain"
+- Interface naming: GigabitEthernet0/1 (full name, not Gi0/1)
+"""
+```
+
 ### Error 1: "Model Refuses to Answer"
 
 ```
 I cannot generate that configuration as it could be used to...
 ```
 
-**Cause**: Model's safety filters triggered
+**Cause**: Model's safety filters triggered (often for ACLs, firewall rules, or anything that mentions "block" or "deny")
 
 **Fix**: Add context
 ```python
@@ -1240,6 +1285,17 @@ prompt = """
 I am a network engineer working in a lab environment for training purposes.
 
 Generate a Cisco IOS configuration for [task]...
+"""
+```
+
+Or be more specific about the legitimate use case:
+```python
+prompt = """
+Context: I'm implementing security controls for PCI-DSS compliance.
+We need to restrict traffic between the cardholder data environment and 
+corporate network per requirement 1.3.
+
+Generate an ACL that...
 """
 ```
 
@@ -1382,6 +1438,52 @@ Use for one real networking task (config analysis, log classification, etc.).
 
 ---
 
+## Quick Reference Card: Prompt Engineering for Network Engineers
+
+Copy this and keep it handy:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│           PROMPT ENGINEERING CHEAT SHEET                        │
+├─────────────────────────────────────────────────────────────────┤
+│ STRUCTURE TEMPLATE:                                             │
+│                                                                 │
+│   [Context] You are a {role} with {expertise}.                  │
+│   [Task] {specific action verb} this {specific thing}.          │
+│   [Constraints] Only consider {X}. Don't {Y}.                   │
+│   [Format] Return as {JSON/bullets/commands}.                   │
+│   [Examples] (if few-shot needed)                               │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ TEMPERATURE GUIDE:                                              │
+│   0.0 → Config generation, compliance, extraction               │
+│   0.3 → Documentation, explanations                             │
+│   0.7 → Brainstorming, alternatives                             │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ ALWAYS SPECIFY:                                                 │
+│   □ Platform (IOS, IOS-XE, NX-OS, Junos, Arista)                │
+│   □ Model/version if relevant                                   │
+│   □ Output format (JSON, commands, prose)                       │
+│   □ What to do if information is missing                        │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ DEBUGGING CHECKLIST:                                            │
+│   □ Is temperature = 0?                                         │
+│   □ Are instructions at the END of long prompts?                │
+│   □ Did you specify output format explicitly?                   │
+│   □ Did you provide examples (few-shot)?                        │
+│   □ Is the task single-focused (not mixing multiple asks)?      │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│ THE GOLDEN RULE:                                                │
+│   If the output is wrong, the prompt is wrong.                  │
+│   The model did exactly what you asked.                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Next Steps
 
 You can now write prompts that consistently produce the results you need. You understand how to control output format, manage randomness, and test effectiveness.
@@ -1392,7 +1494,14 @@ You can now write prompts that consistently produce the results you need. You un
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~7,500 | Code: Tested | Prompt Library: Production-Ready
+**Chapter Status**: Complete (Enhanced) | Word Count: ~9,000 | Code: Tested | Prompt Library: Production-Ready
+
+**What's New in This Version**:
+- Real-world opening story (firewall change review automation)
+- Enhanced networking analogies (route-maps, ECMP)
+- Technique decision table
+- Networking-specific pitfalls section
+- Quick reference cheat sheet
 
 **Files Created**:
 - `networking_prompts.py` - Reusable prompt templates
