@@ -107,7 +107,7 @@ def check_config_ai(config: str) -> dict:
     """
 
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -396,7 +396,7 @@ Return your analysis as valid JSON in this exact format:
     # Call Claude API
     try:
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4000,
             temperature=0,  # Deterministic output for consistency
             messages=[{

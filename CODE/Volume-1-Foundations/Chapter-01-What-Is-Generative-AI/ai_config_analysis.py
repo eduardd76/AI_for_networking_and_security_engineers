@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Chapter 1: What is Generative AI?
-AI-Powered Network Configuration Analysis
+AI-Powered Network Config Analyzer
+Identifies security issues, best practice violations, and optimization opportunities.
 
-This script demonstrates the "Aha Moment" — using AI to analyze
-network configurations and diagnose issues automatically.
+This is the main project from Chapter 1: What is Generative AI?
 
-Run with: python ai_config_analysis.py
-Or:       python ai_config_analysis.py --example 1
+Usage:
+    python ai_config_analysis.py                    # Analyze sample_config.txt
+    python ai_config_analysis.py --file myconfig.cfg  # Analyze custom file
+    python ai_config_analysis.py --severity high    # Only show high+ severity
 
 Author: Eduard Dulharu (Ed Harmoosh)
 Company: vExpertAI GmbH
@@ -15,6 +16,8 @@ Company: vExpertAI GmbH
 
 import os
 import sys
+import json
+import re
 import argparse
 
 # Load environment variables from .env file (optional dependency)
@@ -24,19 +27,15 @@ try:
 except ImportError:
     pass  # dotenv not installed, rely on shell environment
 
-# ---------------------------------------------------------------------------
-# AI Client Setup (Simple, no frameworks needed)
-# ---------------------------------------------------------------------------
 
 def get_ai_client():
     """
     Create an Anthropic client.
     
     We use the Anthropic SDK directly — no frameworks needed for basic calls.
-    This keeps Chapter 1 simple. We'll explore abstractions in later chapters.
     """
     try:
-        import anthropic
+        from anthropic import Anthropic
     except ImportError:
         print("❌ Error: anthropic package not installed")
         print("   Run: pip install anthropic")
@@ -55,439 +54,298 @@ def get_ai_client():
         print("   Get a key at: https://console.anthropic.com/")
         sys.exit(1)
     
-    return anthropic.Anthropic(api_key=api_key)
+    return Anthropic(api_key=api_key)
 
 
-def ask_ai(prompt: str, temperature: float = 0) -> str:
+def analyze_config(config_file: str) -> dict:
     """
-    Send a prompt to Claude and get a response.
+    Analyze network configuration using Claude.
     
     Args:
-        prompt: The question or task for the AI
-        temperature: 0 = deterministic, higher = more creative
+        config_file: Path to configuration file
     
     Returns:
-        The AI's response as a string
+        Dictionary with findings categorized by severity
     """
+    # Read config file
+    try:
+        with open(config_file, 'r') as f:
+            config_text = f.read()
+    except FileNotFoundError:
+        return {"error": f"Config file not found: {config_file}"}
+    
     client = get_ai_client()
     
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=2048,
-        temperature=temperature,
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-    
-    return response.content[0].text
+    # Craft the prompt
+    prompt = f"""You are a senior network security engineer conducting a configuration review.
 
+Analyze this Cisco IOS configuration and identify:
 
-# ---------------------------------------------------------------------------
-# Example 1: Network Topology Analysis
-# ---------------------------------------------------------------------------
+1. **Critical Security Issues**: Vulnerabilities that could lead to compromise
+2. **Warnings**: Best practice violations that should be addressed
+3. **Optimizations**: Opportunities to improve performance or maintainability
 
-def example_topology_analysis():
-    """
-    Analyze a network topology with configuration issues.
-    
-    Scenario: Users report intermittent connectivity between Site A and Site B.
-    BGP is up, OSPF neighbors are up, but 40% of pings fail.
-    
-    This is a classic "iBGP next-hop" issue that trips up many engineers.
-    """
-    print("=" * 60)
-    print("Example 1: Network Topology Analysis")
-    print("=" * 60)
-    print()
+For each finding, provide:
+- **Category**: security | best-practice | optimization
+- **Severity**: critical | high | medium | low
+- **Issue**: One-line description
+- **Explanation**: Why this matters (2-3 sentences)
+- **Recommendation**: Specific fix with example commands
 
-    topology = """
-    Network Topology:
+Configuration:
+```
+{config_text}
+```
 
-    Site A [R1] <--BGP--> [R2] Site B
-              \\          /
-               \\ OSPF   /
-                \\     /
-                 [R3]
-                 Core
-    """
-
-    r1_config = """
-    router bgp 65001
-     neighbor 10.0.0.2 remote-as 65001
-     network 192.168.1.0 mask 255.255.255.0
-    !
-    router ospf 1
-     network 10.1.0.0 0.0.255.255 area 0
-    !
-    interface GigabitEthernet0/0
-     ip address 192.168.1.1 255.255.255.0
-    !
-    interface GigabitEthernet0/1
-     ip address 10.0.0.1 255.255.255.252
-    """
-
-    r2_config = """
-    router bgp 65001
-     neighbor 10.0.0.1 remote-as 65001
-     network 192.168.2.0 mask 255.255.255.0
-    !
-    router ospf 1
-     network 10.2.0.0 0.0.255.255 area 0
-    !
-    interface GigabitEthernet0/0
-     ip address 192.168.2.1 255.255.255.0
-    !
-    interface GigabitEthernet0/1
-     ip address 10.0.0.2 255.255.255.252
-    """
-
-    problem = """
-    Symptoms reported by users:
-    - Site B (192.168.2.0/24) has intermittent connectivity to Site A (192.168.1.0/24)
-    - Ping succeeds about 60% of the time
-    - Traceroute shows different paths each time
-    - BGP session shows as Established
-    - OSPF neighbors are all Full
-
-    Question: What is causing the intermittent connectivity?
-    """
-
-    prompt = f"""You are a senior network engineer troubleshooting a connectivity issue.
-
-{topology}
-
-R1 Configuration:
-{r1_config}
-
-R2 Configuration:
-{r2_config}
-
-{problem}
-
-Analyze the configuration and identify the root cause. Provide:
-1. Root cause explanation (be specific)
-2. Why this causes INTERMITTENT failure (not total failure)
-3. Step-by-step fix
-4. IOS commands to apply the fix
+Return your analysis as valid JSON in this exact format:
+{{
+  "findings": [
+    {{
+      "category": "security",
+      "severity": "critical",
+      "issue": "Weak SNMP community string",
+      "explanation": "The 'public' community string is widely known and allows read access to device information.",
+      "recommendation": "Change to a strong, unique community string: snmp-server community X92kP!m3Z RO"
+    }}
+  ],
+  "summary": {{
+    "total_issues": 5,
+    "critical": 2,
+    "high": 1,
+    "medium": 1,
+    "low": 1
+  }}
+}}
 """
-
-    print("Scenario: Intermittent connectivity between sites")
-    print("Sending to AI for analysis...")
-    print()
-
-    response = ask_ai(prompt, temperature=0)
-
-    print("AI Analysis:")
-    print("-" * 60)
-    print(response)
-    print()
-
-
-# ---------------------------------------------------------------------------
-# Example 2: Rule-Based vs AI-Based Comparison
-# ---------------------------------------------------------------------------
-
-def example_rule_vs_ai():
-    """
-    Compare traditional rule-based automation with AI-based analysis.
     
-    Traditional approach: Pattern matching with regex
-    AI approach: Contextual understanding and correlation
-    """
-    print("=" * 60)
-    print("Example 2: Rule-Based vs AI-Based Automation")
-    print("=" * 60)
-    print()
-
-    logs = [
-        "%BGP-5-ADJCHANGE: neighbor 10.1.1.1 Down - Hold timer expired",
-        "%OSPF-5-ADJCHG: Process 1, Nbr 10.2.2.2 on Gi0/1 from FULL to DOWN",
-        "%LINEPROTO-5-UPDOWN: Line protocol on Interface Gi0/0, changed state to down",
-        "Interface GigabitEthernet0/2 flapping detected - 15 changes in 60 seconds",
-        "%SYS-5-CONFIG_I: Configured from console by admin on vty0"
-    ]
-
-    # Show what traditional automation would do
-    print("TRADITIONAL RULE-BASED APPROACH:")
-    print("-" * 40)
-    print("Pattern: 'BGP.*Down'     → Alert: Critical")
-    print("Pattern: 'OSPF.*DOWN'    → Alert: Critical")
-    print("Pattern: 'UPDOWN.*down'  → Alert: Warning")
-    print("Pattern: 'flapping'      → Alert: Warning")
-    print("Pattern: 'CONFIG_I'      → Alert: Info")
-    print()
-    print("Problems with this approach:")
-    print("  • Cannot correlate events")
-    print("  • Doesn't understand root cause")
-    print("  • Generates separate alerts for related issues")
-    print()
-
-    # Now show AI approach
-    prompt = f"""Analyze these network syslog messages as a senior network engineer.
-
-Logs (in chronological order):
-{chr(10).join(f"  {i+1}. {log}" for i, log in enumerate(logs))}
-
-Provide:
-1. Which issues need immediate attention (and why)
-2. How these events are likely related to each other
-3. Probable root cause
-4. Recommended troubleshooting steps (in order)
-5. Severity assessment for the overall situation
-
-Think step by step about what these logs tell us together."""
-
-    print("AI-BASED APPROACH:")
-    print("-" * 40)
-    print("Sending logs to AI for intelligent analysis...")
-    print()
-
-    response = ask_ai(prompt, temperature=0)
-
-    print("AI Analysis:")
-    print("-" * 60)
-    print(response)
-    print()
-
-
-# ---------------------------------------------------------------------------
-# Example 3: Auto-Generate Documentation
-# ---------------------------------------------------------------------------
-
-def example_generate_docs():
-    """
-    Automatically generate documentation from network configs.
-    
-    This shows the "generative" in Generative AI — creating new content
-    (documentation) from existing data (config).
-    """
-    print("=" * 60)
-    print("Example 3: Auto-Generate Network Documentation")
-    print("=" * 60)
-    print()
-
-    config = """
-    hostname CORE-SW-01
-    !
-    vlan 10
-     name USERS
-    vlan 20
-     name SERVERS
-    vlan 30
-     name VOICE
-    vlan 99
-     name MANAGEMENT
-    !
-    interface GigabitEthernet1/0/1
-     description Uplink to Core Router
-     switchport mode trunk
-     switchport trunk allowed vlan 10,20,30,99
-    !
-    interface GigabitEthernet1/0/10
-     description User Access Port - Floor 2
-     switchport mode access
-     switchport access vlan 10
-     spanning-tree portfast
-    !
-    interface Vlan99
-     description Management Interface
-     ip address 10.0.99.10 255.255.255.0
-    """
-
-    prompt = f"""Generate clear, professional documentation for this switch configuration.
-
-Configuration:
-{config}
-
-Create documentation that includes:
-1. Device Overview (hostname, apparent role in network)
-2. VLAN Design (table format: VLAN ID | Name | Purpose)
-3. Interface Summary (what's connected where)
-4. Management Access (how to reach this device)
-5. Notable Configurations (any best practices or concerns)
-
-Format as clean markdown. Be concise but complete."""
-
-    print("Input: Raw switch configuration")
-    print("Output: Professional documentation")
-    print()
-    print("Generating documentation...")
-    print()
-
-    # Slightly higher temperature for more natural writing
-    response = ask_ai(prompt, temperature=0.3)
-
-    print("Generated Documentation:")
-    print("-" * 60)
-    print(response)
-    print()
-
-
-# ---------------------------------------------------------------------------
-# Example 4: Security Issue Detection
-# ---------------------------------------------------------------------------
-
-def example_security_scan():
-    """
-    Scan a network config for security issues.
-    
-    AI can understand security context and best practices,
-    finding issues that simple pattern matching would miss.
-    """
-    print("=" * 60)
-    print("Example 4: Security Issue Detection")
-    print("=" * 60)
-    print()
-
-    config = """
-    hostname EDGE-RTR-01
-    !
-    username admin privilege 15 password cisco123
-    !
-    line vty 0 4
-     transport input telnet
-     password cisco
-     login
-    !
-    snmp-server community public RO
-    snmp-server community private RW
-    !
-    interface GigabitEthernet0/0
-     description Internet Uplink
-     ip address 203.0.113.1 255.255.255.252
-     no ip proxy-arp
-    !
-    interface GigabitEthernet0/1
-     description Internal Network
-     ip address 192.168.1.1 255.255.255.0
-    !
-    ip http server
-    no ip http secure-server
-    !
-    access-list 1 permit any
-    ip nat inside source list 1 interface GigabitEthernet0/0 overload
-    """
-
-    prompt = f"""You are a network security auditor. Analyze this router configuration 
-and identify ALL security vulnerabilities.
-
-Configuration:
-{config}
-
-For each issue found, provide:
-1. Issue name
-2. Why it's a security risk
-3. Severity (Critical / High / Medium / Low)
-4. Specific remediation commands
-
-Be thorough — check authentication, encryption, access control, protocols, 
-SNMP, management interfaces, and ACLs."""
-
-    print("Scanning configuration for security issues...")
-    print()
-
-    response = ask_ai(prompt, temperature=0)
-
-    print("Security Audit Results:")
-    print("-" * 60)
-    print(response)
-    print()
-
-
-# ---------------------------------------------------------------------------
-# Main Entry Point
-# ---------------------------------------------------------------------------
-
-def run_all_examples():
-    """Run all examples in sequence."""
-    examples = [
-        ("Topology Analysis", example_topology_analysis),
-        ("Rule-Based vs AI", example_rule_vs_ai),
-        ("Generate Documentation", example_generate_docs),
-        ("Security Scanning", example_security_scan),
-    ]
-    
-    for i, (name, func) in enumerate(examples, 1):
-        func()
+    # Call Claude API
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            temperature=0,  # Deterministic output for consistency
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
+        )
         
-        if i < len(examples):
-            print()
-            try:
-                input(f"Press Enter for next example ({i+1}/{len(examples)})...")
-            except KeyboardInterrupt:
-                print("\n\nExiting.")
-                return
-            print()
+        # Extract response text
+        response_text = response.content[0].text
+        
+        # Parse JSON (Claude should return valid JSON)
+        try:
+            # Find JSON in response (may have surrounding text)
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = {"error": "No JSON found in response", "raw": response_text}
+        
+        except json.JSONDecodeError:
+            result = {"error": "Invalid JSON in response", "raw": response_text}
+        
+        return result
     
-    print("=" * 60)
-    print("✅ All examples completed!")
-    print("=" * 60)
+    except Exception as e:
+        return {"error": f"API call failed: {str(e)}"}
+
+
+def format_findings(analysis: dict, min_severity: str = None) -> None:
+    """
+    Pretty-print the analysis results.
+    
+    Args:
+        analysis: Dictionary from analyze_config()
+        min_severity: Minimum severity to show (critical, high, medium, low)
+    """
+    if "error" in analysis:
+        print(f"❌ Error: {analysis['error']}")
+        if "raw" in analysis:
+            print(f"\nRaw response:\n{analysis['raw']}")
+        return
+    
+    severity_order = ['critical', 'high', 'medium', 'low']
+    severity_icons = {'critical': '🔴', 'high': '🟠', 'medium': '🟡', 'low': '🟢'}
+    
+    # Filter by minimum severity if specified
+    if min_severity:
+        min_idx = severity_order.index(min_severity)
+        show_severities = severity_order[:min_idx + 1]
+    else:
+        show_severities = severity_order
+    
+    # Print summary
+    summary = analysis.get('summary', {})
+    print("=" * 80)
+    print("CONFIG ANALYSIS SUMMARY")
+    print("=" * 80)
+    print(f"Total Issues: {summary.get('total_issues', 0)}")
+    print(f"  🔴 Critical: {summary.get('critical', 0)}")
+    print(f"  🟠 High: {summary.get('high', 0)}")
+    print(f"  🟡 Medium: {summary.get('medium', 0)}")
+    print(f"  🟢 Low: {summary.get('low', 0)}")
     print()
-    print("💡 Key Takeaways:")
-    print("   • AI understands network context, not just patterns")
-    print("   • Complex troubleshooting in seconds, not hours")
-    print("   • Documentation and security audits on autopilot")
-    print("   • But always verify before applying to production!")
-    print()
-    print("→ Next: Chapter 2 - Introduction to LLMs")
-    print()
+    
+    if min_severity:
+        print(f"(Showing {min_severity} and above)")
+        print()
+    
+    # Print findings by severity
+    for severity in severity_order:
+        if severity not in show_severities:
+            continue
+            
+        findings = [f for f in analysis.get('findings', [])
+                   if f.get('severity') == severity]
+        
+        if not findings:
+            continue
+        
+        print(f"\n{severity_icons[severity]} {severity.upper()} ISSUES")
+        print("-" * 80)
+        
+        for i, finding in enumerate(findings, 1):
+            print(f"\n{i}. {finding.get('issue', 'Unknown issue')}")
+            print(f"   Category: {finding.get('category', 'unknown')}")
+            print(f"\n   Explanation:")
+            print(f"   {finding.get('explanation', 'No explanation')}")
+            print(f"\n   Recommendation:")
+            print(f"   {finding.get('recommendation', 'No recommendation')}")
+    
+    print("\n" + "=" * 80)
+
+
+def create_sample_config():
+    """Create sample config file if it doesn't exist."""
+    sample_path = os.path.join(os.path.dirname(__file__), "sample_config.txt")
+    
+    if os.path.exists(sample_path):
+        return sample_path
+    
+    sample_config = """version 15.2
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname Branch-RTR-01
+!
+boot-start-marker
+boot-end-marker
+!
+enable secret 5 $1$mERr$Vh5xqO5S7K8X1.L4K2kNz1
+!
+no aaa new-model
+!
+ip cef
+!
+interface GigabitEthernet0/0
+ description WAN-Uplink
+ ip address 203.0.113.5 255.255.255.252
+ duplex auto
+ speed auto
+!
+interface GigabitEthernet0/1
+ description LAN-Access
+ ip address 192.168.100.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Vlan10
+ description Guest-Network
+ ip address 10.10.10.1 255.255.255.0
+!
+router ospf 1
+ network 192.168.100.0 0.0.0.255 area 0
+ network 10.10.10.0 0.0.0.255 area 1
+!
+ip route 0.0.0.0 0.0.0.0 203.0.113.6
+!
+snmp-server community public RO
+snmp-server community private RW
+!
+line vty 0 4
+ password cisco123
+ transport input telnet ssh
+line vty 5 15
+ no login
+!
+end
+"""
+    
+    with open(sample_path, 'w') as f:
+        f.write(sample_config)
+    
+    print(f"Created sample config: {sample_path}")
+    return sample_path
 
 
 def main():
+    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Chapter 1: What is Generative AI? — Network Config Analysis Examples",
+        description="AI-Powered Network Config Analyzer - Chapter 1 Project",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python ai_config_analysis.py           Run all examples interactively
-  python ai_config_analysis.py -e 1      Run only topology analysis
-  python ai_config_analysis.py -e 4      Run only security scanning
-  python ai_config_analysis.py --list    List all available examples
+  python ai_config_analysis.py                      Analyze sample_config.txt
+  python ai_config_analysis.py --file router.cfg   Analyze custom file
+  python ai_config_analysis.py --severity high     Only show high and critical
+  python ai_config_analysis.py --output results.json   Save to custom file
         """
     )
     
     parser.add_argument(
-        "-e", "--example",
-        type=int,
-        choices=[1, 2, 3, 4],
-        help="Run a specific example (1-4)"
+        "-f", "--file",
+        help="Config file to analyze (default: sample_config.txt)"
     )
     
     parser.add_argument(
-        "--list",
-        action="store_true",
-        help="List all available examples"
+        "-s", "--severity",
+        choices=['critical', 'high', 'medium', 'low'],
+        help="Minimum severity to display"
+    )
+    
+    parser.add_argument(
+        "-o", "--output",
+        default="analysis_results.json",
+        help="Output JSON file (default: analysis_results.json)"
     )
     
     args = parser.parse_args()
     
-    # Print header
     print()
-    print("🚀 Chapter 1: What is Generative AI?")
-    print("   AI-Powered Network Configuration Analysis")
-    print()
+    print("🔍 AI-Powered Config Analyzer")
+    print("   Chapter 1: What is Generative AI?")
+    print("=" * 80)
     
-    if args.list:
-        print("Available examples:")
-        print("  1. Topology Analysis    — Diagnose BGP/OSPF connectivity issues")
-        print("  2. Rule-Based vs AI     — Compare traditional vs AI automation")
-        print("  3. Generate Docs        — Auto-create documentation from configs")
-        print("  4. Security Scanning    — Find vulnerabilities in router configs")
-        print()
-        print("Run with: python ai_config_analysis.py --example N")
-        return
-    
-    if args.example:
-        examples = {
-            1: example_topology_analysis,
-            2: example_rule_vs_ai,
-            3: example_generate_docs,
-            4: example_security_scan,
-        }
-        examples[args.example]()
+    # Determine config file
+    if args.file:
+        config_file = args.file
     else:
-        run_all_examples()
+        config_file = create_sample_config()
+    
+    print(f"Analyzing: {config_file}")
+    print("This may take 10-20 seconds...\n")
+    
+    # Run analysis
+    analysis = analyze_config(config_file)
+    
+    # Display results
+    format_findings(analysis, min_severity=args.severity)
+    
+    # Save results
+    if "error" not in analysis:
+        output_file = args.output
+        with open(output_file, 'w') as f:
+            json.dump(analysis, f, indent=2)
+        print(f"\n✅ Full results saved to: {output_file}")
+    
+    print()
+    print("💡 Next Steps:")
+    print("   • Try analyzing your own configs (sanitize sensitive data first)")
+    print("   • Modify the prompt to add custom checks")
+    print("   • See Chapter 2 for how LLMs work under the hood")
+    print()
 
 
 if __name__ == "__main__":

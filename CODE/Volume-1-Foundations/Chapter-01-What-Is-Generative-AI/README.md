@@ -1,150 +1,162 @@
 # Chapter 1: What Is Generative AI?
 
-> Your first "aha moment" — watch AI diagnose network issues in seconds.
+> Your first "aha moment" — watch AI diagnose network security issues in seconds.
 
-## What You'll Learn
+## What You'll Build
 
-By the end of this chapter, you will:
+A **production-ready config analyzer** that:
+- Identifies security vulnerabilities
+- Finds best practice violations  
+- Suggests optimizations
+- Outputs structured JSON results
 
-- **See** AI analyze real network problems (BGP, OSPF, security misconfigs)
-- **Understand** why LLMs are different from traditional automation
-- **Compare** rule-based vs. AI-based approaches
-- **Run** your first AI-powered network analysis
+This is the project from the book chapter. The code here matches the chapter content exactly.
 
 ## Prerequisites
 
 | Requirement | Notes |
 |-------------|-------|
 | Python 3.10+ | Check with `python --version` |
-| Anthropic API key | Free tier works! Get one at [console.anthropic.com](https://console.anthropic.com/) |
-| Basic networking | CCNA-level (know what BGP/OSPF are) |
+| Anthropic API key | Get one at [console.anthropic.com](https://console.anthropic.com/) |
+| Basic networking | CCNA-level (understand configs) |
 
 ## Time & Cost
 
-- ⏱️ **Time:** 20-30 minutes
-- 💰 **API Cost:** ~$0.30-0.50 (all 4 examples)
+- ⏱️ **Time:** 5-10 minutes to run
+- 💰 **API Cost:** ~$0.03-0.08 per analysis
 
 ## Quick Start
 
 ```bash
-# 1. Make sure you're in the right directory
+# 1. Navigate to Volume 1
 cd CODE/Volume-1-Foundations
 
-# 2. Activate your virtual environment
+# 2. Activate virtual environment
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 3. Set your API key (or add to .env file)
+# 3. Set your API key
 export ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
 
-# 4. Run Chapter 1
+# 4. Run the analyzer (creates sample_config.txt automatically)
 python Chapter-01-What-Is-Generative-AI/ai_config_analysis.py
 ```
 
-### Run Individual Examples
+## Usage Options
 
 ```bash
-# Just the topology analysis
-python Chapter-01-What-Is-Generative-AI/ai_config_analysis.py --example 1
+# Analyze the sample config (default)
+python ai_config_analysis.py
 
-# Just security scanning
-python Chapter-01-What-Is-Generative-AI/ai_config_analysis.py --example 4
+# Analyze your own config
+python ai_config_analysis.py --file /path/to/router.cfg
 
-# List all examples
-python Chapter-01-What-Is-Generative-AI/ai_config_analysis.py --help
+# Only show critical and high severity issues
+python ai_config_analysis.py --severity high
+
+# Save results to custom file
+python ai_config_analysis.py --output my_results.json
+
+# Combine options
+python ai_config_analysis.py -f myconfig.cfg -s high -o audit.json
 ```
-
-## The 4 Examples
-
-### Example 1: Network Topology Analysis 🔍
-**The scenario:** Users report intermittent connectivity between two sites. BGP is up, OSPF neighbors are up, but pings fail 40% of the time.
-
-**What AI does:** Analyzes the topology and configs to find the root cause — something that would take a human engineer 15-30 minutes of troubleshooting.
-
-### Example 2: Rule-Based vs AI-Based 🤖
-**The comparison:** See how traditional regex/pattern matching handles syslog messages vs. how AI understands context and correlates events.
-
-### Example 3: Auto-Generate Documentation 📝
-**The magic:** Feed in a switch config, get back clean markdown documentation. No more outdated network diagrams.
-
-### Example 4: Security Issue Detection 🔒
-**The audit:** AI scans a router config and finds every security issue — weak passwords, telnet enabled, dangerous SNMP communities, and more.
 
 ## Sample Output
 
-Don't have an API key yet? Here's what Example 1 looks like:
-
 ```
-============================================================
-Example 1: Network Topology Analysis
-============================================================
-Analyzing topology with AI...
+🔍 AI-Powered Config Analyzer
+   Chapter 1: What is Generative AI?
+================================================================================
+Analyzing: sample_config.txt
+This may take 10-20 seconds...
 
-AI Analysis Result:
-------------------------------------------------------------
-## Root Cause Analysis
+================================================================================
+CONFIG ANALYSIS SUMMARY
+================================================================================
+Total Issues: 8
+  🔴 Critical: 3
+  🟠 High: 2
+  🟡 Medium: 2
+  🟢 Low: 1
 
-The intermittent connectivity is caused by **asymmetric routing** 
-combined with **missing iBGP next-hop-self configuration**.
+🔴 CRITICAL ISSUES
+--------------------------------------------------------------------------------
 
-### Why It's Intermittent (Not Total Failure)
+1. Weak SNMP Community Strings
+   Category: security
 
-1. Traffic from Site A → Site B uses BGP (works)
-2. Return traffic from Site B → Site A sometimes uses OSPF path via R3
-3. R3 doesn't have the BGP routes, causing packet drops
+   Explanation:
+   The configuration uses default 'public' and 'private' SNMP community strings 
+   which are widely known. The 'private' string with RW access allows config changes.
 
-### Fix
+   Recommendation:
+   no snmp-server community public
+   no snmp-server community private
+   snmp-server community X92kP!m3Z RO
+   snmp-server community Y83nQ!r7W RW
 
-On R1:
-  router bgp 65001
-   neighbor 10.0.0.2 next-hop-self
-
-On R2:
-  router bgp 65001
-   neighbor 10.0.0.1 next-hop-self
-
-### Verification
-  show ip bgp neighbors 10.0.0.x advertised-routes
-------------------------------------------------------------
+...
 ```
 
-## Key Takeaways
+## The Sample Config
 
-After running these examples, you should understand:
+The analyzer creates `sample_config.txt` automatically with intentional issues:
 
-1. **AI understands context** — It doesn't just match patterns, it reasons about network behavior
-2. **Speed matters** — What takes 30 minutes manually takes 10 seconds with AI
-3. **It's not magic** — AI can be wrong. Always verify recommendations before applying to production
-4. **This changes everything** — Network automation just leveled up
+| Issue | Severity | Type |
+|-------|----------|------|
+| SNMP 'public'/'private' | Critical | Security |
+| VTY lines without auth | Critical | Security |
+| Cleartext password | Critical | Security |
+| Telnet enabled | High | Security |
+| No NTP configured | High | Best Practice |
+| OSPF area design | Medium | Best Practice |
+| Missing descriptions | Medium | Optimization |
+| Password encryption off | Low | Best Practice |
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `ai_config_analysis.py` | Main analyzer script |
+| `sample_config.txt` | Sample Cisco IOS config (auto-created) |
+| `analysis_results.json` | Output file with full findings |
+
+## How It Works
+
+1. **Read config** — Load the text file
+2. **Build prompt** — Tell Claude what to look for
+3. **Call API** — Send to Claude Sonnet 4
+4. **Parse JSON** — Extract structured findings
+5. **Display results** — Pretty-print by severity
+
+No regex. No rule lists. The AI reasons about the config like an experienced engineer would.
+
+## Lab Exercises
+
+From the book chapter:
+
+1. **Modify the prompt** — Add check for deprecated IOS commands
+2. **Analyze your own config** — Use `--file` with a real config (sanitize first!)
+3. **Add severity filtering** — ✅ Already implemented with `--severity`
+4. **Batch processing** — Modify to process a directory of configs
 
 ## Troubleshooting
 
-### "ANTHROPIC_API_KEY not found"
+### "API Key Not Found"
 ```bash
-# Option 1: Export directly
 export ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
-
-# Option 2: Add to .env file
-echo "ANTHROPIC_API_KEY=sk-ant-api03-your-key-here" >> .env
+# Or add to .env file in this directory
 ```
 
-### "Rate limit exceeded"
-Free tier has limits. Wait 60 seconds and try again, or run one example at a time with `--example N`.
+### "Rate Limit Exceeded"
+Free tier: ~5 requests/minute. Wait and retry.
 
-### "Connection error"
-Check your internet connection. The script needs to reach `api.anthropic.com`.
-
-## Exercises
-
-Ready to experiment? Try these:
-
-1. **Modify the topology** — Change the BGP/OSPF config in Example 1 and see if AI catches the new issue
-2. **Add your own config** — Replace the sample security config with one of your real devices
-3. **Compare models** — Change the model to `claude-3-5-haiku-20241022` (10x cheaper) and compare quality
+### "Context Length Exceeded"  
+Config too large. Split into sections or use Claude Opus (200K context).
 
 ## Next Steps
 
-→ **Chapter 2:** Introduction to LLMs — understand *how* this works under the hood
+→ **Chapter 2:** Introduction to LLMs — understand tokens, context, and why this works
 
 ---
 
-**Questions?** Open an issue on GitHub or join the Discord community.
+**Full chapter:** See `Volume-1-Foundations/Chapters/Chapter-01-What-Is-Generative-AI.md`
