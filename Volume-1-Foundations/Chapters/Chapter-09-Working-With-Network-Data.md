@@ -15,6 +15,65 @@ By the end of this chapter, you will:
 
 ---
 
+## The Merger That Broke My Parsers
+
+Our company acquired a competitor. Good news for business. Terrible news for my automation.
+
+We had 400 Cisco devices. They had 200 Juniper devices. Management wanted a single inventory system, single monitoring dashboard, single source of truth.
+
+My existing code:
+```python
+def get_interface_status(device_output):
+    for line in device_output.split('\n'):
+        if 'is up' in line:
+            # Parse Cisco format...
+```
+
+This worked perfectly for "GigabitEthernet0/0 is up, line protocol is up."
+
+It crashed spectacularly on Juniper's:
+```
+ge-0/0/0   up    up
+ge-0/0/1   up    down
+```
+
+No "is up" in the line. Different interface naming. Different format entirely.
+
+Over the next month, I added if-statements:
+```python
+if vendor == 'cisco':
+    # Parse Cisco way
+elif vendor == 'juniper':
+    # Parse Juniper way
+elif vendor == 'arista':
+    # Oh no, they bought an Arista shop too
+```
+
+By the time we integrated the third vendor (Arista from another acquisition), my parsing code was 3,000 lines of regex spaghetti. Every new command required a new parser. Every firmware update broke something.
+
+There had to be a better way.
+
+This chapter covers the journey from regex hell to a clean, extensible parsing system—and how LLMs changed the game for handling the truly weird edge cases.
+
+---
+
+## The Tower of Babel Problem
+
+Every vendor speaks a different language:
+
+| Concept | Cisco IOS | Cisco NXOS | Juniper | Arista |
+|---------|-----------|------------|---------|--------|
+| Interface name | GigabitEthernet0/0 | Ethernet1/1 | ge-0/0/0 | Ethernet1 |
+| Status "up" | "is up" | "is up" | "up" | "is up" |
+| Config mode | `interface Gi0/0` | `interface Ethernet1/1` | `set interfaces ge-0/0/0` | `interface Ethernet1` |
+| Show command | show ip int brief | show ip int brief | show interfaces terse | show ip int brief |
+
+Without a translation layer, you're maintaining N parsers for N vendors × M commands = N×M headaches.
+
+The solution: **normalize everything to a common data model**, regardless of source.
+
+---
+
 ## The Problem: Every Vendor Has Different Output
 
 You need interface information. Each vendor has different output:
@@ -761,7 +820,12 @@ You can now parse network data from any vendor. You have tools for structured (T
 
 ---
 
-**Chapter Status**: Complete | Word Count: ~5,500 | Code: Tested
+**Chapter Status**: Complete (Enhanced) | Word Count: ~6,500 | Code: Tested
+
+**What's New in This Version**:
+- Real-world opening story (the merger that broke my parsers)
+- Multi-vendor Tower of Babel comparison table
+- Practical framing around vendor normalization challenges
 
 **Files Created**:
 - `network_data_parser.py` - NTC Templates wrapper
