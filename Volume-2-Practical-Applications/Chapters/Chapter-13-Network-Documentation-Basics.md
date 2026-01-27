@@ -21,9 +21,10 @@ A new engineer asks: "What's the BGP policy for AWS?" Nobody knows. It takes 3 d
 
 | File | Description | Lines | Key Features |
 |------|-------------|-------|--------------|
-| `doc_generator.py` | Device documentation generator | ~250 | Overview, interfaces, routing, security |
-| `topology_diagrammer.py` | Network diagram generator | ~150 | CDP/LLDP parsing, Mermaid output |
-| `documentation_pipeline.py` | Automated pipeline | ~200 | Scheduling, Git versioning, batch processing |
+| `doc_generator.py` | Device documentation generator | ~800 | Device type detection, multi-vendor support, output formats |
+| `doc_analyzer.py` | Configuration analyzer | ~400 | Security scanning, best practices, compliance checking |
+| `topology_diagrammer.py` | Network diagram generator | ~400 | CDP/LLDP parsing, Mermaid output, connection analysis |
+| `documentation_pipeline.py` | Automated pipeline | ~500 | Scheduling, Git versioning, batch processing, change detection |
 
 ## Quick Start
 
