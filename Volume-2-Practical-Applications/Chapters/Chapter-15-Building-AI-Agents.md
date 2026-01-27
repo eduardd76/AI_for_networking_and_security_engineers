@@ -24,1135 +24,1460 @@ Agents automate this process. The network engineer becomes a supervisor of agent
 
 ---
 
-## Part 1: Agent Architecture from First Principles
+## Part 1: Agent Theory and Fundamentals
 
-### 1.1 What is an Agent? A Structural Definition
+### 1.1 What is an Agent? From Theory to Practice
 
-An agent is not a chatbot. It is not an API. It is a **decision-making system** with specific structural characteristics:
+**Definition**: An agent is a system that maintains internal state, receives observations from its environment, applies reasoning to those observations, chooses actions based on that reasoning, and learns from the outcomes.
 
-```
-A Network Agent is a system that:
-1. OBSERVES its environment (devices, configs, logs, monitoring)
-2. THINKS about what it observes (reasoning + Claude)
-3. ACTS on its reasoning (calls tools, executes commands)
-4. VERIFIES its actions (checks results)
-5. LOOPS until goal is achieved or constraint hit
-```
+This is more precise than "it's like a chatbot." Key components:
 
-This structure is fundamentally different from a traditional script:
+1. **Internal State** - What the agent knows/remembers (goal, history, context)
+2. **Observations** - What it perceives (device status, logs, configs)
+3. **Reasoning** - How it thinks (Claude's reasoning)
+4. **Action Selection** - What it decides to do (tool choice)
+5. **Execution** - How it does it (tool calling)
+6. **Learning** - How it improves (feedback loop)
 
-```
-Traditional Script:
-if condition_X:
-    do_action_Y
-elif condition_Z:
-    do_action_W
-else:
-    do_default_action
+### 1.2 The Mathematical Foundation: Markov Decision Process (MDP)
 
-Problem: Requires programmer to predict all possible scenarios.
-Works when scenarios are limited and well-defined.
-Fails when novel situations arise.
-
-Agent:
-OBSERVE: Get current state
-THINK: "What should I do?" (Claude reasons)
-ACT: Execute tools
-VERIFY: Check results
-LOOP: Repeat until goal achieved
-
-Advantage: Handles novel scenarios through reasoning.
-Disadvantage: More complex, requires oversight.
-```
-
-**When are agents appropriate?**
-- ✓ Problems are complex and variable
-- ✓ Human oversight is available
-- ✓ Cost of mistakes is acceptable (with safety measures)
-- ✗ Problems are simple and fully specified (use scripts)
-- ✗ Cost of any mistake is unacceptable
-- ✗ No human can provide timely oversight
-
-### 1.2 Agent Types: From Simple to Complex
-
-Agents exist on a spectrum. Understanding this spectrum clarifies design choices:
-
-#### Type 1: Query-Response Agent (Zero Loop)
+Network operations can be modeled as a Markov Decision Process:
 
 ```
-User Question
-    ↓
-[Choose best tool]  ← Reasoning
-    ↓
-[Execute tool]      ← Action
-    ↓
-[Return result]
+State Space (S):
+├─ Device states: {up, down, degraded}
+├─ Configuration states: {correct, incorrect}
+├─ Service states: {running, stopped, hanging}
+└─ Network states: {converged, unconverged}
+
+Action Space (A):
+├─ Observe actions: {check_status, get_config, analyze_logs}
+├─ Intervention actions: {apply_config, restart_service}
+└─ Communication actions: {notify_team, escalate}
+
+Transitions:
+S_t + A_t → S_t+1
+
+Example:
+State: router-02 BGP neighbors down
+Action: fix_bgp_config
+Result: State → BGP neighbors up
+
+Reward:
+R(S_t, A_t, S_t+1) = benefit of action
+- Success fixing issue: +100
+- Unsuccessful fix: -50
+- Action took too long: -10
 ```
 
-**Use case**: "What's the BGP status on router-core-01?"
-**Characteristics**: Single decision, single action, immediate result
-**Complexity**: Low
-**Risk**: Very low (read-only)
-**Example implementation**: 
-```python
-def answer_question(question):
-    tool_needed = claude_chooses_tool(question)
-    result = execute_tool(tool_needed)
-    return result
-```
+**Why this matters**: Understanding agents as MDPs clarifies that agent decision-making is fundamentally about **finding optimal action sequences in complex state spaces**.
 
-#### Type 2: Linear Agent (Simple Loop)
+The agent's job: "Given current state S and goal G, choose action A that maximizes probability of reaching goal state."
 
-```
-Goal: "Fix BGP route not advertising"
-    ↓
-Step 1: Check BGP status
-Step 2: Check OSPF status
-Step 3: Check configuration
-Step 4: Apply fix (if needed)
-Step 5: Verify fix
-    ↓
-Complete
-```
+### 1.3 The Agent Loop: Detailed Theory
 
-**Use case**: Diagnosis with linear steps
-**Characteristics**: Multiple steps, predetermined sequence
-**Complexity**: Medium
-**Risk**: Medium (may execute fixes)
-**Safety mechanism**: Require approval before write operations
-
-#### Type 3: Looping Agent (Agentic Loop)
-
-```
-Goal: "Achieve optimal network performance"
-    ↓
-Loop:
-  1. Observe metrics
-  2. Identify problems
-  3. Reason about solutions
-  4. Decide next step
-  5. Execute (with approval)
-  6. Verify
-  7. Go back to 1 (if goal not achieved)
-    ↓
-Continue until goal achieved or max iterations
-```
-
-**Use case**: Complex multi-step problems, optimization
-**Characteristics**: Flexible iteration, dynamic path to solution
-**Complexity**: High
-**Risk**: High (continuous operations)
-**Safety mechanism**: Rate limiting, approval threshold, rollback capability
-
-#### Type 4: Multi-Agent System (Coordinated Loop)
-
-```
-Master Agent: "Ensure network availability"
-    ├─ Monitoring Agent (continuously checks status)
-    ├─ Diagnostic Agent (diagnoses problems)
-    ├─ Planning Agent (decides on fixes)
-    ├─ Execution Agent (applies fixes)
-    └─ Verification Agent (confirms success)
-
-All coordinate toward common goal
-```
-
-**Use case**: Enterprise-scale autonomous operations
-**Characteristics**: Specialized roles, coordination
-**Complexity**: Very High
-**Risk**: Very High (complex interactions)
-**Safety mechanism**: Orchestration layer, circuit breakers, fallback
-
-**Architecture decision**: Most organizations start with Type 1-2, graduate to Type 3 as they mature. Type 4 is enterprise-scale complexity.
-
-### 1.3 The Agent Loop: Detailed Examination
-
-The agent loop is the core algorithm. Understanding it thoroughly is essential:
+The core agent algorithm is fundamentally simple but has deep implications:
 
 ```python
-class Agent:
-    def __init__(self, tools, knowledge_base):
-        self.tools = tools          # Available actions
-        self.knowledge = knowledge_base  # Documentation + RAG
-        self.context = {}           # Current situation
-        self.history = []           # What we've tried
+def agent_loop(goal, max_iterations=10):
+    """
+    The core agent algorithm
+    """
     
-    def run(self, goal):
-        for iteration in range(MAX_ITERATIONS):
-            # OBSERVE: What's the current state?
-            self.observe()
-            
-            # THINK: What should we do?
-            next_action = self.decide_next_action(goal)
-            
-            # Check termination conditions
-            if next_action['type'] == 'DONE':
-                return self.context['result']
-            
-            if next_action['type'] == 'REQUIRES_HELP':
-                return self.context['result']
-            
-            # ACT: Do it (with safety checks)
-            if self.is_safe_to_execute(next_action):
-                result = self.execute_action(next_action)
-            else:
-                # Escalate to human
-                return self.escalate_to_human(next_action)
-            
-            # VERIFY: Did it work?
-            verification = self.verify_action(result)
-            
-            # LEARN: Remember what happened
-            self.history.append({
-                'iteration': iteration,
-                'action': next_action,
-                'result': result,
-                'verification': verification
-            })
-            
-            # Update context for next iteration
-            self.context['last_result'] = result
-            self.context['progress'] = verification['progress']
+    state = initial_state()  # OBSERVE initial situation
+    iteration = 0
+    
+    while iteration < max_iterations:
+        iteration += 1
+        
+        # OBSERVE: Perceive current situation
+        observations = observe_environment()
+        state.update(observations)
+        
+        # CHECK: Is goal achieved?
+        if state.goal_achieved():
+            return {'status': 'success', 'iterations': iteration}
+        
+        # THINK: Reason about what to do
+        decision = reason_about_options(goal, state, history)
+        
+        # CHECK: Should we escalate instead?
+        if decision.requires_human_input:
+            return {'status': 'escalated', 'reason': decision.reason}
+        
+        # ACT: Execute decision
+        action_result = execute_action(decision)
+        
+        # VERIFY: Did it work?
+        verification = verify_action(action_result)
+        
+        # LEARN: Remember what happened
+        history.append({
+            'iteration': iteration,
+            'observations': observations,
+            'decision': decision,
+            'action_result': action_result,
+            'verification': verification
+        })
+        
+        if not verification.success:
+            state.record_failure(action_result)
+    
+    return {'status': 'max_iterations_reached'}
 ```
 
-**Key design decisions in the loop:**
+**Key insight**: The loop is **data-driven**. Each iteration:
+1. Gathers new data (OBSERVE)
+2. Updates understanding of state
+3. Makes decision based on current state
+4. Executes
+5. Verifies and learns
 
-1. **Iteration limit**: Prevents infinite loops
-2. **Termination conditions**: DONE, REQUIRES_HELP, ERROR
-3. **Safety checks**: Is it safe to execute before executing?
-4. **Verification step**: Don't assume success, verify it
-5. **Escalation path**: Human intervention when needed
+This is fundamentally different from a pre-programmed script, which follows a fixed sequence regardless of outcomes.
+
+### 1.4 Agent vs Script: A Detailed Comparison
+
+To understand when agents are appropriate, compare them systematically:
+
+```
+SCRIPT APPROACH:
+if bgp_neighbors_down:
+    check_bgp_config()
+    if config_wrong:
+        fix_bgp_config()
+    elif adjacency_down:
+        check_links()
+        if link_down:
+            escalate_to_human()
+
+Problem 1: Explosion of branches
+- N conditions → 2^N possible paths
+- 5 conditions → 32 possible paths (hard to maintain)
+- 10 conditions → 1024 possible paths (impossible)
+
+Problem 2: No reasoning
+- Script can't understand "why" a condition exists
+- Can't adapt to novel situations
+- No learning from experience
+
+Problem 3: Brittleness
+- Small change in conditions breaks assumptions
+- Requires code modification to adapt
+
+
+AGENT APPROACH:
+goal = "fix_bgp_connectivity"
+
+while not goal_achieved:
+    observations = check_current_state()
+    
+    decision = claude.reason(
+        "Given observations, what's the best next action?"
+    )
+    
+    execute(decision)
+    verify()
+
+Advantage 1: Flexibility
+- Agent reasons about novel situations
+- No predetermined path needed
+- Handles unexpected scenarios
+
+Advantage 2: Learning
+- Agent learns from what works
+- Improves over time
+- Captures context in prompts
+
+Advantage 3: Scalability
+- Works with any number of conditions
+- Conditions added without code changes
+- Team can update without engineering
+```
+
+**Detailed Trade-off Analysis**:
+
+| Aspect | Script | Agent |
+|--------|--------|-------|
+| Predictability | Very high (follows fixed path) | Medium (follows reasoning) |
+| Maintainability | Hard (explosion of branches) | Easier (reasoning is central) |
+| Novelty handling | Poor (breaks on new situations) | Good (reasons through unknowns) |
+| Speed | Fast (no thinking required) | Slower (includes reasoning time) |
+| Implementation time | Medium (lots of conditions) | Higher (prompt engineering) |
+| Debugging when wrong | Easy (trace through if-else) | Harder (why did it think that?) |
+| Cost | Low (no LLM calls) | High (LLM calls per iteration) |
+| Team skill needed | Mid (programming) | Higher (prompt eng + programming) |
+
+**Decision rule:**
+- **Use scripts** if: Problem is well-specified, small number of scenarios, cost-sensitive
+- **Use agents** if: Problem is complex, novel situations occur, human oversight available
+
+Most enterprise networks need **both**: scripts for simple, repetitive tasks; agents for complex troubleshooting.
 
 ---
 
-## Part 2: Tool Design - Giving Agents Capabilities
+## Part 2: The Agent Loop in Detail - How Agents Actually Work
 
-### 2.1 What is a Tool?
+### 2.1 The OBSERVE Phase: Perception and State Gathering
 
-A tool is a function an agent can call to interact with the network:
-
-```python
-class Tool:
-    def __init__(self, name, description, execute_func, 
-                 is_write=False, requires_approval=False):
-        self.name = name  # "check_bgp_status"
-        self.description = description  # What it does
-        self.execute_func = execute_func  # The actual function
-        self.is_write = is_write  # Does it modify state?
-        self.requires_approval = requires_approval  # Need human OK?
-```
-
-**Examples of tools:**
-
-| Tool Name | Type | Write? | Approval? | Purpose |
-|-----------|------|--------|-----------|---------|
-| `get_device_config` | Read | No | No | Retrieve configuration |
-| `check_device_status` | Read | No | No | Ping device, check if online |
-| `search_documentation` | Read | No | No | Search RAG docs (Ch14) |
-| `analyze_routing_table` | Analysis | No | No | Check for routing issues |
-| `apply_config` | Write | Yes | Yes | Deploy configuration change |
-| `restart_service` | Write | Yes | Yes | Bounce a process |
-| `enable_interface` | Write | Yes | Yes | Bring up interface |
-| `send_notification` | Comms | No | No | Alert team via Slack |
-
-**Tool design principle**: Tools should be **atomic** (single responsibility) and **safe** (side effects understood).
-
-### 2.2 Tool Integration with Chapter 14 (RAG)
-
-One of the most powerful tools is documentation search:
+Before an agent can think, it must understand its situation. This is the observation phase:
 
 ```python
-# Chapter 14 tool (RAG integration)
-class RAGTool(Tool):
-    def __init__(self, rag_system):
-        self.rag = rag_system  # ProductionDocumentationRAG
-        super().__init__(
-            name="search_documentation",
-            description="Search network documentation using natural language",
-            execute_func=self.search_and_synthesize,
-            is_write=False,
-            requires_approval=False
-        )
+def observe_environment(agent_context):
+    """
+    The OBSERVE phase: gather all relevant information
+    """
     
-    def search_and_synthesize(self, query):
-        """
-        When an agent calls this tool:
-        Agent: "Search docs: proper BGP redundancy procedure"
-        RAG: [Searches documentation]
-        RAG: [Synthesizes answer from multiple docs]
-        Returns: Clear answer with confidence score
-        """
-        result = self.rag.answer_question(query)
-        return {
-            'answer': result['answer'],
-            'confidence': result['confidence'],
-            'sources': result['sources']
-        }
+    observations = {}
+    
+    # Get device state
+    observations['device_status'] = {
+        'router_core_01': check_device_alive('router_core_01'),
+        'router_core_02': check_device_alive('router_core_02'),
+    }
+    
+    # Get current configurations
+    observations['configs'] = {
+        'router_core_01': get_device_config('router_core_01'),
+        'router_core_02': get_device_config('router_core_02'),
+    }
+    
+    # Get metrics
+    observations['metrics'] = {
+        'cpu': get_device_cpu('router_core_01'),
+        'memory': get_device_memory('router_core_01'),
+        'bgp_neighbors': get_bgp_neighbors('router_core_01'),
+    }
+    
+    # Get logs (recent errors/warnings)
+    observations['logs'] = get_recent_logs('router_core_01', last_n=50)
+    
+    return observations
 ```
 
-**Why this integration matters:**
+**Theory**: Observation quality determines reasoning quality. Incomplete observations lead to poor decisions.
 
-Without RAG tool:
-```
-Agent: "I need to fix BGP. What's the right procedure?"
-Agent (without knowledge): "Um, I don't know. Ask a human."
-Result: Agent escalates, human has to help.
-```
+**Constraint**: You cannot observe more than your tools allow. If you don't have a "get_logs" tool, agent can't analyze logs.
 
-With RAG tool:
-```
-Agent: "I need to fix BGP. Let me search the docs."
-Agent calls: search_documentation("BGP redundancy procedure")
-RAG returns: "Follow these steps... [detailed procedure from your docs]"
-Agent: "Now I know what to do. Let me propose a fix."
-Result: Agent self-educates, proposes informed fix.
-```
+**Design principle**: Include all observation tools that might be relevant. Better to have unused tools than to need one and not have it.
 
-### 2.3 Tool Constraints and Safety
+### 2.2 The THINK Phase: Reasoning and Decision-Making
 
-Not all tools are equal. Some are dangerous and require additional safety measures:
-
-```
-READ-ONLY TOOLS (Safe to call freely)
-├─ get_device_config
-├─ check_device_status
-├─ search_documentation
-└─ analyze_routing_table
-  Constraint: None (read-only)
-  Safety: Can be called unlimited times
-
-WRITE TOOLS (Require approval)
-├─ apply_config
-├─ restart_service
-└─ enable_interface
-  Constraint: Requires human approval first
-  Safety: Rollback capability mandatory
-  Rate limit: Max 5 changes per hour
-
-DANGEROUS TOOLS (Restricted)
-├─ delete_configuration
-├─ factory_reset_device
-└─ shutdown_interface
-  Constraint: Explicitly disable or require explicit approval each time
-  Safety: Backup before execution, testing environment only
-  Rate limit: Max 1 per day, explicit approval required
-```
-
-**Tool safety design pattern:**
+Now the agent must reason about observations:
 
 ```python
-def execute_tool(self, tool_name, args):
-    tool = self.tools[tool_name]
+def think_about_situation(goal, observations, history, rag_system):
+    """
+    The THINK phase: reason about what to do
     
-    # Step 1: Check if tool requires approval
-    if tool.requires_approval:
-        approval = request_human_approval(tool, args)
-        if not approval:
-            return "Rejected by operator"
+    This is where Claude's reasoning capability shines.
+    """
     
-    # Step 2: Check rate limiting
-    if tool.is_write:
-        if self.has_exceeded_rate_limit(tool):
-            return "Rate limit exceeded"
-    
-    # Step 3: For write tools, backup first
-    if tool.is_write:
-        self.create_backup()
-    
-    # Step 4: Execute
-    try:
-        result = tool.execute_func(**args)
-    except Exception as e:
-        if tool.is_write:
-            self.rollback_backup()
-        return f"Error: {e}"
-    
-    # Step 5: Verify success
-    verification = self.verify_result(tool, result)
-    
-    if not verification['success']:
-        if tool.is_write:
-            self.rollback_backup()
-        return f"Verification failed: {verification['reason']}"
-    
-    return result
-```
-
-**Key safety mechanisms:**
-1. **Approval gate**: Some tools don't execute without human OK
-2. **Rate limiting**: Prevents runaway execution
-3. **Backup before change**: Can roll back if needed
-4. **Verification after change**: Confirm it worked
-5. **Automatic rollback on failure**: Don't leave system in bad state
-
----
-
-## Part 3: Agent Decision-Making - The Reasoning Engine
-
-### 3.1 How Agents Decide What to Do
-
-The core of agent intelligence is decision-making. This is where Claude comes in:
-
-```
-Current Situation (OBSERVE):
-- router-core-02 is down
-- BGP neighbors not responding
-- OSPF logs show adjacency failed
-- Last config change was 2 hours ago
-
-Goal: Fix router-core-02 connectivity
-
-Options Claude considers:
-1. Check BGP config for errors
-2. Check OSPF adjacency
-3. Check interface status
-4. Revert last config change
-5. Escalate to human
-
-Claude's Reasoning:
-"OSPF adjacency failed suggests a configuration or link issue.
-BGP failing is a symptom, not the root cause.
-Interface status would tell me if the link is up.
-I should check interfaces first, then OSPF, then BGP.
-If nothing works, revert the recent change and re-check."
-
-Decision: "Next action: Check interface status on router-core-02"
-```
-
-**How to structure the decision prompt:**
-
-```python
-def decide_next_action(self, goal):
-    # Build context about the situation
+    # Build context for Claude
     context = f"""
     GOAL: {goal}
     
-    CURRENT STATE:
-    {json.dumps(self.context, indent=2)}
+    CURRENT OBSERVATIONS:
+    {json.dumps(observations, indent=2)}
     
-    WHAT WE'VE TRIED:
-    {json.dumps(self.history, indent=2)}
+    PREVIOUS ACTIONS (what we've already tried):
+    {json.dumps(history, indent=2)}
     
     AVAILABLE TOOLS:
-    {self.format_tools()}
+    {list_available_tools()}
     
-    DECISION FRAMEWORK:
-    1. What's the root cause?
-    2. Which tool would help diagnose it?
-    3. Is that tool safe to run?
-    4. What would success look like?
-    
-    What's your next action?
+    RELEVANT DOCUMENTATION:
+    {rag_system.search("How to troubleshoot BGP issues")}
     """
     
-    response = claude.think(context)
-    return parse_decision(response)
+    # Ask Claude to reason
+    reasoning_prompt = f"""
+    {context}
+    
+    Based on the above information:
+    1. What is the root cause of the problem?
+    2. What have we already ruled out?
+    3. What is the best next action?
+    4. Why is that the best choice?
+    
+    Think carefully. Consider multiple possibilities before deciding.
+    """
+    
+    decision = claude.think(reasoning_prompt)
+    
+    return {
+        'reasoning': decision['thinking'],
+        'root_cause': decision['root_cause'],
+        'next_action': decision['next_action'],
+        'confidence': decision.get('confidence', 'medium')
+    }
 ```
 
-**Important insight**: The quality of Claude's decisions depends on:
-1. **Context quality**: How much information about the situation
-2. **Tool descriptions**: How clearly tools are described
-3. **Constraint clarity**: What Claude can/cannot do
-4. **History**: What we've already tried
+**Key concept**: This is where the agent demonstrates intelligence. The quality of reasoning depends on:
 
-### 3.2 Multi-Agent Coordination (When One Agent Isn't Enough)
+1. **Observation completeness** - Do we have all needed information?
+2. **Context richness** - Do we explain the situation well?
+3. **Documentation quality** - What does RAG return?
+4. **Prompt quality** - How clearly do we ask for reasoning?
 
-As systems become complex, a single agent becomes bottleneck. Organizations with mature automation use multiple specialized agents:
+### 2.3 The ACT Phase: Taking Action
 
-```
-Monitoring Agent
-├─ Continuously watches metrics
-├─ Detects anomalies
-└─ Creates incidents
-
-    ↓ (reports incident)
-
-Diagnostic Agent
-├─ Takes incident
-├─ Runs diagnostic tools
-├─ Determines root cause
-└─ Creates task for next agent
-
-    ↓ (reports root cause)
-
-Planning Agent
-├─ Considers multiple solutions
-├─ Evaluates risk/benefit
-├─ Creates execution plan
-└─ Requests approval
-
-    ↓ (gets human approval)
-
-Execution Agent
-├─ Takes approved plan
-├─ Applies changes
-├─ Verifies success
-└─ Reports results
-
-    ↓ (reports completion)
-
-Verification Agent
-├─ Confirms incident is resolved
-├─ Checks for side effects
-├─ Updates monitoring
-└─ Closes incident
-```
-
-**Trade-off analysis: Single vs Multi-Agent**
-
-| Aspect | Single Agent | Multi-Agent |
-|--------|--------------|-------------|
-| Complexity | Low | High |
-| Specialization | None | Focused roles |
-| Debugging when wrong | Easy | Harder (where did it fail?) |
-| Scalability | Limited | Excellent |
-| Coordination overhead | None | Significant |
-| Implementation time | 1-2 months | 4-6 months |
-
-**Decision: Use single agent until you hit its limits, then graduate to multi-agent.**
-
----
-
-## Part 4: Safety, Oversight, and Approval Workflows
-
-### 4.1 The Approval Problem
-
-This is the central safety question: **When should an agent execute without human approval? When should it escalate?**
-
-Three possible strategies:
-
-#### Strategy 1: Never Execute, Always Ask
-
-```
-Agent: "I think we should apply this fix. Shall I?"
-Human: "Let me review..." [5 minutes]
-Human: "Approved."
-Agent: "Executing now."
-
-Pros: Maximum safety
-Cons: Slow, defeats purpose of automation
-Latency: 5-30 minutes
-Suitable for: Critical changes only
-```
-
-#### Strategy 2: Auto-Execute Low-Risk, Ask for Medium-Risk
-
-```
-Risk Matrix:
-┌────────────────┬──────────────┬───────────────┐
-│ Risk Level     │ Example      │ Auto-Execute? │
-├────────────────┼──────────────┼───────────────┤
-│ LOW            │ Enable debug │ YES           │
-│                │ logging      │               │
-├────────────────┼──────────────┼───────────────┤
-│ MEDIUM         │ Restart BGP  │ Ask first     │
-│                │ process      │               │
-├────────────────┼──────────────┼───────────────┤
-│ HIGH           │ Change BGP   │ Always ask    │
-│                │ AS number    │               │
-└────────────────┴──────────────┴───────────────┘
-
-LOW risk: Execute, then notify human
-MEDIUM risk: Ask async (Slack), execute if no objection in 2 min
-HIGH risk: Block, require explicit approval
-```
-
-Pros: Balance safety and speed
-Cons: Requires good risk classification
-Latency: 0-5 minutes depending on risk
-Suitable for: Most organizations
-
-#### Strategy 3: Full Autonomy (Dangerous)
-
-```
-Agent: "Executing fix now."
-Human: "Wait, what are you—oh, it's done."
-
-Pros: Fastest
-Cons: No safety net, catastrophic failures possible
-Latency: <1 second
-Suitable for: Literally nobody (don't do this)
-```
-
-**Recommendation**: Strategy 2 (risk-based escalation). Define risk levels clearly:
+Once the agent decides what to do, it must execute:
 
 ```python
-RISK_LEVELS = {
-    'LOW': {
-        'examples': ['enable logging', 'restart BGP process', 'clear statistics'],
-        'approval': 'none',
-        'rollback': 'automatic',
-        'monitoring': 'increased'
-    },
-    'MEDIUM': {
-        'examples': ['change interface cost', 'update ACL', 'adjust queue size'],
-        'approval': 'async_slack (2 min window)',
-        'rollback': 'manual_backup',
-        'monitoring': 'very_frequent'
-    },
-    'HIGH': {
-        'examples': ['change BGP AS', 'delete route', 'shutdown link'],
-        'approval': 'explicit_manager',
-        'rollback': 'pre_change_backup_mandatory',
-        'monitoring': 'continuous'
-    },
-    'CRITICAL': {
-        'examples': ['factory reset', 'major reachability change'],
-        'approval': 'two_managers',
-        'rollback': 'parallel_device_required',
-        'monitoring': 'human_override_ready'
-    }
-}
-```
-
-### 4.2 Rollback Capability - The Safety Net
-
-If an agent-applied fix fails, the system must recover automatically:
-
-```python
-def execute_agent_change(agent, change_request):
-    device = change_request['device']
-    new_config = change_request['config']
+def act_on_decision(decision, safety_constraints):
+    """
+    The ACT phase: execute the chosen action
     
-    # Step 1: Backup current state
-    backup = {
-        'config': get_device_config(device),
-        'timestamp': datetime.now(),
-        'state_before': measure_device_state(device)
-    }
+    But with safety checks!
+    """
     
-    # Step 2: Apply change
+    tool_name = decision['tool']
+    tool_args = decision['args']
+    
+    # Safety Check 1: Is this tool available?
+    if tool_name not in AVAILABLE_TOOLS:
+        return {
+            'status': 'error',
+            'reason': f'Tool {tool_name} not available',
+            'escalate': True
+        }
+    
+    tool = AVAILABLE_TOOLS[tool_name]
+    
+    # Safety Check 2: Does this tool require approval?
+    if tool.requires_approval:
+        approval = request_approval(tool, tool_args)
+        if not approval:
+            return {
+                'status': 'rejected',
+                'reason': 'Human rejected this action',
+                'escalate': True
+            }
+    
+    # Safety Check 3: Rate limiting
+    if tool.is_write_operation:
+        if check_rate_limit_exceeded(tool):
+            return {
+                'status': 'rate_limited',
+                'reason': 'Too many write operations in this time window',
+                'escalate': True
+            }
+    
+    # Safety Check 4: Backup before write operations
+    if tool.is_write_operation:
+        backup = create_backup()
+    
+    # Execute the action
     try:
-        deploy_config(device, new_config)
+        result = tool.execute(**tool_args)
+        return {
+            'status': 'success',
+            'result': result,
+            'backup': backup if tool.is_write_operation else None
+        }
     except Exception as e:
-        logger.error(f"Deployment failed: {e}")
-        return {'status': 'deployment_failed', 'rolled_back': False}
-    
-    # Step 3: Verify the change worked
-    time.sleep(5)  # Let things stabilize
-    
-    state_after = measure_device_state(device)
-    verification = compare_states(backup['state_before'], state_after)
-    
-    # Step 4: If verification fails, rollback
-    if not verification['success']:
-        logger.warning(f"Verification failed, rolling back")
-        deploy_config(device, backup['config'])
+        # Automatic rollback on failure
+        if tool.is_write_operation:
+            rollback(backup)
         
         return {
-            'status': 'rolled_back',
-            'reason': verification['failure_reason'],
-            'change_was': new_config,
-            'restored_to': backup['config']
+            'status': 'failed',
+            'error': str(e),
+            'rolled_back': True,
+            'escalate': True
+        }
+```
+
+**Theory**: Action execution must be **safe by default**. Safety mechanisms should be:
+- Automatic (no human has to remember)
+- Layered (multiple checks)
+- Verifiable (we can prove they ran)
+
+### 2.4 The VERIFY Phase: Confirming Success
+
+After acting, the agent must verify the action worked:
+
+```python
+def verify_action(action_result, original_goal):
+    """
+    The VERIFY phase: confirm the action achieved its purpose
+    
+    Verification is critical - don't assume success.
+    """
+    
+    if action_result['status'] != 'success':
+        return {
+            'verification_passed': False,
+            'reason': 'Action failed'
         }
     
-    # Success
+    # Wait for system to stabilize
+    time.sleep(5)
+    
+    # Gather new observations
+    new_observations = observe_environment()
+    
+    # Check if goal is achieved
+    if achieved_goal(new_observations, original_goal):
+        return {
+            'verification_passed': True,
+            'goal_achieved': True,
+            'observations': new_observations
+        }
+    
+    # Check if we made progress (even if goal not fully achieved)
+    if made_progress(new_observations, original_goal):
+        return {
+            'verification_passed': True,
+            'goal_achieved': False,
+            'progress_made': True,
+            'next_step_needed': True,
+            'observations': new_observations
+        }
+    
+    # If nothing changed, action didn't work
     return {
-        'status': 'success',
-        'verification': verification,
-        'timestamp': datetime.now()
+        'verification_passed': False,
+        'goal_achieved': False,
+        'progress_made': False,
+        'observations': new_observations,
+        'recommendation': 'Try different approach'
     }
 ```
 
-**Critical design point**: Rollback must be **automatic**, not manual. If an agent can't rollback automatically, it can't execute write operations.
+**Critical principle**: Never assume an action succeeded. Verify it with fresh observations.
 
-### 4.3 Auditing and Compliance
+---
 
-Every agent action must be logged for auditing and learning:
+## Part 3: Prompt Engineering for Agents - The Art and Science
+
+### 3.1 The Prompt Structure: Setting Up Claude to Think Like an Agent
+
+The quality of agent reasoning depends entirely on the prompt. This is not obvious but absolutely critical.
 
 ```python
-class AuditLog:
-    """Track everything the agent does"""
+def build_agent_prompt(goal, observations, history, tools, rag_docs):
+    """
+    Build a well-structured prompt for the agent to reason
     
-    def log_action(self, action_record):
-        record = {
-            'timestamp': datetime.now(),
-            'agent_id': self.agent_id,
-            'action_type': action_record['type'],
-            'action_detail': action_record['detail'],
-            'reasoning': action_record['reasoning'],
-            'tools_called': action_record['tools'],
-            'risk_level': action_record['risk_level'],
-            'approval_status': action_record['approval'],
-            'approval_requestor': action_record.get('approver'),
-            'result': action_record['result'],
-            'success': action_record['success'],
-            'rollback_needed': action_record.get('rolled_back', False),
-            'human_notified': action_record['notification_sent']
-        }
-        
-        # Write to immutable audit trail
-        write_to_audit_trail(record)
-        
-        # If high risk or failed, also alert
-        if action_record['risk_level'] == 'HIGH':
-            send_alert(f"High-risk action: {action_record['detail']}")
-        
-        if not action_record['success']:
-            send_alert(f"Agent action failed: {action_record['detail']}")
+    The prompt structure matters a lot.
+    """
+    
+    prompt = f"""
+You are a network operations agent. Your job is to help diagnose and fix network issues.
+
+# CONTEXT
+## Goal
+{goal}
+
+## Current Observations
+{format_observations(observations)}
+
+## What We've Already Tried
+{format_history(history)}
+
+## Available Tools
+{format_tools(tools)}
+
+## Relevant Documentation
+{format_rag_docs(rag_docs)}
+
+# DECISION FRAMEWORK
+Think through these questions in order:
+
+1. **Understanding the Problem**
+   - What is the current state?
+   - What is the desired state?
+   - What's the gap?
+
+2. **Root Cause Analysis**
+   - What are the possible root causes?
+   - Which is most likely?
+   - What evidence supports this?
+
+3. **Consider Your Options**
+   - What are all possible next actions?
+   - What would each action accomplish?
+   - What are the risks?
+
+4. **Choose the Best Action**
+   - Of all options, which is best?
+   - Why is it the best?
+   - What's the confidence level?
+
+5. **Plan the Action**
+   - What tool will you use?
+   - What arguments to that tool?
+   - What's the expected outcome?
+
+# OUTPUT FORMAT
+Return your reasoning in this exact format:
+
+ROOT_CAUSE: [Your diagnosis]
+CONFIDENCE: [HIGH/MEDIUM/LOW]
+ACTION: [Tool name]
+ARGS: [Arguments as JSON]
+REASONING: [Explain your choice]
+RISK_LEVEL: [HIGH/MEDIUM/LOW]
+ALTERNATIVE_ACTIONS: [Other options considered]
+"""
+    
+    return prompt
 ```
 
-**Audit questions you must be able to answer:**
-- ✓ Who made this change? (agent is accountable)
-- ✓ When was it made? (timestamp)
-- ✓ Why was it made? (reasoning)
-- ✓ What changed? (before/after)
-- ✓ Did it work? (verification)
-- ✓ Was it approved? (approval trail)
-- ✓ Can we undo it? (rollback capability)
+**Key design principles:**
 
-Compliance teams will demand these. Build audit logging from the start.
+1. **Structure the prompt** - Organize information clearly
+2. **Give decision framework** - Tell Claude how to think
+3. **Request output format** - Make parsing unambiguous
+4. **Include context** - Observations, history, tools, docs
+5. **Ask for reasoning** - Explain the thought process
 
----
+### 3.2 System Prompt vs User Prompt
 
-## Part 5: Real-World Implementation Case Study
-
-### Case Study: Manufacturing Company with 300 Devices
-
-**Organization Context:**
-- Manufacturing facility with ~300 network devices
-- 8 network engineers, 1 contractor
-- Critical production network (downtime = lost revenue)
-- Compliance requirement: All changes must be logged
-
-**Problem They Faced:**
-- Manual BGP/OSPF configuration changes: 2-3 per week
-- Average change duration: 30 minutes of engineer time
-- Error rate: ~5% (1 in 20 changes causes minor issue)
-- Rollback time: 15-30 minutes when something goes wrong
-- Cost: ~12 hours/week of manual engineering
-
-**Solution Design:**
-
-**Phase 1: Documentation (Chapter 13)**
-- Time to implement: 6 weeks
-- Output: 300 auto-generated device docs
-- Quality check: 4 docs manually reviewed, all were accurate
-- Update frequency: Nightly automatic regeneration
-
-**Phase 2: RAG System (Chapter 14)**
-- Time to implement: 4 weeks
-- Database chosen: Chroma (embedded, sufficient for 300 devices)
-- Documentation searchability: "Now engineers search instead of asking."
-- Integration: Connected to internal wiki for discovery
-
-**Phase 3: Agent System (Chapter 15)**
-- Time to implement: 8 weeks (longer due to safety requirements)
-- Agent type chosen: Type 2 (linear agent with approval workflow)
-- Tools implemented:
-  - `get_device_config` (read-only, no approval)
-  - `check_bgp_status` (read-only, no approval)
-  - `search_documentation` (read-only, uses RAG)
-  - `apply_bgp_config` (write, MEDIUM risk, needs async approval)
-  - `apply_ospf_config` (write, MEDIUM risk, needs async approval)
-  - `rollback_config` (write, LOW risk, auto-executes on failure)
-
-**Phase 4: Approval Workflow**
-```
-Engineer: "I think router-02 BGP config is wrong. Let me fix it."
-Engineer calls agent: fix_bgp_config(router-02)
-
-Agent Step 1: Check current config
-Agent Step 2: Search docs: "proper BGP redundancy"
-Agent Step 3: Analyze difference between current and documented
-Agent Step 4: Backup current config
-Agent Step 5: Request approval (Slack to engineering team)
-  Message: "I found BGP issue on router-02. Proposed fix: [details].
-            Approving this change will..."
-
-Team response (within 2 minutes): "Approved" or "Wait, let me check"
-
-If approved:
-Agent Step 6: Apply config
-Agent Step 7: Wait 10 seconds for convergence
-Agent Step 8: Verify BGP is healthy
-Agent Step 9: If healthy, keep change. If not, auto-rollback.
-Agent Step 10: Report results
-
-Result: Change applied or rolled back, fully logged, fully audited.
-```
-
-**Operational Results (After 3 Months):**
-
-| Metric | Before Agents | After Agents | Improvement |
-|--------|--------------|------------|------------|
-| Manual BGP changes | 3/week | 2/week | -33% human effort |
-| Time per change | 30 min | 5 min approval + 1 min execution | 85% faster |
-| Error rate | 5% | 0% | Perfect |
-| Rollback events | 1/month | 0 | 100% success rate |
-| Mean Time To Recover | 45 min | 3 min | 93% faster |
-| Engineer satisfaction | "Tedious" | "Much better" | Improved |
-| Compliance audit | Manual log review | Automatic audit trail | Simpler |
-
-**Lessons Learned:**
-
-1. **Documentation quality is foundational**
-   - Initial docs had 2 errors (out of 300)
-   - Agents propagated those errors
-   - Fixed by validating Chapter 13 output first
-
-2. **Approval workflow is critical**
-   - Tried synchronous approval (asking Slack, waiting for response)
-   - Slow! (average approval time: 7 minutes)
-   - Switched to async (if no response in 2 min, execute LOW risk; escalate MEDIUM)
-   - Much better
-
-3. **Team trust takes time**
-   - First month: engineers reviewed every agent action
-   - Second month: reviewed 50% of actions
-   - Third month: only reviewing HIGH risk actions
-   - Trust built through consistent success
-
-4. **Monitoring and alerts are essential**
-   - Without monitoring, engineers didn't know agent was helping
-   - Added dashboard: "Agent Actions Today: 12 successful, 0 failed"
-   - Visibility drove adoption
-
-5. **Multi-phase rollout is better than big bang**
-   - Phase 1: Read-only agents (very safe)
-   - Phase 2: Write agents with approval
-   - Phase 3: Auto-execute LOW risk
-   - This gradual approach built confidence
-
----
-
-## Part 6: Agent Integration with Complete Platform
-
-### 6.1 The Complete Autonomous Operations Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ MONITORING LAYER                                            │
-│ ├─ Network health checks (continuous)                       │
-│ ├─ Performance metrics                                      │
-│ ├─ Anomaly detection                                        │
-│ └─ Alert generation                                         │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│ CHAPTER 13: DOCUMENTATION                                   │
-│ ├─ Auto-generate device docs                                │
-│ ├─ Auto-generate topology docs                              │
-│ ├─ Version control and history                              │
-│ └─ Daily update schedule                                    │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│ CHAPTER 14: RAG SYSTEM                                      │
-│ ├─ Index documentation                                      │
-│ ├─ Enable semantic search                                   │
-│ ├─ Answer questions                                         │
-│ └─ Provide confidence scores                                │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│ CHAPTER 15: AGENT SYSTEM (This Chapter)                     │
-│ ├─ Observe environment                                      │
-│ ├─ Think: Search docs, reason about issues                  │
-│ ├─ Act: Execute tools, make changes                         │
-│ ├─ Verify: Confirm changes worked                           │
-│ └─ Loop: Repeat until goal achieved                         │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│ HUMAN OVERSIGHT                                             │
-│ ├─ Approval for medium/high risk changes                    │
-│ ├─ Monitoring dashboard                                     │
-│ ├─ Audit trail review                                       │
-│ └─ Agent feedback and tuning                                │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 6.2 Data Flow: Example Issue Resolution
-
-```
-STARTING STATE:
-- Router-core-02 BGP routes not advertising
-- Monitoring detects anomaly
-- Issue is created
-
-CHAPTER 13 (Documentation):
-- Chapter 13 ran last night
-- Router-core-02.md exists with current config
-- Already in version control
-
-CHAPTER 14 (RAG):
-- Router-core-02.md is indexed in vector database
-- RAG system ready to answer questions
-
-CHAPTER 15 (Agent):
-Agent wakes up: "There's a BGP issue on router-core-02"
-
-Agent OBSERVES:
-- Calls: check_bgp_status(router-core-02)
-- Result: "BGP neighbors present but no routes advertising"
-- Calls: get_device_config(router-core-02)
-- Result: [Running config retrieved]
-
-Agent THINKS:
-- Calls: search_documentation("BGP route advertisement requirements")
-- RAG Result: "Routes must have redistribute statement in BGP config"
-- Agent analyzes: "Current config missing 'redistribute ospf'"
-
-Agent ACTS (with approval):
-- Requests approval: "Add 'redistribute ospf' to BGP on router-core-02?"
-- Human approves within 2 minutes
-
-Agent EXECUTES:
-- Backs up current config
-- Applies: add "redistribute ospf 1 metric 100" to router-core-02 BGP
-- Waits 5 seconds for convergence
-
-Agent VERIFIES:
-- Calls: check_bgp_status(router-core-02)
-- Result: "BGP neighbors present, routes advertising correctly"
-- Success!
-
-Agent REPORTS:
-- "Issue resolved: Added redistribute OSPF to BGP config"
-- Logs all actions to audit trail
-- Closes the incident
-
-TOTAL TIME: 3 minutes (from alert to resolution)
-MANUAL ENGINEER TIME: 30 seconds (approval only)
-PREVIOUS MANUAL TIME: 45 minutes
-```
-
----
-
-## Part 7: Constraints, Trade-offs, and Decision Framework
-
-### 7.1 Constraints on Agent Autonomy
-
-Agents operate under multiple constraints. Understanding them is essential:
-
-```
-TECHNICAL CONSTRAINTS:
-├─ Tool availability (can only do what tools exist)
-├─ Network availability (can't reach unreachable devices)
-├─ API rate limits (limited calls per minute)
-└─ Knowledge completeness (can only know what's documented)
-
-BUSINESS CONSTRAINTS:
-├─ Change windows (only execute during maintenance windows)
-├─ Approval requirements (compliance may require approval)
-├─ Risk tolerance (different organizations accept different risk)
-└─ Budget (AI/automation isn't free)
-
-OPERATIONAL CONSTRAINTS:
-├─ Staff skill level (must trust agent with critical tasks)
-├─ Monitoring capability (must detect when agent fails)
-├─ Escalation procedures (must have fallback to humans)
-└─ Documentation quality (agent is only as good as docs)
-```
-
-**Key insight**: More autonomy doesn't always mean better. The optimal level of autonomy depends on:
-- How well-understood the problem is
-- How confident we are in documentation
-- What happens if the agent makes a mistake
-- How much human oversight is available
-
-### 7.2 The Autonomy Trade-off Spectrum
-
-```
-Level 0: Human Does Everything
-├─ Safety: Maximum
-├─ Speed: Slow (45+ minutes per issue)
-├─ Cost: High (engineer time)
-├─ Complexity: Low
-└─ Use case: Critical production systems with zero-tolerance failures
-
-Level 1: Agent Provides Information (Read-Only)
-├─ Safety: Very High
-├─ Speed: Fast (5 minutes)
-├─ Cost: Medium (engineer time + agent cost)
-├─ Complexity: Low
-└─ Use case: Information gathering, decision support
-
-Level 2: Agent Proposes Changes (Requires Approval)
-├─ Safety: High
-├─ Speed: Medium (5-10 minutes)
-├─ Cost: Medium
-├─ Complexity: Medium
-└─ Use case: Routine operations, documented procedures
-
-Level 3: Agent Executes with Post-Approval
-├─ Safety: Medium
-├─ Speed: Fast (2-3 minutes)
-├─ Cost: Low
-├─ Complexity: High (approval workflow + monitoring)
-└─ Use case: Low-risk changes, mature automation
-
-Level 4: Agent Executes Autonomously
-├─ Safety: Low
-├─ Speed: Fastest (<1 minute)
-├─ Cost: Lowest
-├─ Complexity: Very High (requires perfect system)
-└─ Use case: Non-critical systems, last resort (not recommended)
-```
-
-**Decision: Most organizations should be at Level 2-3. Level 4 is dangerous.**
-
-### 7.3 The Engineering Mindset: Structure, Constraints, Trade-offs
-
-Applying the engineering mindset to agent design:
-
-#### Structure
-Agents have clear layers:
-1. Observation (get current state)
-2. Reasoning (understand state)
-3. Decision (choose action)
-4. Action (execute)
-5. Verification (confirm success)
-
-Maintain this structure in design and code. Don't mix layers.
-
-#### Constraints
-Agents operate under constraints that are features, not bugs:
-- Rate limits prevent runaway execution
-- Approval gates prevent catastrophic mistakes
-- Rollback capability provides safety net
-- Monitoring provides visibility
-
-Design agents to work within constraints, not around them.
-
-#### Trade-offs
-Every design choice has costs and benefits:
-- More autonomy = faster, but riskier
-- More documentation = better agents, but expensive to maintain
-- More monitoring = safer, but overhead
-- More tools = powerful, but complex
-
-Be explicit about trade-offs. Document the choices and reasoning.
-
----
-
-## Part 8: Advanced Topics and Future Directions
-
-### 8.1 Multi-Agent Orchestration (Enterprise Scale)
-
-As networks grow, single agents become bottlenecks. Multi-agent systems coordinate:
-
-```
-Incident: "Multiple routers have BGP adjacencies down"
-
-Diagnostic Agent: "It's a link failure. Affects 3 routers."
-   ↓
-Planning Agent: "3 options: 1) Reroute traffic, 2) Bring up redundant link, 3) Escalate"
-   ↓
-Execution Agent 1: "Rerouting traffic on router-a"
-Execution Agent 2: "Rerouting traffic on router-b"
-Execution Agent 3: "Bringing up redundant link"
-   ↓
-All report success
-   ↓
-Verification Agent: "All traffic is restored. Issue resolved."
-```
-
-Complex but powerful. Only implement if single agent can't scale.
-
-### 8.2 Learning from Failures
-
-Agents should improve over time:
+The system prompt sets the agent's "personality" and constraints:
 
 ```python
-class LearningAgent:
-    def log_failure(self, action, failure_reason):
-        """Learn from mistakes"""
-        self.failures.append({
+SYSTEM_PROMPT = """
+You are a careful, deliberate network operations agent. 
+
+YOUR CONSTRAINTS:
+- Never recommend an action you don't fully understand
+- Always verify your assumptions
+- Always check documentation before acting
+- Escalate when uncertain
+- Prioritize safety over speed
+
+YOUR CAPABILITIES:
+- You can call tools to observe network state
+- You can read and understand network documentation
+- You can reason about complex technical problems
+- You can learn from your history of actions
+
+YOUR LIMITATIONS:
+- You cannot make changes without approval (for HIGH risk)
+- You cannot predict the future
+- You cannot understand unstated goals
+- You cannot learn across sessions
+"""
+
+def run_agent(goal, observations, history):
+    """Run agent with system and user prompts"""
+    
+    # System prompt: sets personality
+    response = claude.messages.create(
+        system=SYSTEM_PROMPT,
+        
+        # User prompt: specific task
+        user=build_agent_prompt(goal, observations, history, ...),
+        
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=2000
+    )
+    
+    return response
+```
+
+**Why this matters**: System prompt controls agent behavior across all sessions. If you want cautious agents, make that clear in system prompt.
+
+### 3.3 Few-Shot Prompting: Teaching by Example
+
+Agents learn from examples. Including examples in the prompt improves reasoning:
+
+```python
+def build_prompt_with_examples():
+    """
+    Few-shot prompting: include examples of good reasoning
+    """
+    
+    prompt = """
+You are a network agent. Here are examples of good decisions:
+
+EXAMPLE 1: Interface Down
+Observations: Interface Gi0/1 is down on router-core-01
+Tools available: check_interface_config, check_physical_link, check_logs
+
+Good reasoning:
+ROOT_CAUSE: Physical link problem
+ACTION: check_physical_link(interface=Gi0/1, device=router-core-01)
+REASONING: Interface is down - could be physical or configuration. 
+Physical link check is safer (read-only) than config change. Start there.
+
+EXAMPLE 2: BGP Routes Not Advertising
+Observations: BGP is running, neighbors are up, but routes not advertising
+Tools available: search_docs, get_bgp_config, check_routing_table
+
+Good reasoning:
+ROOT_CAUSE: Redistribute policy missing (most common)
+ACTION: search_documentation(query="BGP route redistribution requirements")
+REASONING: Before making changes, search docs for proper procedure.
+Documentation should clarify what redistribute statement is needed.
+
+Now, for this situation:
+Observations: {observations}
+...
+"""
+    
+    return prompt
+```
+
+**Why this matters**: Examples help Claude understand the style of reasoning you want. Good examples → better decisions.
+
+### 3.4 Chain-of-Thought Prompting: Making Claude Show Its Work
+
+Explicitly ask Claude to show its reasoning step-by-step:
+
+```python
+def chain_of_thought_prompt():
+    """
+    Chain-of-thought: ask for step-by-step reasoning
+    
+    This improves accuracy significantly.
+    """
+    
+    prompt = """
+Diagnose the issue step-by-step.
+
+STEP 1: What is the current state?
+[First, describe what you observe in detail]
+
+STEP 2: What is the desired state?
+[Second, describe the goal clearly]
+
+STEP 3: What's the gap?
+[Third, identify what's wrong]
+
+STEP 4: What could cause this gap?
+[List all possible root causes]
+
+STEP 5: Which root cause is most likely?
+[Eliminate unlikely causes, narrow down]
+
+STEP 6: What action would test this hypothesis?
+[What tool would help confirm?]
+
+STEP 7: What's the expected outcome?
+[If I do this action, what should I see?]
+
+STEP 8: Decision
+[Given all above, what's the best action?]
+"""
+    
+    return prompt
+```
+
+**Why this matters**: Forcing explicit step-by-step reasoning reduces errors and makes reasoning auditable.
+
+---
+
+## Part 4: Tool Design for Agents - The Agent's Interface to the World
+
+### 4.1 Designing Tools: From Theory to Implementation
+
+A tool is not just a function. It's an **interface between agent and world**. Good tool design is critical.
+
+```python
+@dataclass
+class Tool:
+    """
+    Complete tool specification
+    """
+    # Identity
+    name: str
+    description: str  # What the tool does
+    
+    # Execution
+    execute_func: Callable  # The actual function
+    
+    # Safety
+    is_write_operation: bool  # Does it modify state?
+    is_read_only: bool  # Just observing?
+    requires_approval: bool  # Need human OK?
+    
+    # Constraints
+    rate_limit: Optional[int]  # Max calls per hour?
+    risk_level: str  # LOW/MEDIUM/HIGH
+    
+    # Documentation for agent
+    parameters: Dict[str, str]  # Parameter descriptions
+    return_description: str  # What does it return?
+    preconditions: List[str]  # What must be true first?
+    postconditions: List[str]  # What happens after?
+    side_effects: List[str]  # What else might change?
+    
+    # Safety mechanisms
+    rollback_supported: bool  # Can we undo?
+    
+    def __str__(self) -> str:
+        """Format for agent to understand"""
+        return f"""
+Tool: {self.name}
+Purpose: {self.description}
+Parameters: {self.parameters}
+Returns: {self.return_description}
+Risk Level: {self.risk_level}
+Requires Approval: {self.requires_approval}
+Can be rolled back: {self.rollback_supported}
+"""
+```
+
+**Key design principle**: Tools should be **self-documenting** so agents understand them correctly.
+
+### 4.2 Tool Ontology: Organizing Tools Hierarchically
+
+As you add more tools, organize them in a taxonomy:
+
+```
+READ TOOLS (Safe, no approval needed)
+├── Observation Tools
+│   ├─ get_device_status
+│   ├─ get_device_config
+│   ├─ get_interface_status
+│   └─ get_routing_table
+├── Analysis Tools
+│   ├─ check_bgp_status
+│   ├─ check_ospf_status
+│   └─ analyze_routing_table
+└── Documentation Tools
+    ├─ search_documentation (RAG)
+    └─ get_best_practices
+
+WRITE TOOLS (Require approval)
+├── Low-Risk Write Tools
+│   ├─ enable_debug_logging
+│   ├─ disable_debug_logging
+│   └─ clear_statistics
+├── Medium-Risk Write Tools
+│   ├─ apply_interface_config
+│   ├─ change_ospf_cost
+│   └─ adjust_bgp_timers
+└── High-Risk Write Tools
+    ├─ change_bgp_asn
+    ├─ delete_route
+    └─ shutdown_interface
+
+COMMUNICATION TOOLS (No approval needed)
+├─ send_slack_notification
+├─ send_email
+└─ create_ticket
+```
+
+**Why this matters**: When agent has 50+ tools, it must understand relationships between them.
+
+### 4.3 Tool Error Handling: Building Resilient Tools
+
+Tools should handle errors gracefully:
+
+```python
+def create_tool(name, execute_func):
+    """
+    Wrap a function as a tool with error handling
+    """
+    
+    def robust_execute(**kwargs):
+        """
+        Execute tool with proper error handling
+        """
+        
+        # Validate inputs
+        try:
+            validate_inputs(kwargs)
+        except ValueError as e:
+            return {
+                'status': 'error',
+                'error_type': 'invalid_input',
+                'message': str(e),
+                'user_message': 'The arguments you provided are invalid. Here\'s why...'
+            }
+        
+        # Execute with timeout
+        try:
+            result = timeout_call(execute_func, kwargs, timeout=30)
+        except TimeoutError:
+            return {
+                'status': 'error',
+                'error_type': 'timeout',
+                'message': f'Tool {name} took too long (>30s)',
+                'user_message': 'This operation timed out. The device might be slow.'
+            }
+        except ConnectionError as e:
+            return {
+                'status': 'error',
+                'error_type': 'connection_failed',
+                'message': str(e),
+                'user_message': 'Could not reach the device. It might be down.'
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error_type': 'unexpected',
+                'message': str(e),
+                'user_message': 'An unexpected error occurred. Please investigate.'
+            }
+        
+        # Validate output
+        try:
+            validate_output(result)
+        except ValueError as e:
+            return {
+                'status': 'error',
+                'error_type': 'invalid_output',
+                'message': str(e),
+                'user_message': 'The device returned unexpected data.'
+            }
+        
+        # Success
+        return {
+            'status': 'success',
+            'data': result
+        }
+    
+    return Tool(
+        name=name,
+        execute_func=robust_execute,
+        ...
+    )
+```
+
+**Key principle**: Tools should fail gracefully, returning meaningful error messages that agents can understand and react to.
+
+---
+
+## Part 5: State Management in Agents
+
+### 5.1 Agent Context: Maintaining State Across Iterations
+
+An agent must maintain state to avoid repeating mistakes:
+
+```python
+class AgentContext:
+    """
+    Maintain agent state across iterations
+    """
+    
+    def __init__(self, goal):
+        self.goal = goal
+        self.observations = {}  # Current observations
+        self.history = []  # What we've done
+        self.failed_actions = []  # What didn't work
+        self.successful_actions = []  # What did work
+        self.current_hypothesis = None  # Our diagnosis
+        self.iteration = 0
+        self.max_iterations = 10
+    
+    def record_observation(self, obs_type, data):
+        """Record what we observe"""
+        self.observations[obs_type] = {
+            'data': data,
+            'timestamp': datetime.now()
+        }
+    
+    def record_action(self, action, result, success):
+        """Record what we tried and if it worked"""
+        self.history.append({
+            'iteration': self.iteration,
             'action': action,
-            'reason': failure_reason,
+            'result': result,
+            'success': success,
+            'timestamp': datetime.now()
+        })
+        
+        if success:
+            self.successful_actions.append(action)
+        else:
+            self.failed_actions.append(action)
+    
+    def should_escalate(self) -> bool:
+        """
+        Decide if we should give up and ask for human help
+        """
+        
+        # Escalate if we've hit iteration limit
+        if self.iteration >= self.max_iterations:
+            return True
+        
+        # Escalate if we've tried the same thing twice unsuccessfully
+        if self.has_tried_twice_unsuccessfully():
+            return True
+        
+        # Escalate if we're stuck (no progress in last 3 iterations)
+        if self.no_progress_last_n_iterations(3):
+            return True
+        
+        # Otherwise, keep trying
+        return False
+    
+    def get_summary_for_prompt(self):
+        """
+        Summarize context for Claude
+        """
+        return f"""
+GOAL: {self.goal}
+
+CURRENT OBSERVATIONS:
+{self.format_observations()}
+
+WHAT WE'VE TRIED:
+{self.format_history()}
+
+WHAT WORKED:
+{self.successful_actions}
+
+WHAT DIDN'T WORK:
+{self.failed_actions}
+
+CURRENT HYPOTHESIS:
+{self.current_hypothesis}
+
+ITERATION: {self.iteration}/{self.max_iterations}
+"""
+```
+
+**Critical principle**: An agent without state is like a human with amnesia. Each iteration would start from scratch.
+
+### 5.2 Memory and Learning: Building Agent Knowledge
+
+Agents should improve through experience:
+
+```python
+class AgentMemory:
+    """
+    Remember what we learn for future episodes
+    """
+    
+    def __init__(self):
+        self.successful_patterns = []  # Techniques that worked
+        self.failure_patterns = []  # Mistakes to avoid
+        self.domain_knowledge = {}  # What we learned about this network
+    
+    def record_success(self, problem, solution, outcome):
+        """Learn from successes"""
+        self.successful_patterns.append({
+            'problem': problem,
+            'solution': solution,
+            'outcome': outcome,
             'timestamp': datetime.now()
         })
     
-    def extract_lessons(self):
-        """Periodically review failures and improve"""
-        # Example: If agent always makes same mistake,
-        # add safeguard to prevent it
-        common_failures = analyze_failures(self.failures)
-        for failure_pattern in common_failures:
-            self.add_safeguard(failure_pattern)
+    def record_failure(self, attempted_solution, reason):
+        """Learn from failures"""
+        self.failure_patterns.append({
+            'solution': attempted_solution,
+            'why_it_failed': reason,
+            'timestamp': datetime.now()
+        })
+    
+    def get_relevant_memories(self, current_problem):
+        """
+        When facing a new problem, look for similar past problems
+        """
+        relevant = []
+        for pattern in self.successful_patterns:
+            if self.is_similar(current_problem, pattern['problem']):
+                relevant.append(pattern)
+        return relevant
 ```
 
-This is advanced. Start with basic agents first.
+**Important note**: Agents need persistent memory to improve. Without it, every episode is treated as a new problem.
 
 ---
 
-## Chapter Summary: Key Engineering Principles
+## Part 6: Advanced Agent Decision-Making
 
-### Structure
-Agents have clear stages: Observe → Think → Act → Verify. Each stage has specific responsibility.
+### 6.1 Decision Trees in Agent Context
 
-### Constraints
-Agents operate within constraints: rate limits, approval requirements, network availability. These constraints are features that ensure safety.
+Agents must navigate decision spaces. Understanding decision theory helps:
 
-### Trade-offs
-- More autonomy → faster but riskier
-- More documentation → better agents but expensive
-- More tools → powerful but complex
-- More monitoring → safer but overhead
-
-Choose the right balance for your organization's tolerance and capabilities.
-
-### Success Factors
-1. **Excellent documentation** (Chapter 13) - agents are only as good as their knowledge
-2. **Searchable documentation** (Chapter 14) - agents must find relevant docs
-3. **Clear tool design** - agents must understand what tools do
-4. **Approval workflows** - humans remain in the loop for high-risk actions
-5. **Monitoring and alerting** - know when agents fail
-6. **Gradual rollout** - start with read-only, graduate to write
-7. **Team training** - engineers must trust and oversee agents
-8. **Continuous improvement** - learn from failures, improve the system
-
----
-
-## Conclusion: The Future of Network Operations
-
-Agents represent a fundamental shift in how networks are operated. Instead of engineers executing tasks, engineers design systems that execute tasks.
-
-```
-Before Agents:
-  Day in life of network engineer:
-  - 8 hours
-  - 40% troubleshooting/firefighting
-  - 30% configuration changes
-  - 20% monitoring/alerts
-  - 10% strategic work
-
-After Agents:
-  Day in life of network engineer:
-  - 8 hours
-  - 5% troubleshooting (supervising agents)
-  - 10% configuration (approving agent changes)
-  - 5% monitoring (agent alerts)
-  - 80% strategic work (design, planning, optimization)
+```python
+def agent_decision_analysis(observations, available_actions):
+    """
+    Analyze decisions systematically
+    
+    Agents should think in terms of decision trees.
+    """
+    
+    decision_tree = {
+        'problem': 'BGP routes not advertising',
+        
+        'decisions': [
+            {
+                'decision': 'Is BGP running?',
+                'outcomes': {
+                    'yes': 'Move to next decision',
+                    'no': 'Action: start BGP'
+                }
+            },
+            {
+                'decision': 'Are BGP neighbors up?',
+                'outcomes': {
+                    'yes': 'Move to next decision',
+                    'no': 'Action: fix BGP neighbor config'
+                }
+            },
+            {
+                'decision': 'Is redistribute configured?',
+                'outcomes': {
+                    'yes': 'Routes should be advertising',
+                    'no': 'Action: add redistribute statement'
+                }
+            }
+        ]
+    }
+    
+    # Agent traverses this tree by observation
 ```
 
-This transformation is not hypothetical—organizations using agents are seeing it happen today.
+**Key insight**: Good agent prompts should guide Claude to think in decision trees.
+
+### 6.2 Confidence Scoring: Knowing When You're Uncertain
+
+Agents must express certainty:
+
+```python
+def score_confidence(decision):
+    """
+    Rate confidence in decision
+    
+    HIGH: >80% confident this is right
+    MEDIUM: 50-80% confident
+    LOW: <50% confident
+    """
+    
+    factors = {
+        'observation_quality': 0.8,  # How complete are observations?
+        'past_success_rate': 0.7,  # Similar problems always resolved this way?
+        'risk_level': 0.6,  # How risky is this action?
+        'documentation_clarity': 0.9,  # How clear is the documentation?
+    }
+    
+    overall = sum(factors.values()) / len(factors)
+    
+    if overall > 0.8:
+        return 'HIGH'
+    elif overall > 0.5:
+        return 'MEDIUM'
+    else:
+        return 'LOW'
+    
+    # Rule: If confidence is LOW, escalate to human
+```
+
+### 6.3 Exploration vs Exploitation
+
+Should the agent try new approaches or stick with what works?
+
+```python
+def choose_action_strategy(history):
+    """
+    Balance trying proven solutions vs exploring new ones
+    
+    This is the exploration-exploitation trade-off
+    """
+    
+    # Count successes
+    success_rate = count_successes(history) / len(history)
+    
+    if success_rate > 0.8:
+        # We're doing well - mostly exploit
+        strategy = 'mostly_exploit_some_exploration'
+    elif success_rate > 0.5:
+        # Mixed success - balance both
+        strategy = 'balanced'
+    else:
+        # Not working - explore more
+        strategy = 'mostly_explore_some_exploitation'
+    
+    if strategy == 'mostly_exploit_some_exploration':
+        # 90% of time: choose proven solutions
+        # 10% of time: try novel approaches
+        
+    return strategy
+```
 
 ---
 
-## References and Further Reading
+## Part 7: Real-World Implementation Patterns
 
-### Foundational Papers
-- "Agents in Large Language Models" (Research papers on LLM agents)
-- "Prompt Engineering for Autonomous Agents" (Prompt design patterns)
-- "Safety in Autonomous Systems" (Designing safe agent systems)
+### 7.1 The Diagnostic Agent Pattern
 
-### Tools and Platforms
-- Anthropic Claude API: https://docs.anthropic.com
-- LangChain Agent Framework: https://python.langchain.com
-- LlamaIndex: https://gpt-index.readthedocs.io
+A common pattern for network troubleshooting:
 
-### Related Chapters
-- Chapter 13: Network Documentation Basics
-- Chapter 14: RAG Fundamentals
-- Chapter 15: Building AI Agents (this chapter)
-- Chapter 16: Fine-Tuning Models for Network Ops
-- Chapter 20: Production Systems at Scale
+```python
+class DiagnosticAgent:
+    """
+    Systematically diagnose network issues
+    
+    Pattern: OBSERVE → HYPOTHESIS → TEST → CONFIRM → ACT
+    """
+    
+    def diagnose(self, symptom):
+        """
+        Given a symptom, find root cause
+        """
+        
+        # Phase 1: OBSERVE
+        observations = self.gather_observations(symptom)
+        
+        # Phase 2: HYPOTHESIS GENERATION
+        hypotheses = self.generate_hypotheses(observations)
+        # Examples: "Link failure", "Configuration error", "Policy issue"
+        
+        # Phase 3: HYPOTHESIS TESTING
+        for hypothesis in sorted(hypotheses, key=lambda h: h['likelihood']):
+            test_result = self.test_hypothesis(hypothesis, observations)
+            
+            if test_result['confirmed']:
+                root_cause = hypothesis
+                break
+        
+        # Phase 4: SOLUTION
+        solution = self.find_solution(root_cause)
+        
+        # Phase 5: EXECUTION (with approval)
+        self.execute_solution(solution)
+        
+        # Phase 6: VERIFICATION
+        self.verify_solution_worked()
+        
+        return root_cause
+```
+
+### 7.2 The Patrol Agent Pattern
+
+Continuously monitoring and proactive fixing:
+
+```python
+class PatrolAgent:
+    """
+    Continuously monitor, detect issues, fix proactively
+    
+    Pattern: Infinite loop of observation and correction
+    """
+    
+    def patrol(self):
+        """Run continuously"""
+        
+        while True:
+            # Observe
+            state = self.observe_network()
+            
+            # Detect issues
+            issues = self.detect_issues(state)
+            
+            # Fix automatically
+            for issue in issues:
+                if issue['severity'] == 'LOW':
+                    # Auto-fix low severity
+                    self.fix_automatically(issue)
+                elif issue['severity'] == 'MEDIUM':
+                    # Alert and propose fix
+                    self.alert_and_propose(issue)
+                else:
+                    # High severity: escalate to human immediately
+                    self.escalate_to_human(issue)
+            
+            # Sleep before next patrol
+            time.sleep(60)
+```
+
+### 7.3 The Responder Agent Pattern
+
+Respond to human requests intelligently:
+
+```python
+class ResponderAgent:
+    """
+    Answer human questions about network state
+    
+    Pattern: QUERY → UNDERSTAND → SEARCH → SYNTHESIZE → ANSWER
+    """
+    
+    def answer_question(self, question):
+        """
+        Answer a network question
+        """
+        
+        # UNDERSTAND: What is being asked?
+        intent = claude.understand_intent(question)
+        
+        # SEARCH: Find relevant documentation and data
+        docs = self.rag_system.search(intent)
+        observations = self.gather_observations(intent)
+        
+        # SYNTHESIZE: Combine docs and observations
+        context = docs + observations
+        
+        # ANSWER: Generate response
+        answer = claude.synthesize_answer(question, context)
+        
+        return answer
+```
 
 ---
 
-**End of Chapter 15** ✓
+## Part 8: Testing and Validation
 
-*From manual operations to autonomous operations: the future of networking is here.*
+### 8.1 Agent Testing: How to Know If It Works
+
+```python
+def test_agent(agent, test_cases):
+    """
+    Test an agent against known problems
+    """
+    
+    results = []
+    
+    for test_case in test_cases:
+        # Run agent
+        result = agent.run(
+            goal=test_case['goal'],
+            initial_observations=test_case['observations']
+        )
+        
+        # Check if it succeeded
+        success = result['goal_achieved']
+        
+        # Check quality metrics
+        iterations = result['iterations_used']
+        cost = result['api_cost']
+        
+        results.append({
+            'test': test_case['name'],
+            'success': success,
+            'iterations': iterations,
+            'cost': cost
+        })
+    
+    # Summarize
+    success_rate = sum(1 for r in results if r['success']) / len(results)
+    avg_iterations = sum(r['iterations'] for r in results) / len(results)
+    total_cost = sum(r['cost'] for r in results)
+    
+    return {
+        'success_rate': success_rate,
+        'avg_iterations': avg_iterations,
+        'total_cost': total_cost,
+        'results': results
+    }
+```
+
+### 8.2 Benchmark Test Cases
+
+Every agent should be tested against standard scenarios:
+
+```python
+BENCHMARK_TEST_CASES = [
+    {
+        'name': 'Simple: Interface Down',
+        'goal': 'Fix interface down on router-core-01',
+        'observations': {
+            'interface_status': 'down',
+            'interface_error': 'physical link down'
+        },
+        'expected_solution': 'Check physical link'
+    },
+    {
+        'name': 'Medium: BGP Neighbors Down',
+        'goal': 'Fix BGP neighbors not responding',
+        'observations': {
+            'bgp_neighbors': 'down',
+            'bgp_running': True,
+            'interfaces': 'up'
+        },
+        'expected_solution': 'Check BGP config or neighbors down'
+    },
+    {
+        'name': 'Complex: Intermittent Issues',
+        'goal': 'Find intermittent connectivity issue',
+        'observations': {
+            'status': 'intermittent',
+            'no_constant_pattern': True
+        },
+        'expected_solution': 'Detailed analysis required'
+    }
+]
+```
+
+---
+
+## Part 9: Complete Working Example
+
+### A Full Agent Implementation
+
+```python
+class NetworkOperationsAgent:
+    """
+    Complete, working agent for network operations
+    """
+    
+    def __init__(self, tools, rag_system):
+        self.tools = tools
+        self.rag = rag_system
+        self.context = AgentContext(goal=None)
+        self.memory = AgentMemory()
+    
+    def run(self, goal, initial_observations):
+        """
+        Execute the full agent loop
+        """
+        
+        self.context.goal = goal
+        self.context.record_observation('initial', initial_observations)
+        
+        while not self.context.should_escalate():
+            self.context.iteration += 1
+            
+            # OBSERVE
+            observations = self.observe()
+            self.context.record_observation(f'iteration_{self.context.iteration}', observations)
+            
+            # THINK
+            decision = self.think()
+            
+            # ACT
+            action_result = self.act(decision)
+            
+            # VERIFY
+            verification = self.verify(action_result)
+            
+            # RECORD
+            self.context.record_action(decision, action_result, verification['success'])
+            
+            # SUCCESS?
+            if verification['goal_achieved']:
+                return self.success_result()
+        
+        return self.escalation_result()
+    
+    def think(self):
+        """Ask Claude to reason"""
+        
+        prompt = self.build_thinking_prompt()
+        
+        response = claude.think(
+            system="You are a careful network agent. Think step by step.",
+            user=prompt
+        )
+        
+        return self.parse_decision(response)
+    
+    def build_thinking_prompt(self):
+        """Build a good thinking prompt"""
+        
+        relevant_memories = self.memory.get_relevant_memories(
+            self.context.goal
+        )
+        
+        prompt = f"""
+GOAL: {self.context.goal}
+
+CONTEXT:
+{self.context.get_summary_for_prompt()}
+
+RELEVANT PAST SUCCESSES:
+{self.format_memories(relevant_memories)}
+
+Based on all above, what's the best next action?
+
+Think carefully through:
+1. Root cause
+2. Options
+3. Best choice
+4. Why
+
+Then provide: ACTION, ARGS, REASONING, CONFIDENCE
+"""
+        
+        return prompt
+    
+    def observe(self):
+        """Gather observations"""
+        
+        observations = {
+            'device_status': self.tools['check_device_status'](),
+            'configs': self.tools['get_configs'](),
+            'metrics': self.tools['get_metrics'](),
+        }
+        
+        return observations
+    
+    def act(self, decision):
+        """Execute decision"""
+        
+        tool = decision['tool']
+        args = decision['args']
+        
+        # Safety check
+        if self.tools[tool].requires_approval:
+            approval = request_approval(tool, args)
+            if not approval:
+                return {'status': 'rejected'}
+        
+        # Execute
+        result = self.tools[tool].execute(**args)
+        
+        return result
+    
+    def verify(self, action_result):
+        """Verify action worked"""
+        
+        if action_result['status'] != 'success':
+            return {'success': False}
+        
+        # Wait for convergence
+        time.sleep(5)
+        
+        # Check if goal achieved
+        observations = self.observe()
+        goal_achieved = self.check_goal(observations)
+        
+        return {'success': True, 'goal_achieved': goal_achieved}
+    
+    def success_result(self):
+        """Format successful result"""
+        
+        return {
+            'status': 'success',
+            'goal': self.context.goal,
+            'iterations': self.context.iteration,
+            'actions_taken': self.context.history,
+            'api_cost': self.calculate_cost()
+        }
+```
+
+---
+
+## Summary: Key Theoretical Concepts
+
+1. **Agents as Decision Makers**: Agents solve problems through reasoning + action, not pre-programmed scripts
+
+2. **The Agent Loop**: OBSERVE → THINK → ACT → VERIFY repeats until goal achieved
+
+3. **Prompt Engineering**: Quality of reasoning depends on prompt quality
+
+4. **Tool Design**: Tools must be safe, well-documented, error-handling
+
+5. **State and Context**: Agents need memory to avoid repeating mistakes
+
+6. **Safety First**: All write operations require approval + verification + rollback capability
+
+7. **Escalation**: Know when to give up and ask for human help
+
+8. **Testing and Validation**: Benchmark agents against known scenarios
+
+---
+
+## Next Steps: Building Your First Agent
+
+1. **Define your goal** - What problem does the agent solve?
+2. **Build tools** - What capabilities does it need?
+3. **Design prompts** - How should it reason?
+4. **Test thoroughly** - Benchmark against known scenarios
+5. **Deploy safely** - Start with read-only, graduate to write operations
+6. **Monitor and improve** - Track what works and doesn't
+
+---
+
+## Chapter 15 Complete ✓
+
+*Agents represent the future of network operations. Understanding their theory and practice is essential.*
