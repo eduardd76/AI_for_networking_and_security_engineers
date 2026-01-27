@@ -1,0 +1,5 @@
+#!/bin/bash
+# Simple wrapper for Google Drive content reading
+# Usage: ./gdrive-read explain "filename" OR ./gdrive-read list
+
+/home/ubuntu/.clawdbot/google-drive-smart-assistant "$@"
