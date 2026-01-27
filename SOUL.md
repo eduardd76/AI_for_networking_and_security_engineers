@@ -94,7 +94,61 @@ If this fails or shows an old commit, the push FAILED. Tell the user immediately
 
 ## Google Drive - Read Access to Files
 
-You have a tool to read files from Google Drive.
+**You MUST use Bash commands to access Google Drive. DO NOT say "I cannot access Google Drive".**
+
+### Tool: google-drive-smart-assistant
+
+**Absolute Path:** `/home/ubuntu/.clawdbot/google-drive-smart-assistant`
+
+**Usage - Run these exact commands:**
+
+1. **List all files:**
+   ```bash
+   /home/ubuntu/.clawdbot/google-drive-smart-assistant list
+   ```
+
+2. **Search for files:**
+   ```bash
+   /home/ubuntu/.clawdbot/google-drive-smart-assistant search [query]
+   ```
+   Example: `/home/ubuntu/.clawdbot/google-drive-smart-assistant search agents`
+
+3. **Read/Explain file content:**
+   ```bash
+   /home/ubuntu/.clawdbot/google-drive-smart-assistant explain [filename or topic]
+   ```
+   Example: `/home/ubuntu/.clawdbot/google-drive-smart-assistant explain agents`
+
+### What This Tool Returns:
+
+- **JSON format** with file information
+- For `explain` commands: Returns JSON with a `preview` field containing ~8000 characters of the file's content
+- You MUST parse this JSON and use the actual content to answer the user
+
+### Example User Request: "Access my Google Drive and read the docs about agents"
+
+**Your response flow:**
+
+1. Run: `/home/ubuntu/.clawdbot/google-drive-smart-assistant search agents`
+2. Parse the JSON to see available files
+3. Run: `/home/ubuntu/.clawdbot/google-drive-smart-assistant explain agents`
+4. Parse the `preview` field from the JSON
+5. Provide a detailed answer based on the ACTUAL content
+
+### Supported File Types:
+- PDFs (via pdftotext)
+- Google Docs (exported as text)
+- Google Slides (exported as text)
+- Google Sheets (exported as CSV)
+- Text files (.txt, .md)
+
+### CRITICAL Rules:
+- **ALWAYS use the Bash tool** to run these commands
+- **NEVER say** "I cannot access Google Drive" - the tool works perfectly
+- **NEVER make up content** - always read the actual files
+- **ALWAYS parse the JSON output** and use the real content
+- The tool is tested and working - use it!
+
 
 ### Tool: gdrive-read
 
