@@ -915,6 +915,24 @@ result_b = rag.query(tenant_id="company_b", question="What's our BGP policy?")
 4. **Monitoring** reveals performance bottlenecks
 5. **Multi-tenancy** requires careful data isolation
 
+### Core Concepts Expanded
+
+- **RAG (Retrieval-Augmented Generation)**: A blend of retrieval and generation, RAG combines the ability to fetch relevant data from a vast repository with the generation of coherent text. This ensures the AI provides contextually accurate and informative responses.
+
+- **Vector Store**: Think of a vector store as a smart filing system where data is stored to enable quick and meaningful searches. It converts complex information into vectors (numerical representations) that cluster similar information together.
+
+- **Embedding**: Embeddings are like the unique fingerprints for words and sentences. They convert these into numbers that machines comprehend, capturing their essence and context. This allows AI to recognize similarities and differences, understand nuances, and deliver precise results.
+
+#### Importance of Fine-Tuning Embedding Models
+
+Embedding models translate human language into a form that AI systems can understand. Fine-tuning these models is like refining an artist's palette:
+
+- **Customization**: Tailor embeddings to focus on specific needs, such as industry jargon or special terminologies.
+- **Precision**: Enhance accuracy by concentrating on relevant areas and discarding unnecessary data. It helps AI differentiate subtle context changes.
+- **Adaptation**: As language evolves, embedding models can adjust to incorporate new words, meanings, or contexts, ensuring AI stays current and effective.
+
+Fine-tuning is crucial for crafting an AI that truly understands the unique and changing language of any field, making interactions smoother and more accurate.
+
 Your RAG system is now production-ready.
 
 Next chapter: Building intelligent troubleshooting agents.
