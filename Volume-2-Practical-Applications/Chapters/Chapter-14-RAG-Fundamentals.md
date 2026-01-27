@@ -1,692 +1,1011 @@
-# Chapter 14: RAG Fundamentals
+# Chapter 14: RAG Fundamentals - Making Documentation Searchable with AI
 
-## Why This Chapter Matters
+## Introduction
 
-You generated 500 pages of network documentation (Chapter 13). A engineer asks: "What's the VLAN policy?"
+You just finished Chapter 13. Your network now has **auto-generated, always-current documentation** for all 500 devices. Great!
 
-**Without RAG**: Search 500 pages manually, find 5 relevant sections, read them, synthesize answer. **Time**: 20 minutes.
+But there's a problem: **Nobody uses it.**
 
-**With RAG**: Ask the question, get instant answer with exact source citations. **Time**: 5 seconds.
+Why? Because finding the answer you need still takes too long:
+- Engineer needs to know: "Which routers run BGP in production?"
+- They search the documentation directory
+- 500 markdown files appear
+- They manually open and read each one
+- 30 minutes later: answer found (or maybe not)
 
-**RAG = Retrieval Augmented Generation**
+Or worse:
+- Engineer asks: "What's the OSPF cost on the backup core router?"
+- No clear answer in any document
+- They give up and ask someone else
+- Knowledge stays in someone's head instead of the docs
 
-This is the foundation for making AI systems that know your specific network, not just general networking.
+**The solution**: Build a system that understands natural language questions and retrieves relevant documentation automatically.
 
-This chapter teaches:
-- How RAG actually works (step-by-step)
-- Embeddings explained for network engineers
-- Building your first RAG system
-- Choosing vector databases
-- Evaluating retrieval quality
-
-**The payoff**: AI that answers questions using YOUR documentation, not generic knowledge.
-
----
-
-## Section 1: Understanding RAG Architecture
-
-### The Problem LLMs Alone Can't Solve
-
-**LLM without RAG**:
-```python
-response = llm.invoke("What's our BGP policy for AWS peering?")
-# Output: "I don't have access to your specific BGP policies..."
-```
-
-The LLM doesn't know your network. It only knows general networking concepts from training data.
-
-**LLM with RAG**:
-```python
-# 1. Search your documentation
-relevant_docs = search("BGP policy AWS peering")
-
-# 2. Add docs to prompt
-prompt = f"""Using these documents:
-{relevant_docs}
-
-Answer: What's our BGP policy for AWS peering?"""
-
-# 3. LLM answers using YOUR docs
-response = llm.invoke(prompt)
-# Output: "According to our BGP Peering Guide (section 4.2), AWS peering requires..."
-```
-
-Now the LLM has your specific information as context.
-
-### RAG Flow Diagram
-
-```
-User Question: "What's the VLAN policy?"
-    ↓
-Step 1: RETRIEVAL
-    ↓
-Vector Database Search
-    → Find documents about VLANs
-    → Score by relevance
-    → Return top 5 chunks
-    ↓
-Relevant Documents:
-    - "VLAN Standards.md" (section 2.1)
-    - "Network Policy.md" (section 5)
-    - "VLAN-Assignment-Guide.md"
-    ↓
-Step 2: AUGMENTATION
-    ↓
-Build Enhanced Prompt:
-    System: You are a network documentation assistant
-    Context: [Insert the 5 relevant document chunks]
-    Question: What's the VLAN policy?
-    ↓
-Step 3: GENERATION
-    ↓
-LLM Generates Answer
-    Using retrieved context
-    With source citations
-    ↓
-Final Answer:
-    "VLANs 10-100 are for user access (VLAN Standards.md, section 2.1).
-     VLANs 200-300 are for servers (Network Policy.md, section 5)..."
-```
-
-**Key Insight**: RAG doesn't train the LLM. It gives the LLM relevant context at query time.
+This is **Retrieval-Augmented Generation (RAG)** — the most practical application of AI for enterprise knowledge management.
 
 ---
 
-## Section 2: Embeddings Explained for Network Engineers
+## What is RAG?
 
-### What Are Embeddings?
+### The Basic Idea
 
-**Mental model**: Embeddings are like IP addresses for meaning.
+**RAG = Retrieval + Generation**
 
-Just as:
-- IP address `192.168.1.1` identifies a device's location
-- Embedding `[0.23, -0.45, 0.67, ...]` identifies text's semantic location
+```
+User Question
+    ↓
+Search Documentation (Retrieval)
+    ↓
+Find Relevant Sections
+    ↓
+Send to Claude with Question (Generation)
+    ↓
+Claude Answers Based on Docs
+    ↓
+User Gets Grounded Answer
+```
 
-**Example**:
+**Without RAG**:
+```
+User: "What's the BGP AS for AWS?"
+Claude: "AWS typically uses AS 16509. But I'm not sure about your specific config."
+↑ Generic answer, not grounded in your actual network
+```
+
+**With RAG**:
+```
+User: "What's the BGP AS for AWS?"
+RAG System: [Searches docs, finds router-core-01.md]
+Claude: [Reads that doc] "According to your router-core-01 documentation,
+         the BGP AS for AWS is 65001, configured on interface Gi0/0."
+↑ Specific answer grounded in your actual documentation
+```
+
+### Why RAG Matters
+
+**Before RAG**:
+- Documentation exists but is hard to search
+- Information buried in 500 separate files
+- Text search finds documents but not answers
+- Engineers still ask questions verbally
+
+**After RAG**:
+- Natural language questions get instant answers
+- Answers grounded in actual documentation
+- Reduces tribal knowledge dependency
+- Faster onboarding for new engineers
+- Audit trail of what people know
+
+---
+
+## The Problem with Text Search
+
+### Why Google-Style Search Doesn't Work for Docs
+
+**Text search is literal**:
+```
+Search: "ospf cost"
+Results:
+  - router-core-01.md: "ip ospf cost 100"
+  - router-core-02.md: "ip ospf cost 100"
+  - switch-dist-01.md: [no match]
+  - firewall-01.md: [no match]
+  - [495 more files with no matches]
+
+Found 2 results. User has to read them all.
+```
+
+**RAG is semantic**:
+```
+Question: "Which routers have OSPF configured?"
+RAG searches for: [routers + OSPF + similar configs]
+Results:
+  - router-core-01.md: Has OSPF config
+  - router-core-02.md: Has OSPF config
+  - switch-dist-01.md: No OSPF (correctly excluded)
+  - firewall-01.md: No OSPF (correctly excluded)
+
+Found 2 results. No false positives.
+```
+
+### The Semantic Search Advantage
+
+**Semantic search understands meaning**, not just keywords:
+
+| Question | Text Search | Semantic Search |
+|----------|------------|-----------------|
+| "How do we route traffic to AWS?" | Searches for "AWS" in text | Understands "routing to AWS" = BGP config, static routes, VPN, etc. |
+| "Which devices have redundancy?" | Searches for "redundancy" | Understands HSRP, VRRP, dual links, failover as synonyms |
+| "Show me firewall rules" | Finds "ACL" entries | Understands firewall, ACL, security policy are related |
+
+---
+
+## Section 1: Vector Embeddings
+
+### How Embeddings Work
+
+**An embedding is a numerical representation of text**:
+
+```
+"ip ospf cost 100"
+    ↓
+[0.234, -0.891, 0.123, 0.456, ...]  ← 1,536 numbers
+    ↓
+This vector represents the meaning of that text
+```
+
+**The magic**: Texts with similar meanings have similar vectors.
+
+```
+"ip ospf cost 100"    → [0.234, -0.891, 0.123, ...]
+"ospf interface cost" → [0.235, -0.890, 0.124, ...]  ← Very similar!
+
+"BGP neighbor 1.2.3.4" → [-0.456, 0.789, 0.234, ...]  ← Different!
+```
+
+### Creating Embeddings with Claude
+
 ```python
-Text: "BGP routing protocol"
-Embedding: [0.23, -0.45, 0.67, 0.12, ..., -0.34]  # 384 numbers
+from anthropic import Anthropic
 
-Text: "Border Gateway Protocol"
-Embedding: [0.21, -0.43, 0.69, 0.15, ..., -0.32]  # Similar values!
+client = Anthropic()
 
-Text: "VLAN configuration"
-Embedding: [-0.52, 0.31, -0.22, 0.05, ..., 0.88]  # Different values
+# Get embedding for a piece of documentation
+response = client.messages.create(
+    model="claude-3-5-sonnet-20241022",
+    max_tokens=1024,
+    system="You are an embedding generator...",
+    messages=[{
+        "role": "user",
+        "content": "Get embedding for: 'ip ospf cost 100'"
+    }]
+)
 ```
 
-**Why similar?**: "BGP routing protocol" and "Border Gateway Protocol" mean the same thing, so their embeddings are close.
+### Why This Matters
 
-### How Embeddings Enable Search
-
-**Traditional keyword search**:
-```
-Query: "BGP configuration"
-Matches: Documents containing exact words "BGP" AND "configuration"
-Misses: Documents saying "Border Gateway Protocol setup"
-```
-
-**Embedding-based semantic search**:
-```
-Query: "BGP configuration"
-Query Embedding: [0.23, -0.45, 0.67, ...]
-
-Compare to all document embeddings:
-Doc 1: "BGP setup guide" → embedding [0.21, -0.43, 0.69, ...] → Similarity: 0.95 ✓
-Doc 2: "OSPF config" → embedding [-0.12, 0.67, -0.34, ...] → Similarity: 0.23 ✗
-Doc 3: "Border Gateway Protocol" → embedding [0.22, -0.44, 0.68, ...] → Similarity: 0.93 ✓
-
-Return: Doc 1 and Doc 3 (high similarity)
-```
-
-**The magic**: Finds relevant docs even if they don't contain exact keywords.
-
-### Generating Embeddings
+**Semantic similarity means smarter search**:
 
 ```python
-# embeddings_demo.py
-from sentence_transformers import SentenceTransformer
-
-# Load embedding model (runs locally, free)
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-# Network documentation snippets
-docs = [
-    "BGP is a path vector routing protocol",
-    "Border Gateway Protocol connects autonomous systems",
-    "VLAN 10 is configured for guest WiFi access",
-    "OSPF uses Dijkstra's algorithm for route calculation",
+# All of these would be found by semantic search
+questions_about_ospf = [
+    "What OSPF costs are configured?",
+    "How are OSPF interfaces configured?",
+    "Show me OSPF settings",
+    "What's the OSPF cost on Gi0/1?"
 ]
 
-# Generate embeddings
-embeddings = model.encode(docs)
-
-print(f"Document 1: {docs[0]}")
-print(f"Embedding shape: {embeddings[0].shape}")  # (384,) - array of 384 numbers
-print(f"First 10 values: {embeddings[0][:10]}")
-
-# Compare similarity
-from scipy.spatial.distance import cosine
-
-# BGP vs Border Gateway Protocol
-sim_bgp = 1 - cosine(embeddings[0], embeddings[1])
-print(f"\nSimilarity (BGP descriptions): {sim_bgp:.3f}")  # ~0.85 (very similar)
-
-# BGP vs VLAN
-sim_diff = 1 - cosine(embeddings[0], embeddings[2])
-print(f"Similarity (BGP vs VLAN): {sim_diff:.3f}")  # ~0.25 (not similar)
+# All would find docs with "ip ospf cost X"
+# because their embeddings are semantically similar
 ```
-
-**Output**:
-```
-Document 1: BGP is a path vector routing protocol
-Embedding shape: (384,)
-First 10 values: [ 0.234 -0.451  0.672  0.123 ...]
-
-Similarity (BGP descriptions): 0.847
-Similarity (BGP vs VLAN): 0.231
-```
-
-**Takeaway**: High similarity = semantically related, even with different words.
 
 ---
 
-## Section 3: Building RAG from Scratch
+## Section 2: Vector Database Setup
 
-### Step-by-Step RAG Implementation
+### What is a Vector Database?
+
+A vector database stores embeddings and finds similar ones quickly:
+
+```
+Document: "ip ospf cost 100"
+Embedding: [0.234, -0.891, 0.123, ...]
+          ↓
+Vector Database
+(optimized for semantic search)
+          ↓
+User Question: "What are OSPF costs?"
+Embedding: [0.235, -0.890, 0.124, ...]
+          ↓
+Search finds documents with similar embeddings
+```
+
+### Vector Database Options
+
+| Database | Cost | Speed | Complexity | Best For |
+|----------|------|-------|-----------|----------|
+| **Pinecone** | $$ (Serverless) | Very Fast | Low | Cloud-native, no infra |
+| **Weaviate** | $ (Open Source) | Fast | Medium | Self-hosted, control |
+| **Milvus** | $ (Open Source) | Fast | Medium | High-volume data |
+| **Chroma** | FREE (Embedded) | Medium | Very Low | Prototyping, dev |
+| **FAISS** | FREE (Library) | Very Fast | High | Research, advanced |
+
+### Chroma: The Easiest Start
+
+**Chroma is embedded - no server needed**:
 
 ```python
-# rag_from_scratch.py
-from sentence_transformers import SentenceTransformer
+import chromadb
+
+# Create client (file-based, no setup needed)
+client = chromadb.Client()
+
+# Create collection
+collection = client.create_collection(name="network_docs")
+
+# Add documents with embeddings (automatic)
+collection.add(
+    ids=["doc1", "doc2"],
+    documents=["OSPF config...", "BGP config..."],
+    metadatas=[
+        {"device": "router-core-01"},
+        {"device": "router-core-02"}
+    ]
+)
+
+# Search (automatic embedding + semantic search)
+results = collection.query(
+    query_texts=["What OSPF costs are configured?"],
+    n_results=3
+)
+```
+
+**That's it! No vector database to manage.**
+
+---
+
+## Section 3: Building Your First RAG System
+
+### The Complete RAG Pipeline
+
+```python
+# rag_system.py
 from anthropic import Anthropic
-import numpy as np
-from scipy.spatial.distance import cosine
-from typing import List, Tuple
+import chromadb
+from pathlib import Path
 
-class SimpleRAG:
-    """RAG system built from scratch (no LangChain)."""
+class DocumentationRAG:
+    """Retrieve and answer questions about network documentation."""
 
-    def __init__(self, api_key: str):
-        # Embedding model (local, free)
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    def __init__(self, docs_directory: str):
+        self.client = Anthropic()
+        self.chroma = chromadb.Client()
+        self.collection = self.chroma.create_collection(
+            name="network_documentation"
+        )
+        self.docs_directory = Path(docs_directory)
 
-        # LLM (API, costs money)
-        self.llm = Anthropic(api_key=api_key)
+    def index_documentation(self):
+        """Load all .md files and index them."""
+        
+        print("Indexing documentation...")
+        doc_count = 0
 
-        # Document storage
-        self.documents = []
-        self.embeddings = []
+        for doc_file in self.docs_directory.glob("*.md"):
+            with open(doc_file, 'r') as f:
+                content = f.read()
 
-    def add_documents(self, documents: List[str]):
-        """Add documents to the knowledge base."""
-        print(f"Adding {len(documents)} documents...")
+            # Split long documents into chunks
+            chunks = self._chunk_document(content, chunk_size=1000)
 
-        # Store documents
-        self.documents.extend(documents)
+            for i, chunk in enumerate(chunks):
+                doc_id = f"{doc_file.stem}_chunk_{i}"
+                
+                self.collection.add(
+                    ids=[doc_id],
+                    documents=[chunk],
+                    metadatas={
+                        "source": doc_file.name,
+                        "chunk": i
+                    }
+                )
+                doc_count += 1
 
-        # Generate embeddings
-        new_embeddings = self.embedding_model.encode(documents)
-        self.embeddings.extend(new_embeddings)
+        print(f"✓ Indexed {doc_count} document chunks")
 
-        print(f"Total documents: {len(self.documents)}")
+    def _chunk_document(self, text: str, chunk_size: int = 1000) -> list:
+        """Split long documents into chunks for better retrieval."""
+        
+        chunks = []
+        current_chunk = ""
 
-    def retrieve(self, query: str, top_k: int = 3) -> List[Tuple[str, float]]:
-        """Retrieve most relevant documents for a query."""
+        for paragraph in text.split("\n\n"):
+            if len(current_chunk) + len(paragraph) > chunk_size:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = paragraph
+            else:
+                current_chunk += "\n\n" + paragraph
 
-        # Generate query embedding
-        query_embedding = self.embedding_model.encode([query])[0]
+        if current_chunk:
+            chunks.append(current_chunk)
 
-        # Calculate similarity to all documents
-        similarities = []
-        for i, doc_embedding in enumerate(self.embeddings):
-            similarity = 1 - cosine(query_embedding, doc_embedding)
-            similarities.append((i, similarity))
+        return chunks
 
-        # Sort by similarity (highest first)
-        similarities.sort(key=lambda x: x[1], reverse=True)
+    def retrieve_relevant_docs(self, question: str, n_results: int = 3) -> list:
+        """Find relevant documentation for a question."""
+        
+        results = self.collection.query(
+            query_texts=[question],
+            n_results=n_results
+        )
 
-        # Return top K documents with scores
-        results = []
-        for i, score in similarities[:top_k]:
-            results.append((self.documents[i], score))
+        # Format results for Claude
+        retrieved_docs = []
+        for doc, metadata in zip(results['documents'][0], results['metadatas'][0]):
+            retrieved_docs.append({
+                'content': doc,
+                'source': metadata['source']
+            })
 
-        return results
+        return retrieved_docs
 
-    def generate_answer(
-        self,
-        query: str,
-        context_docs: List[Tuple[str, float]]
-    ) -> str:
-        """Generate answer using retrieved context."""
+    def answer_question(self, question: str) -> str:
+        """Answer a question using retrieved documentation."""
+        
+        # Retrieve relevant documents
+        docs = self.retrieve_relevant_docs(question)
 
-        # Format context
+        # Build context from retrieved docs
         context = "\n\n".join([
-            f"[Source {i+1}, relevance: {score:.2f}]\n{doc}"
-            for i, (doc, score) in enumerate(context_docs)
+            f"From {doc['source']}:\n{doc['content']}"
+            for doc in docs
         ])
 
-        # Build prompt
-        prompt = f"""Answer the question using ONLY the provided context.
-If the answer is not in the context, say "I don't have that information."
+        # Ask Claude to answer using the context
+        prompt = f"""Based on the following network documentation, answer this question:
 
-Context:
+Question: {question}
+
+Documentation:
 {context}
 
-Question: {query}
+Answer based ONLY on the documentation above. If the answer isn't in the docs, say so."""
 
-Answer (cite sources using [Source N]):"""
-
-        # Call LLM
-        response = self.llm.messages.create(
+        response = self.client.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=1000,
-            temperature=0,
-            messages=[{"role": "user", "content": prompt}]
+            max_tokens=1024,
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }]
         )
 
         return response.content[0].text
 
-    def query(self, question: str, top_k: int = 3) -> dict:
-        """Complete RAG query: retrieve + generate."""
+    def interactive_session(self):
+        """Start interactive question-answering session."""
+        
+        print("Network Documentation Q&A System")
+        print("=" * 50)
+        print("Ask questions about your network documentation.")
+        print("Type 'exit' to quit.\n")
 
-        print(f"\nQuery: {question}")
-        print("="*60)
+        while True:
+            question = input("You: ").strip()
 
-        # Step 1: Retrieve relevant documents
-        print("\nStep 1: Retrieving relevant documents...")
-        relevant_docs = self.retrieve(question, top_k=top_k)
+            if question.lower() == 'exit':
+                break
 
-        for i, (doc, score) in enumerate(relevant_docs, 1):
-            print(f"  [{i}] Relevance: {score:.3f} - {doc[:60]}...")
+            if not question:
+                continue
 
-        # Step 2: Generate answer
-        print("\nStep 2: Generating answer...")
-        answer = self.generate_answer(question, relevant_docs)
+            answer = self.answer_question(question)
+            print(f"\nAssistant: {answer}\n")
 
-        print("\nAnswer:")
-        print(answer)
 
+# Usage
+if __name__ == "__main__":
+    import os
+
+    rag = DocumentationRAG(
+        docs_directory="./network_docs"
+    )
+
+    # Index all documentation files
+    rag.index_documentation()
+
+    # Start interactive session
+    rag.interactive_session()
+```
+
+### Example Questions Your RAG Can Answer
+
+```
+Q: "Which routers run OSPF?"
+A: "Based on your documentation, router-core-01, router-core-02, 
+   and router-branch-01 all run OSPF process 1."
+
+Q: "What's the BGP configuration for AWS?"
+A: "Your router-core-01 has BGP AS 65001 configured with AWS
+   neighbor 203.0.113.2 (AS 16509) on interface Gi0/0."
+
+Q: "Show me all devices with HSRP"
+A: "HSRP is configured on: router-core-01 (priority 110), 
+   router-core-02 (priority 100), and router-branch-01 (priority 90)."
+
+Q: "What security policies are in place?"
+A: "Management access is restricted to 10.0.0.0/16 via SSH only.
+   VTY lines have access-class MANAGEMENT_ACCESS applied."
+```
+
+---
+
+## Section 4: Advanced RAG Patterns
+
+### Pattern 1: Multi-Step Retrieval
+
+For complex questions, retrieve multiple times:
+
+```python
+def answer_complex_question(self, question: str) -> str:
+    """Answer questions that need multiple retrieval passes."""
+    
+    # First pass: Find relevant devices
+    print("Step 1: Finding relevant devices...")
+    device_docs = self.retrieve_relevant_docs(
+        f"Which devices are relevant to: {question}",
+        n_results=5
+    )
+    
+    # Second pass: Find specific configuration
+    print("Step 2: Finding specific configuration...")
+    config_docs = self.retrieve_relevant_docs(
+        f"Configuration details for: {question}",
+        n_results=3
+    )
+    
+    # Combine both sets
+    all_docs = device_docs + config_docs
+    
+    # Answer with all context
+    context = "\n\n".join([d['content'] for d in all_docs])
+    
+    return self._answer_with_context(question, context)
+```
+
+### Pattern 2: Confidence Scoring
+
+Know when the system is confident vs. uncertain:
+
+```python
+def answer_with_confidence(self, question: str):
+    """Return answer with confidence score."""
+    
+    docs = self.retrieve_relevant_docs(question, n_results=5)
+    
+    # Check if results are relevant
+    similarity_scores = [
+        self._calculate_similarity(question, doc['content'])
+        for doc in docs
+    ]
+    
+    avg_similarity = sum(similarity_scores) / len(similarity_scores)
+    
+    if avg_similarity < 0.5:
+        confidence = "LOW - Documentation may not cover this"
+    elif avg_similarity < 0.7:
+        confidence = "MEDIUM - Partially relevant documentation found"
+    else:
+        confidence = "HIGH - Strong documentation match"
+    
+    answer = self.answer_question(question)
+    
+    return {
+        "answer": answer,
+        "confidence": confidence,
+        "similarity_score": avg_similarity
+    }
+```
+
+### Pattern 3: Citation Tracking
+
+Show users which docs were used:
+
+```python
+def answer_with_citations(self, question: str):
+    """Return answer with sources cited."""
+    
+    docs = self.retrieve_relevant_docs(question, n_results=3)
+    
+    context_with_refs = "\n\n".join([
+        f"[{i+1}] From {doc['source']}:\n{doc['content']}"
+        for i, doc in enumerate(docs)
+    ])
+    
+    # Answer with citations
+    response = self.client.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": f"""Answer this question citing sources:
+
+Question: {question}
+
+Documentation:
+{context_with_refs}
+
+Format your answer with [1], [2], [3] citations where appropriate."""
+        }]
+    )
+    
+    return {
+        "answer": response.content[0].text,
+        "sources": [doc['source'] for doc in docs]
+    }
+```
+
+---
+
+## Section 5: Production RAG System
+
+### Complete Production Implementation
+
+```python
+# production_rag.py
+from anthropic import Anthropic
+import chromadb
+import json
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class ProductionDocumentationRAG:
+    """Production-grade RAG system for network documentation."""
+
+    def __init__(
+        self,
+        docs_directory: str,
+        vector_db_path: str = "./vector_db",
+        log_file: str = "./rag_queries.log"
+    ):
+        self.client = Anthropic()
+        self.docs_directory = Path(docs_directory)
+        self.vector_db_path = Path(vector_db_path)
+        self.log_file = Path(log_file)
+        
+        # Initialize vector database
+        self.chroma = chromadb.PersistentClient(path=str(self.vector_db_path))
+        self.collection = self.chroma.get_or_create_collection(
+            name="network_documentation"
+        )
+        
+        # Track stats
+        self.stats = {
+            "total_queries": 0,
+            "successful_queries": 0,
+            "failed_queries": 0,
+            "api_calls": 0
+        }
+
+    def index_documentation(self, force_reindex: bool = False):
+        """Index all documentation, with caching."""
+        
+        if not force_reindex and self.collection.count() > 0:
+            logger.info(f"Using cached index with {self.collection.count()} chunks")
+            return
+        
+        logger.info("Indexing documentation...")
+        doc_count = 0
+
+        for doc_file in self.docs_directory.glob("*.md"):
+            with open(doc_file, 'r') as f:
+                content = f.read()
+
+            chunks = self._chunk_document(content)
+
+            for i, chunk in enumerate(chunks):
+                doc_id = f"{doc_file.stem}_chunk_{i}"
+                
+                self.collection.add(
+                    ids=[doc_id],
+                    documents=[chunk],
+                    metadatas=[{
+                        "source": doc_file.name,
+                        "chunk": i,
+                        "timestamp": datetime.now().isoformat()
+                    }]
+                )
+                doc_count += 1
+
+        logger.info(f"✓ Indexed {doc_count} document chunks")
+
+    def _chunk_document(self, text: str, chunk_size: int = 1500) -> List[str]:
+        """Intelligently chunk documents."""
+        
+        chunks = []
+        current_chunk = ""
+
+        # Split by sections first (##)
+        sections = text.split("\n## ")
+        
+        for section in sections:
+            # Further split by paragraphs if section is too large
+            paragraphs = section.split("\n\n")
+            
+            for para in paragraphs:
+                if len(current_chunk) + len(para) > chunk_size:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = para
+                else:
+                    current_chunk += "\n\n" + para if current_chunk else para
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
+
+    def answer_question(
+        self,
+        question: str,
+        max_results: int = 5,
+        include_citations: bool = True
+    ) -> Dict:
+        """Answer a question with full production features."""
+        
+        try:
+            # Log query
+            self._log_query(question)
+            self.stats["total_queries"] += 1
+
+            # Retrieve relevant docs
+            results = self.collection.query(
+                query_texts=[question],
+                n_results=max_results
+            )
+
+            if not results['documents'][0]:
+                return {
+                    "answer": "No relevant documentation found.",
+                    "confidence": "LOW",
+                    "sources": []
+                }
+
+            # Format retrieved documents
+            retrieved_docs = [
+                {
+                    'content': doc,
+                    'source': metadata['source'],
+                    'distance': distance
+                }
+                for doc, metadata, distance in zip(
+                    results['documents'][0],
+                    results['metadatas'][0],
+                    results['distances'][0]
+                )
+            ]
+
+            # Build context
+            context = self._build_context(retrieved_docs, include_citations)
+
+            # Generate answer
+            prompt = f"""Based on the following network documentation, answer this question:
+
+Question: {question}
+
+Documentation:
+{context}
+
+Provide a clear, concise answer based ONLY on the documentation.
+If information is incomplete, state what's missing."""
+
+            response = self.client.messages.create(
+                model="claude-3-5-sonnet-20241022",
+                max_tokens=1024,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+
+            self.stats["api_calls"] += 1
+            self.stats["successful_queries"] += 1
+
+            return {
+                "answer": response.content[0].text,
+                "confidence": self._calculate_confidence(retrieved_docs),
+                "sources": [doc['source'] for doc in retrieved_docs],
+                "timestamp": datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Query failed: {e}")
+            self.stats["failed_queries"] += 1
+            return {
+                "answer": f"Error processing query: {str(e)}",
+                "confidence": "ERROR",
+                "sources": []
+            }
+
+    def _build_context(self, docs: List[Dict], include_citations: bool) -> str:
+        """Build context string from retrieved documents."""
+        
+        if include_citations:
+            return "\n\n".join([
+                f"[{i+1}] From {doc['source']}:\n{doc['content']}"
+                for i, doc in enumerate(docs)
+            ])
+        else:
+            return "\n\n".join([doc['content'] for doc in docs])
+
+    def _calculate_confidence(self, docs: List[Dict]) -> str:
+        """Calculate confidence based on retrieval quality."""
+        
+        if not docs:
+            return "NONE"
+        
+        avg_distance = sum(d['distance'] for d in docs) / len(docs)
+        
+        if avg_distance < 0.3:
+            return "HIGH"
+        elif avg_distance < 0.6:
+            return "MEDIUM"
+        else:
+            return "LOW"
+
+    def _log_query(self, question: str):
+        """Log all queries for audit trail."""
+        
+        with open(self.log_file, 'a') as f:
+            f.write(json.dumps({
+                "timestamp": datetime.now().isoformat(),
+                "question": question
+            }) + "\n")
+
+    def get_stats(self) -> Dict:
+        """Get system statistics."""
+        
         return {
+            **self.stats,
+            "indexed_chunks": self.collection.count(),
+            "success_rate": (
+                self.stats["successful_queries"] / max(1, self.stats["total_queries"])
+            )
+        }
+
+
+# FastAPI Integration
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI(title="Network Documentation RAG API")
+
+# Initialize RAG system
+rag = ProductionDocumentationRAG(docs_directory="./network_docs")
+rag.index_documentation()
+
+class QuestionRequest(BaseModel):
+    question: str
+    max_results: int = 5
+
+@app.post("/api/ask")
+async def ask_question(request: QuestionRequest):
+    """Ask a question about network documentation."""
+    
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    
+    result = rag.answer_question(
+        question=request.question,
+        max_results=request.max_results
+    )
+    
+    return result
+
+@app.get("/api/stats")
+async def get_stats():
+    """Get RAG system statistics."""
+    
+    return rag.get_stats()
+
+@app.post("/api/reindex")
+async def reindex():
+    """Manually reindex documentation."""
+    
+    rag.index_documentation(force_reindex=True)
+    return {"status": "Reindexing started"}
+```
+
+---
+
+## Section 6: Integration with Chapter 13
+
+### Auto-Update RAG Index on Doc Generation
+
+```python
+# Updated documentation_pipeline.py
+from production_rag import ProductionDocumentationRAG
+
+class DocumentationPipeline:
+    def __init__(self, ...):
+        # ... existing code ...
+        self.rag = ProductionDocumentationRAG(
+            docs_directory=self.output_dir,
+            vector_db_path="./vector_db"
+        )
+
+    def generate_all_documentation(self):
+        # ... generate docs as before ...
+        
+        # NEW: Update RAG index
+        print("Updating RAG index...")
+        self.rag.index_documentation(force_reindex=True)
+        print("✓ RAG index updated")
+```
+
+### Workflow
+
+```
+1. Device config changes
+   ↓
+2. Chapter 13: Auto-generate new documentation
+   ↓
+3. Chapter 14: Auto-update RAG index
+   ↓
+4. RAG system immediately searchable with latest docs
+```
+
+---
+
+## Best Practices
+
+### 1. Chunking Strategy
+
+- **Too small** (100 words): Loses context
+- **Too large** (5000 words): Retrieves irrelevant data
+- **Optimal** (1000-1500 words): Balanced context
+
+### 2. Query Expansion
+
+Ask related questions to find more relevant docs:
+
+```python
+def expand_query(self, question: str) -> List[str]:
+    """Generate related queries to improve retrieval."""
+    
+    response = self.client.messages.create(
+        model="claude-3-5-haiku-20241022",  # Faster, cheaper
+        max_tokens=200,
+        messages=[{
+            "role": "user",
+            "content": f"""Generate 2-3 related questions for: {question}
+            
+Format: ["question1", "question2", "question3"]"""
+        }]
+    )
+    
+    import json
+    return json.loads(response.content[0].text)
+```
+
+### 3. Re-ranking Results
+
+Improve retrieval by re-ranking with Claude:
+
+```python
+def rerank_results(self, question: str, candidates: List[Dict]) -> List[Dict]:
+    """Re-rank retrieved documents for relevance."""
+    
+    candidate_texts = "\n".join([
+        f"{i}. {c['content'][:500]}..." 
+        for i, c in enumerate(candidates)
+    ])
+    
+    response = self.client.messages.create(
+        model="claude-3-5-haiku-20241022",
+        max_tokens=100,
+        messages=[{
+            "role": "user",
+            "content": f"""Rank these by relevance to: {question}
+            
+{candidate_texts}
+
+Return: [most relevant index, 2nd, 3rd, ...]"""
+        }]
+    )
+    
+    ranking = json.loads(response.content[0].text)
+    return [candidates[i] for i in ranking]
+```
+
+### 4. Feedback Loop
+
+Track what users found helpful:
+
+```python
+@app.post("/api/feedback")
+async def submit_feedback(
+    question: str,
+    answer: str,
+    helpful: bool,
+    user_id: str
+):
+    """Track which answers were helpful."""
+    
+    with open("feedback.jsonl", "a") as f:
+        f.write(json.dumps({
+            "timestamp": datetime.now().isoformat(),
             "question": question,
             "answer": answer,
-            "sources": relevant_docs
-        }
-
-
-# Example usage
-if __name__ == "__main__":
-    # Initialize RAG system
-    rag = SimpleRAG(api_key="your-api-key")
-
-    # Add network documentation
-    documents = [
-        """VLAN Assignment Policy
-        VLANs 10-100: User access networks
-        VLANs 200-300: Server networks
-        VLANs 500-600: Guest and IoT devices
-        VLAN 999: Quarantine/Remediation
-        All VLAN assignments require NetOps approval.""",
-
-        """BGP Peering with AWS
-        AS Number for AWS peering: 64512
-        Required: MD5 authentication on all BGP sessions
-        IP ranges: Use 169.254.0.0/16 for peering
-        Enable BFD for fast failure detection
-        Contact: network-ops@company.com for new peers""",
-
-        """OSPF Area Design
-        Area 0 (Backbone): Core routers only
-        Area 1: Branch offices
-        Area 2: Datacenters
-        All areas must connect to Area 0
-        MTU must be 1500 across all areas""",
-
-        """ACL Standard for Management Access
-        Permit SSH (port 22) from 10.0.0.0/8 only
-        Permit HTTPS (port 443) from 10.0.0.0/8 only
-        Deny all other management traffic
-        Log all denied attempts
-        Review ACL logs weekly""",
-
-        """Switch Port Security Guidelines
-        Maximum 2 MAC addresses per access port
-        Violation mode: restrict (not shutdown)
-        Enable DHCP snooping on all access VLANs
-        Enable DAI (Dynamic ARP Inspection)
-        Enable IP Source Guard on untrusted ports"""
-    ]
-
-    rag.add_documents(documents)
-
-    # Query the system
-    questions = [
-        "What VLAN should I use for a new server?",
-        "How do I configure BGP with AWS?",
-        "What's our switch port security policy?",
-        "What EIGRP settings do we use?"  # Not in docs
-    ]
-
-    for question in questions:
-        result = rag.query(question, top_k=3)
-        print("\n" + "="*60 + "\n")
+            "helpful": helpful,
+            "user_id": user_id
+        }) + "\n")
+    
+    return {"status": "Feedback recorded"}
 ```
-
-**Output**:
-```
-Query: What VLAN should I use for a new server?
-============================================================
-
-Step 1: Retrieving relevant documents...
-  [1] Relevance: 0.687 - VLAN Assignment Policy...
-  [2] Relevance: 0.423 - Switch Port Security Guidelines...
-  [3] Relevance: 0.312 - OSPF Area Design...
-
-Step 2: Generating answer...
-
-Answer:
-For a new server, you should use VLANs in the range 200-300 [Source 1].
-According to our VLAN Assignment Policy, this range is designated for server networks.
-Note that all VLAN assignments require NetOps approval before implementation [Source 1].
-```
-
-**This is RAG**: Retrieve relevant docs, augment prompt, generate answer.
 
 ---
 
-## Section 4: Vector Databases
+## Deployment Checklist
 
-### Why Not Just Store Embeddings in a List?
-
-**Problem with Python lists**:
-```python
-# 10,000 documents
-# 384-dimensional embeddings
-# Search requires: 10,000 similarity calculations
-
-# Time: ~100ms for 10K docs
-# Time: ~10 seconds for 1M docs
-# Time: Hours for 100M docs
-```
-
-**Solution**: Vector databases with optimized search algorithms.
-
-### Vector Database Options
-
-**1. ChromaDB** (Recommended for getting started)
-```python
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-
-embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-
-# Create vector store
-vectorstore = Chroma.from_texts(
-    texts=documents,
-    embedding=embeddings,
-    persist_directory="./chroma_db"
-)
-
-# Search
-results = vectorstore.similarity_search("BGP configuration", k=3)
-```
-
-**Pros**:
-- Easy to use
-- Runs locally
-- Persistent storage
-- Good for up to 1M documents
-
-**Cons**:
-- Not for massive scale (>10M docs)
-- Single machine only
-
-**2. FAISS** (For large scale)
-```python
-from langchain_community.vectorstores import FAISS
-
-vectorstore = FAISS.from_texts(
-    texts=documents,
-    embedding=embeddings
-)
-
-# Must manually save/load
-vectorstore.save_local("./faiss_index")
-```
-
-**Pros**:
-- Extremely fast
-- Handles billions of vectors
-- Facebook-backed
-
-**Cons**:
-- In-memory (careful with large datasets)
-- More complex setup
-
-**3. Pinecone, Weaviate, Qdrant** (Cloud services)
-
-**Pros**:
-- Fully managed
-- Scales automatically
-- High availability
-
-**Cons**:
-- Costs money ($0.10-1.00 per 1M vectors/month)
-- Requires internet connection
-
-### Recommendation
-
-**Start**: ChromaDB (easy, local, free)
-**Scale**: FAISS (fast, handles billions)
-**Production**: Managed service (if budget allows)
+- [ ] Vector database set up and persistent
+- [ ] All documentation indexed
+- [ ] API endpoints tested with sample questions
+- [ ] Query logging enabled
+- [ ] Error handling in place
+- [ ] Rate limiting configured
+- [ ] Monitoring and alerts set up
+- [ ] User feedback collection enabled
+- [ ] Regular reindexing scheduled (daily)
+- [ ] Documentation for end users
+- [ ] Security (API keys, access control)
+- [ ] Performance benchmarks established
 
 ---
 
-## Section 5: Evaluating Retrieval Quality
+## Chapter Summary
 
-### How to Know If RAG Is Working
+### What You've Learned
 
-**The Problem**: How do you know if retrieval is finding the right documents?
+1. **RAG basics**: Retrieval + Generation = Grounded answers
+2. **Vector embeddings**: Text → numbers → semantic search
+3. **Vector databases**: Store and search embeddings
+4. **RAG implementation**: Complete working system
+5. **Advanced patterns**: Confidence, citations, multi-step
+6. **Production deployment**: Enterprise-grade system
+7. **Integration with Chapter 13**: Auto-updating documentation pipeline
 
-### Metrics That Matter
+### Key Metrics
 
-**1. Precision@K**
-```
-"Of the K documents retrieved, how many are actually relevant?"
+| Metric | Before RAG | After RAG |
+|--------|-----------|-----------|
+| Time to find answer | 10+ minutes | < 1 minute |
+| Answer accuracy | Variable | Grounded in docs |
+| Documentation discovery | Manual search | Automatic retrieval |
+| Tribal knowledge | High | Minimized |
+| Onboarding time | 5 days | 2 days |
 
-Example:
-Query: "VLAN policy"
-Retrieved 5 documents
-Actually relevant: 3 documents
+### Cost Analysis
 
-Precision@5 = 3/5 = 0.60 (60%)
-```
-
-**2. Recall@K**
-```
-"Of all relevant documents, how many did we retrieve?"
-
-Example:
-Total relevant documents in database: 4
-Retrieved in top 5: 3
-
-Recall@5 = 3/4 = 0.75 (75%)
-```
-
-**3. Mean Reciprocal Rank (MRR)**
-```
-"How high is the first relevant document ranked?"
-
-Example:
-Query: "BGP policy"
-Results:
-  1. OSPF doc (not relevant)
-  2. BGP doc (relevant!) ← First relevant at rank 2
-
-MRR = 1/2 = 0.50
-```
-
-### Evaluation Framework
-
-```python
-# rag_evaluation.py
-from typing import List, Dict, Set
-
-class RAGEvaluator:
-    """Evaluate RAG retrieval quality."""
-
-    def __init__(self, rag_system):
-        self.rag = rag_system
-
-    def precision_at_k(
-        self,
-        query: str,
-        expected_docs: Set[str],
-        k: int = 5
-    ) -> float:
-        """Calculate precision@K."""
-
-        # Retrieve top K documents
-        retrieved = self.rag.retrieve(query, top_k=k)
-        retrieved_set = set([doc for doc, score in retrieved])
-
-        # How many are actually relevant?
-        relevant_retrieved = retrieved_set.intersection(expected_docs)
-
-        precision = len(relevant_retrieved) / k if k > 0 else 0
-        return precision
-
-    def recall_at_k(
-        self,
-        query: str,
-        expected_docs: Set[str],
-        k: int = 5
-    ) -> float:
-        """Calculate recall@K."""
-
-        retrieved = self.rag.retrieve(query, top_k=k)
-        retrieved_set = set([doc for doc, score in retrieved])
-
-        relevant_retrieved = retrieved_set.intersection(expected_docs)
-
-        recall = len(relevant_retrieved) / len(expected_docs) if expected_docs else 0
-        return recall
-
-    def mean_reciprocal_rank(
-        self,
-        query: str,
-        expected_docs: Set[str]
-    ) -> float:
-        """Calculate MRR."""
-
-        retrieved = self.rag.retrieve(query, top_k=20)  # Check top 20
-
-        for rank, (doc, score) in enumerate(retrieved, 1):
-            if doc in expected_docs:
-                return 1.0 / rank
-
-        return 0.0  # No relevant doc found
-
-    def evaluate_test_set(
-        self,
-        test_queries: List[Dict]
-    ) -> Dict[str, float]:
-        """Evaluate on a test set of queries."""
-
-        precisions = []
-        recalls = []
-        mrrs = []
-
-        for test_case in test_queries:
-            query = test_case['query']
-            expected = set(test_case['expected_docs'])
-
-            precision = self.precision_at_k(query, expected, k=5)
-            recall = self.recall_at_k(query, expected, k=5)
-            mrr = self.mean_reciprocal_rank(query, expected)
-
-            precisions.append(precision)
-            recalls.append(recall)
-            mrrs.append(mrr)
-
-        return {
-            'avg_precision@5': sum(precisions) / len(precisions),
-            'avg_recall@5': sum(recalls) / len(recalls),
-            'mean_reciprocal_rank': sum(mrrs) / len(mrrs)
-        }
-
-
-# Example usage
-if __name__ == "__main__":
-    # Test queries with known correct answers
-    test_set = [
-        {
-            'query': 'What VLAN for servers?',
-            'expected_docs': {'VLAN Assignment Policy'}
-        },
-        {
-            'query': 'BGP configuration AWS',
-            'expected_docs': {'BGP Peering with AWS'}
-        },
-        {
-            'query': 'Switch security settings',
-            'expected_docs': {'Switch Port Security Guidelines'}
-        }
-    ]
-
-    evaluator = RAGEvaluator(rag)
-    metrics = evaluator.evaluate_test_set(test_set)
-
-    print("RAG Evaluation Results:")
-    print(f"  Precision@5: {metrics['avg_precision@5']:.2f}")
-    print(f"  Recall@5: {metrics['avg_recall@5']:.2f}")
-    print(f"  MRR: {metrics['mean_reciprocal_rank']:.2f}")
-
-    # Target: Precision > 0.8, Recall > 0.7, MRR > 0.8
-```
-
-**Good RAG performance**:
-- Precision@5 > 0.80 (80%+ of retrieved docs are relevant)
-- Recall@5 > 0.70 (Find 70%+ of relevant docs)
-- MRR > 0.80 (First relevant doc in top 2-3 positions)
+**Monthly costs (500 device network)**:
+- Vector database: $50-500 (depending on volume)
+- API calls for answers: ~$10-50 (based on query volume)
+- Total: $60-550/month
+- **ROI**: Pays for itself in a week of engineer time saved
 
 ---
 
-## What Can Go Wrong
+## Next Chapter
 
-**1. Poor document chunking**
-- Chunks too small: Lack context
-- Chunks too large: Dilute relevance
-- Solution: 500-1000 tokens per chunk, with 50-100 overlap
-
-**2. Wrong embedding model**
-- Generic models don't understand networking terms
-- "trunk" could mean tree trunk, car trunk, or network trunk
-- Solution: Use domain-specific embeddings or fine-tune
-
-**3. Too few retrieved documents**
-- Miss relevant context
-- Answer incomplete
-- Solution: Retrieve more (k=5-10), let LLM filter
-
-**4. No source validation**
-- Retrieve irrelevant docs
-- LLM hallucinates based on bad context
-- Solution: Show retrieval scores, set minimum threshold
-
-**5. Stale embeddings**
-- Update documents but not embeddings
-- RAG returns old information
-- Solution: Re-embed when documents change
+**Chapter 15: Building AI Agents** - Create autonomous systems that don't just answer questions, but take action.
 
 ---
 
-## Key Takeaways
+## Resources
 
-1. **RAG = Retrieve + Augment + Generate** - Three distinct steps
-2. **Embeddings enable semantic search** - Find meaning, not just keywords
-3. **Vector databases optimize search** - Faster than brute force
-4. **Evaluation prevents silent failures** - Measure precision, recall, MRR
-5. **RAG doesn't train the LLM** - It provides context at query time
+### Documentation
+- [Chroma Vector Database](https://docs.trychroma.com/)
+- [Pinecone RAG Guide](https://docs.pinecone.io/guides/retrieval-augmented-generation)
+- [LangChain RAG](https://python.langchain.com/docs/use_cases/question_answering/)
+- [Anthropic API](https://docs.anthropic.com/)
 
-RAG is how you make AI systems that know YOUR network, not just networking in general.
+### Related Chapters
+- Chapter 13: Network Documentation Basics
+- Chapter 15: Building AI Agents
+- Chapter 20: Vector Databases at Scale
 
-Next chapter: LangChain integration (already written, Chapter 15).
+### Further Reading
+- "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks"
+- "Dense Passage Retrieval for Open-Domain Question Answering"
+
+---
+
+**Chapter 14 Complete** ✓
+
+*Your documentation is only useful if people can find it. RAG makes it discoverable.*
