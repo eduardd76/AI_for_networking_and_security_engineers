@@ -1,0 +1,5 @@
+#!/bin/bash
+# Wrapper for Google Drive Smart Assistant
+# Makes tool accessible from workspace
+
+exec /home/ubuntu/.clawdbot/google-drive-smart-assistant "$@"
