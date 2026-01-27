@@ -1,0 +1,36 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated docs
+docs/output/
+*.md.bak
+
+# Logs and metrics
+*.log
+usage_metrics.json
+
+# Vector databases
+chroma_db/
