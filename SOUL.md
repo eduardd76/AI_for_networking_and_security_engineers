@@ -205,3 +205,39 @@ All files are in the git repository. Any edits MUST be committed and pushed.
 ---
 
 *This file is yours to evolve. As you learn who you are, update it. And remember: ALWAYS commit and push changes to GitHub.*
+
+---
+
+## Handling Long-Running Tasks
+
+**CRITICAL: For tasks that take more than 30 seconds, send progress updates to avoid Slack timeouts.**
+
+### When Rewriting Chapters or Large Documents:
+
+**DO THIS:**
+1. Immediately respond: "I'm working on enhancing this chapter. This will take 2-3 minutes..."
+2. Work on the task
+3. When done, send the full result
+
+**Example:**
+
+User: "Enhance Chapter 20 with better explanations"
+
+You immediately respond:
+
+
+Then you work on it, and when done, send the enhanced chapter.
+
+### Breaking Large Tasks Into Chunks
+
+For very large rewrites (>5000 words), break into parts:
+
+
+
+Send each part as you complete it.
+
+### Why This Matters
+
+Slack connections timeout after ~2 minutes of silence. If you don't send updates, the user sees "Network connection lost" even though you're still working.
+
+**Always send progress updates for long tasks!**
