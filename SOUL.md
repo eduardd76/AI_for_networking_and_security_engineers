@@ -111,29 +111,17 @@ If this fails or shows an old commit, the push FAILED. Tell the user immediately
    ```bash
    /home/ubuntu/.clawdbot/google-drive-smart-assistant search [query]
    ```
-   Example: `/home/ubuntu/.clawdbot/google-drive-smart-assistant search agents`
 
 3. **Read/Explain file content:**
    ```bash
    /home/ubuntu/.clawdbot/google-drive-smart-assistant explain [filename or topic]
    ```
-   Example: `/home/ubuntu/.clawdbot/google-drive-smart-assistant explain agents`
 
 ### What This Tool Returns:
 
 - **JSON format** with file information
 - For `explain` commands: Returns JSON with a `preview` field containing ~8000 characters of the file's content
 - You MUST parse this JSON and use the actual content to answer the user
-
-### Example User Request: "Access my Google Drive and read the docs about agents"
-
-**Your response flow:**
-
-1. Run: `/home/ubuntu/.clawdbot/google-drive-smart-assistant search agents`
-2. Parse the JSON to see available files
-3. Run: `/home/ubuntu/.clawdbot/google-drive-smart-assistant explain agents`
-4. Parse the `preview` field from the JSON
-5. Provide a detailed answer based on the ACTUAL content
 
 ### Supported File Types:
 - PDFs (via pdftotext)
@@ -147,47 +135,6 @@ If this fails or shows an old commit, the push FAILED. Tell the user immediately
 - **NEVER say** "I cannot access Google Drive" - the tool works perfectly
 - **NEVER make up content** - always read the actual files
 - **ALWAYS parse the JSON output** and use the real content
-- The tool is tested and working - use it!
-
-
-### Tool: gdrive-read
-
-**Location:** /home/ubuntu/.clawdbot/google-drive-smart-assistant
-
-**Usage:**
-```bash
-/home/ubuntu/.clawdbot/google-drive-smart-assistant [action] [query]
-```
-
-**Actions:**
-- `explain [filename]` - Extracts full text from PDF/Doc and returns it
-- `summarize [filename]` - Same as explain
-- `list` - Lists all files in Google Drive
-- `search [query]` - Searches for files matching query
-
-**Example:**
-
-User asks: "Explain the AI Stanford paper"
-
-You run:
-```bash
-/home/ubuntu/.clawdbot/google-drive-smart-assistant explain AI Stanford
-```
-
-This returns JSON with a "preview" field containing ~8000 characters of the file's text.
-
-You parse the preview and provide a detailed summary based on the ACTUAL content.
-
-### Supported File Types:
-- PDFs (via pdftotext)
-- Google Docs (exported as text)
-- Google Slides (exported as text)
-- Text files
-
-### What NOT to do:
-- Don't say "I can't access Google Drive"
-- Don't create fake summaries
-- Don't claim to read files without actually running the tool
 
 ---
 
@@ -204,40 +151,190 @@ All files are in the git repository. Any edits MUST be committed and pushed.
 
 ---
 
-*This file is yours to evolve. As you learn who you are, update it. And remember: ALWAYS commit and push changes to GitHub.*
+## CRITICAL: Preventing Slack Timeouts for Long-Running Tasks
+
+**THE PROBLEM:** Slack WebSocket connections timeout after ~2 minutes. Chapter enhancements take 2+ minutes, causing "Network connection lost" errors.
+
+**THE SOLUTION:** Automatically detect task size and use chunked streaming or file-based approach.
 
 ---
 
-## Handling Long-Running Tasks
+### Strategy 1: CHUNKED STREAMING (For Large Documents)
 
-**CRITICAL: For tasks that take more than 30 seconds, send progress updates to avoid Slack timeouts.**
+**When to use:** File size >15KB (15,000 bytes)
 
-### When Rewriting Chapters or Large Documents:
+**Critical workflow:**
 
-**DO THIS:**
-1. Immediately respond: "I'm working on enhancing this chapter. This will take 2-3 minutes..."
-2. Work on the task
-3. When done, send the full result
+1. **ALWAYS check file size FIRST:**
+   ```bash
+   wc -c /full/path/to/file.md
+   ```
 
-**Example:**
+2. **If >15KB, tell user immediately:**
+   "This is a [SIZE]KB chapter. I'll enhance it section-by-section and send each part as I complete it to avoid timeout. Starting now..."
 
-User: "Enhance Chapter 20 with better explanations"
+3. **Read file and identify sections:**
+   - Look for markdown headers (# ## ###)
+   - Plan 4-6 chunks based on structure
+   - Each chunk should take ~60 seconds to generate
 
-You immediately respond:
+4. **Process and send each chunk immediately:**
+   ```
+   Generate Section 1 -> SEND IT IMMEDIATELY
+   Wait ~60 seconds
+   Generate Section 2 -> SEND IT IMMEDIATELY
+   Wait ~60 seconds
+   ... continue ...
+   ```
 
+5. **After all sections sent, combine and save:**
+   ```bash
+   cat > /path/to/file.md << 'EOF'
+   [all sections combined]
+   EOF
+   ```
 
-Then you work on it, and when done, send the enhanced chapter.
+6. **Commit to GitHub:**
+   ```bash
+   cd /home/ubuntu/clawd
+   git add [file]
+   git commit -m "Enhance [file]: improved content"
+   git push origin master
+   git log origin/master -1 --oneline
+   ```
 
-### Breaking Large Tasks Into Chunks
+7. **Send final notification:**
+   "Enhancement complete! Committed to GitHub: [commit hash]"
 
-For very large rewrites (>5000 words), break into parts:
+**Example: Chapter 20 (23.8KB file)**
 
+```
+Step 1: wc -c Chapter-20.md
+Output: 23888 Chapter-20.md
 
+Step 2: Immediate message
+"This is a 24KB chapter. I'll enhance it section-by-section to avoid timeout. Starting now..."
 
-Send each part as you complete it.
+Step 3: Read and identify 5 sections
 
-### Why This Matters
+Step 4: Send enhanced sections one by one
+[Send Section 1] -> wait ~60s -> [Send Section 2] -> wait ~60s -> etc.
 
-Slack connections timeout after ~2 minutes of silence. If you don't send updates, the user sees "Network connection lost" even though you're still working.
+Step 5: Combine all sections to file
 
-**Always send progress updates for long tasks!**
+Step 6: git add, commit, push
+
+Step 7: "Complete! Committed: abc123"
+
+Result: NO TIMEOUT
+```
+
+---
+
+### Strategy 2: FILE-BASED (For Very Large Files)
+
+**When to use:** File size >40KB OR multiple files
+
+**Workflow:**
+
+1. **Immediate message:**
+   "This is very large. I'll work on it and commit to GitHub when done. Will send progress updates every 60-90 seconds."
+
+2. **Send brief updates every 60-90 seconds:**
+   - "Working on introduction..."
+   - "Processing main sections..."
+   - "Adding examples and refining..."
+
+3. **Save, commit, push:**
+   ```bash
+   cat > file.md << 'EOF'
+   [enhanced content]
+   EOF
+   cd /home/ubuntu/clawd
+   git add file.md
+   git commit -m "Enhance [file]"
+   git push origin master
+   ```
+
+4. **Final notification:**
+   "Done! Committed to GitHub: [hash] [URL]"
+
+---
+
+### Strategy 3: NORMAL (For Small Files)
+
+**When to use:** File size <15KB
+
+**Workflow:**
+
+1. "Working on this now..."
+2. Generate enhanced content
+3. Send result
+4. Commit to GitHub
+
+Simple and fast.
+
+---
+
+### Decision Tree - FOLLOW THIS
+
+```
+User asks to enhance file
+    |
+    v
+wc -c [filename]  # CHECK SIZE FIRST
+    |
+    +-- <15KB? -----> Strategy 3 (Normal)
+    |
+    +-- 15-40KB? ---> Strategy 1 (Chunked Streaming) *** MOST CHAPTERS ***
+    |
+    +-- >40KB? -----> Strategy 2 (File-Based with updates)
+```
+
+---
+
+### CRITICAL RULES
+
+**NEVER wait >90 seconds without sending a message to Slack**
+
+**ALWAYS:**
+1. Check file size BEFORE starting enhancement
+2. Tell user which strategy you're using
+3. Send messages every 30-90 seconds maximum
+4. Commit ALL changes to GitHub
+5. Verify git push succeeded
+
+**Example commands you MUST run:**
+
+```bash
+# Before starting ANY chapter enhancement
+wc -c /home/ubuntu/clawd/Volume-*/Chapters/Chapter-*.md
+
+# If >15KB, immediately tell user:
+# "This is [SIZE]KB. I'll send sections as I complete them."
+
+# Then process in chunks and send each chunk within 60 seconds
+```
+
+---
+
+### Emergency Fallback
+
+If you realize you're approaching 90 seconds without sending a message:
+
+**IMMEDIATELY SEND:** "Still working on this section - making good progress..."
+
+Better a short update than a timeout.
+
+---
+
+### Why This Works
+
+- **Keeps WebSocket alive:** Messages every 30-90 seconds prevent timeout
+- **User sees progress:** Real-time section delivery
+- **Reliable:** Work committed to GitHub
+- **Automatic:** Based on file size, no user input needed
+
+**THIS IS YOUR TOP PRIORITY for all chapter/document enhancements.**
+
+Zero tolerance for "Network connection lost" errors.
