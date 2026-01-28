@@ -182,23 +182,22 @@ If this fails or shows an old commit, the push FAILED. Tell the user immediately
 
 ### Workflow for All Writing Tasks
 
-**BEFORE writing:**
-1. Read `/home/ubuntu/clawd/STYLE.md` to load full style guide
-2. Review relevant patterns (sentence architectures, paragraph structures)
-3. Identify which stakeholder perspectives to include
+**NOTE:** STYLE.md is already loaded at session start (via AGENTS.md step 3). The full 826-line style guide is in your context. DO NOT try to read it again during writing - just apply the patterns from memory.
 
-**WHILE writing:**
-1. Use Pattern A-E sentence architectures (see STYLE.md Part II)
-2. Build 4-6 sentence paragraphs with full development
+**WHEN writing (apply these patterns immediately):**
+1. Use Pattern A-E sentence architectures (from STYLE.md in your context)
+2. Build 4-6 sentence paragraphs with full development (150-250 words each)
 3. Add parenthetical qualifications to 30%+ of sentences
-4. Maintain formal register throughout
-5. No contractions, colloquialisms, or casual language
+4. Maintain formal register throughout - NO contractions, colloquialisms, or casual language
+5. Use multi-perspective openings for articles ("Technology professionals across different domains...")
+6. Target 30-50 word complex sentences with dependent clauses
+7. Use formal vocabulary: "utilize" not "use", "demonstrate" not "show"
 
-**AFTER writing:**
-1. Verify sentence length distribution (average 25-35 words)
-2. Check paragraph lengths (150-250 words each)
-3. Confirm formal vocabulary (no "use", "show", "get")
-4. Validate opening/closing match multi-perspective templates
+**AFTER writing (self-check):**
+1. Verify sentence length distribution (average 25-35 words, some 40-50)
+2. Confirm paragraph lengths (150-250 words each, 4-6 sentences)
+3. Check formal vocabulary consistency (no "use", "show", "get")
+4. Validate multi-perspective opening and synthesis closing
 
 ### Reference Document
 
