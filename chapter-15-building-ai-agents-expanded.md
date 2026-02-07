@@ -151,48 +151,48 @@ class ReasoningEngineSelector:
     """Select appropriate LLM for agent reasoning"""
     
     MODELS_AND_PROFILES = {
-        'gpt-4-turbo': {
+        'gpt-4o': {
             'reasoning': 0.95,      # 0-1 scale
             'context_tokens': 128000,
             'tool_use': 0.98,
-            'latency_ms': 2000,
-            'cost_per_1k_input': 0.01,
-            'cost_per_1k_output': 0.03,
+            'latency_ms': 1000,
+            'cost_per_1k_input': 0.0025,
+            'cost_per_1k_output': 0.01,
             'best_for': ['Complex reasoning', 'Research', 'Code'],
-            'worst_for': ['Real-time', 'Cost-sensitive at scale']
+            'worst_for': ['Cost-sensitive at scale']
         },
-        
-        'claude-3-5-sonnet': {
-            'reasoning': 0.90,
+
+        'claude-sonnet-4': {
+            'reasoning': 0.93,
             'context_tokens': 200000,
-            'tool_use': 0.97,
-            'latency_ms': 1500,
+            'tool_use': 0.98,
+            'latency_ms': 1200,
             'cost_per_1k_input': 0.003,
             'cost_per_1k_output': 0.015,
-            'best_for': ['Production', 'Long context', 'Balanced'],
-            'worst_for': ['Extreme reasoning tasks']
+            'best_for': ['Production', 'Long context', 'Tool use', 'Balanced'],
+            'worst_for': ['Ultra-low-cost high-volume']
         },
-        
-        'gpt-3.5-turbo': {
+
+        'claude-haiku-4': {
+            'reasoning': 0.78,
+            'context_tokens': 200000,
+            'tool_use': 0.90,
+            'latency_ms': 400,
+            'cost_per_1k_input': 0.0008,
+            'cost_per_1k_output': 0.004,
+            'best_for': ['Low cost', 'Simple tasks', 'High volume', 'Fast response'],
+            'worst_for': ['Complex reasoning', 'Multi-step planning']
+        },
+
+        'llama-3-70b': {
             'reasoning': 0.75,
-            'context_tokens': 16000,
-            'tool_use': 0.85,
-            'latency_ms': 500,
-            'cost_per_1k_input': 0.0005,
-            'cost_per_1k_output': 0.0015,
-            'best_for': ['Low cost', 'Simple tasks', 'High volume'],
-            'worst_for': ['Complex reasoning', 'Large context']
-        },
-        
-        'llama-2-70b': {
-            'reasoning': 0.70,
-            'context_tokens': 4096,
-            'tool_use': 0.70,
-            'latency_ms': 3000,
+            'context_tokens': 8192,
+            'tool_use': 0.75,
+            'latency_ms': 2000,
             'cost_per_1k_input': 0,  # Self-hosted
             'cost_per_1k_output': 0,
-            'best_for': ['Open source', 'On-premise', 'Privacy'],
-            'worst_for': ['Production latency', 'Tool use']
+            'best_for': ['Open source', 'On-premise', 'Air-gapped networks', 'Privacy'],
+            'worst_for': ['Production latency', 'Complex tool use']
         }
     }
     
@@ -220,7 +220,7 @@ class ReasoningEngineSelector:
             candidates.append((model_name, score))
         
         if not candidates:
-            return 'claude-3-5-sonnet'  # Safe default
+            return 'claude-sonnet-4'  # Safe default
         
         candidates.sort(key=lambda x: x[1], reverse=True)
         return candidates[0][0]

@@ -242,7 +242,7 @@ ANTHROPIC_API_KEY=your-key-here
 ```python
 from langchain_anthropic import ChatAnthropic
 
-llm = ChatAnthropic(model='claude-3-5-sonnet-20241022')
+llm = ChatAnthropic(model='claude-sonnet-4-20250514')
 response = llm.invoke('What is BGP in one sentence?')
 print(response.content)
 ```
@@ -341,7 +341,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain.prompts import ChatPromptTemplate
 
 # Our LLM
-llm = ChatAnthropic(model='claude-3-5-sonnet-20241022')
+llm = ChatAnthropic(model='claude-sonnet-4-20250514')
 
 # Our tools
 tools = [run_show_command]
