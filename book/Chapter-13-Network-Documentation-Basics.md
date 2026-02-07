@@ -18,10 +18,18 @@ A new engineer asks: "What's the BGP policy for AWS?" Nobody knows. It takes 3 d
 This chapter shows you how to:
 - Auto-generate documentation from configs
 - Create network diagrams with AI
-- Build searchable knowledge bases
+- Build a documentation pipeline that stays in sync
 - Keep docs synchronized with reality
 
 **The goal**: Documentation that's actually useful because it's always accurate.
+
+### What AI Is Doing Here (The 30-Second Explanation)
+
+If you're new to AI, here's the key concept: a Large Language Model (LLM) like Claude can **read text and extract structured information from it**. Think of it as a very fast, very consistent junior engineer who can read a Cisco config and fill out a documentation template -- except it does it in seconds and never gets bored or forgetful.
+
+You send the config text to Claude's API, and Claude sends back structured data (JSON, Markdown tables, etc.) that you can use to build documentation.
+
+**Networking analogy**: If SNMP polls a device for structured data from MIBs, think of an LLM as "polling" a config file for structured data -- except you describe what you want in plain English instead of OIDs.
 
 ---
 
@@ -82,8 +90,10 @@ from datetime import datetime
 class ConfigDocumentationGenerator:
     """Generate documentation automatically from network configs."""
 
-    def __init__(self, api_key: str):
-        self.client = Anthropic(api_key=api_key)
+    def __init__(self, api_key: str = None):
+        # Uses ANTHROPIC_API_KEY env var if no key passed directly.
+        # Best practice: always use environment variables for API keys.
+        self.client = Anthropic(api_key=api_key) if api_key else Anthropic()
 
     def generate_device_overview(self, config: str, hostname: str) -> Dict:
         """Generate high-level device documentation."""
@@ -116,7 +126,7 @@ Return as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -143,7 +153,7 @@ Include ALL interfaces (physical, loopback, tunnel, etc.)
 Markdown table:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -185,7 +195,7 @@ Format as markdown with sections and bullet points.
 Documentation:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -226,7 +236,7 @@ Cover:
 Markdown documentation:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -308,7 +318,8 @@ Markdown documentation:"""
 
 # Example usage
 if __name__ == "__main__":
-    generator = ConfigDocumentationGenerator(api_key="your-api-key")
+    # Uses ANTHROPIC_API_KEY environment variable automatically
+    generator = ConfigDocumentationGenerator()
 
     # Sample config
     config = """
@@ -376,8 +387,8 @@ import re
 class NetworkTopologyDiagrammer:
     """Generate network diagrams from configs and CDP/LLDP data."""
 
-    def __init__(self, api_key: str):
-        self.client = Anthropic(api_key=api_key)
+    def __init__(self, api_key: str = None):
+        self.client = Anthropic(api_key=api_key) if api_key else Anthropic()
 
     def extract_neighbors_from_cdp(self, cdp_output: str) -> List[Dict]:
         """Extract neighbor information from CDP/LLDP output."""
@@ -401,7 +412,7 @@ Return JSON array of neighbors:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Haiku for cost efficiency
+            model="claude-haiku-4-20250514",  # Haiku for cost efficiency
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -441,7 +452,7 @@ Generate Mermaid flowchart syntax showing:
 Mermaid syntax:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -514,7 +525,8 @@ Mermaid syntax:"""
 
 # Example usage
 if __name__ == "__main__":
-    diagrammer = NetworkTopologyDiagrammer(api_key="your-api-key")
+    # Uses ANTHROPIC_API_KEY environment variable automatically
+    diagrammer = NetworkTopologyDiagrammer()
 
     # Simulate CDP output from multiple devices
     cdp_data = {
@@ -732,8 +744,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # API key loaded from ANTHROPIC_API_KEY environment variable
     pipeline = DocumentationPipeline(
-        api_key="your-api-key",
         config_dir=args.config_dir,
         output_dir=args.output_dir,
         git_repo=args.git_repo
@@ -827,32 +839,35 @@ jobs:
 
 ---
 
-## What Can Go Wrong
+## What Can Go Wrong (And How to Fix It)
 
 **1. Stale configs**
-- Pipeline reads old configs
-- Documentation doesn't match reality
-- Solution: Fetch live configs from devices
+- Pipeline reads old configs that don't match what's running on the device
+- Documentation looks accurate but is misleading
+- **Fix**: Fetch live configs directly from devices using Netmiko/NAPALM, or use a config backup tool like Oxidized that keeps configs current in Git
 
 **2. API costs for large networks**
-- 500 devices × $0.05/doc = $25 per run
-- Daily runs = $750/month
-- Solution: Generate only changed devices, use cheaper models for simple extraction
+- Each device doc requires ~4 API calls (overview, interfaces, routing, security)
+- At Sonnet pricing: roughly $0.01-0.05 per device depending on config size
+- 500 devices daily could be $5-25/run
+- **Fix**: Only regenerate docs for devices whose configs actually changed (diff against last run). Use Haiku (~10x cheaper) for simple extraction tasks
 
 **3. Git conflicts**
-- Multiple updates at once
-- Merge conflicts in documentation
-- Solution: Single automated process, not multiple sources
+- Multiple pipeline runs or manual edits create merge conflicts
+- **Fix**: Single automated process owns the docs directory. Humans annotate in a separate file, not inline
 
-**4. Incomplete extraction**
-- AI misses some config sections
-- Documentation has gaps
-- Solution: Template validation, human review of first generation
+**4. AI hallucination / incomplete extraction**
+- The LLM may occasionally infer information that isn't in the config, or miss sections
+- **Fix**: Use `temperature=0` (we do this already) for deterministic output. Validate the generated JSON structure. Review the first batch manually, then trust the pipeline
 
 **5. Sensitive data exposure**
-- Docs include passwords, keys
-- Published to public repo
-- Solution: Sanitize configs before documentation (Chapter 12 patterns)
+- Configs contain passwords, SNMP community strings, TACACS keys
+- Generated docs could accidentally include them
+- **Fix**: Sanitize configs before sending to the API. Strip `password`, `secret`, `community` lines. The security documentation prompt explicitly says "do NOT include passwords"
+
+**6. API rate limits**
+- Processing 500 devices in a loop may hit rate limits
+- **Fix**: Add a small delay between devices (e.g., `time.sleep(1)`), or use the Anthropic batch API for large runs
 
 ---
 

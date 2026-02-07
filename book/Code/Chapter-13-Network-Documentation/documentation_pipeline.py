@@ -4,14 +4,31 @@ Automated Documentation Pipeline
 
 Build an automated pipeline that generates and maintains network documentation.
 
+How it works:
+    1. Point this script at a directory full of .cfg files (device configs)
+    2. It generates Markdown documentation for every device
+    3. Optionally commits the docs to a Git repo for version history
+    4. Can run on a schedule (daily at 2 AM) or as a one-shot
+
+In production, you'd typically:
+    - Store configs in Git (pulled by Oxidized, RANCID, or Ansible)
+    - Run this pipeline in CI/CD (GitHub Actions, GitLab CI)
+    - Have the generated docs auto-published to your wiki/Confluence
+
+Prerequisites:
+    pip install anthropic
+    pip install gitpython   # optional, for Git versioning
+    pip install schedule    # optional, for scheduled runs
+    export ANTHROPIC_API_KEY="your-key-here"
+
 Author: Eduard Dulharu
 Company: vExpertAI GmbH
 """
 
+import argparse
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
-from datetime import datetime
-import argparse
 
 # Import the generator (assumes it's in the same directory)
 from doc_generator import ConfigDocumentationGenerator

@@ -18,6 +18,15 @@
 
 Retrieval-Augmented Generation (RAG) represents a paradigm shift in how organizations can leverage large language models (LLMs) for domain-specific knowledge tasks. Rather than relying solely on the pretraining knowledge of models, RAG systems dynamically retrieve relevant information from custom knowledge bases and use that information to ground LLM responses in factual, up-to-date data.
 
+### The Networking Analogy: RAG as a "Knowledge DNS"
+
+If you're new to AI, think of RAG like **DNS for knowledge**:
+
+- **Without RAG**: You ask an LLM a question, and it answers from its "cached" knowledge (training data) -- which might be outdated or wrong for your specific network. It's like having only a static hosts file.
+- **With RAG**: The system first **looks up** relevant documents from your knowledge base (like a DNS query), then feeds those documents to the LLM along with your question. The LLM answers using your **actual documentation** as its source of truth. It's like having a recursive resolver that always checks the authoritative source.
+
+The result: instead of the LLM guessing about your network, it reads your actual configs, runbooks, and design docs before answering.
+
 In the context of network documentation and operations, RAG systems offer transformative capabilities:
 
 - **Knowledge Retrieval**: Rapidly search through thousands of network configurations, troubleshooting guides, and architecture diagrams
@@ -221,7 +230,11 @@ print(f"Created {len(chunks)} chunks")
 
 #### 2. Vector Embedding Generation
 
-Embedding models convert documents into numerical vectors that capture semantic meaning:
+Embedding models convert documents into numerical vectors that capture semantic meaning.
+
+> **Networking analogy**: Think of embeddings like IP addresses for meaning. Just as devices in the same subnet (e.g., 10.0.1.0/24) are "close" to each other on the network, documents about similar topics end up with similar embedding vectors -- "close" in mathematical space. When you search, the system finds documents whose vectors are closest to your query's vector, like finding the nearest neighbor in a routing table.
+
+The code below shows two embedding options: a free local model (SentenceTransformers) and OpenAI's API-based embeddings. For production network documentation RAG systems, **text-embedding-3-small** from OpenAI offers the best balance of quality and cost:
 
 ```python
 from abc import ABC, abstractmethod
@@ -514,8 +527,8 @@ Vector embeddings are dense numerical representations of text that capture seman
 | all-MiniLM-L6-v2 | 384 | Fast | Good | General purpose, on-device |
 | all-mpnet-base-v2 | 768 | Medium | Very Good | Semantic search, high quality |
 | bge-large-en-v1.5 | 1024 | Medium | Excellent | Dense retrieval, production |
-| text-embedding-3-small | 1536 | Slow | Excellent | OpenAI API, high quality |
-| text-embedding-ada-002 | 1536 | Slow | Very Good | Production, established |
+| text-embedding-3-small | 1536 | Slow | Excellent | OpenAI API, best value for most use cases |
+| text-embedding-3-large | 3072 | Slow | Best | OpenAI API, highest quality (use for critical retrieval) |
 
 ```python
 class EmbeddingComparison:
@@ -661,6 +674,12 @@ class DistanceMetricComparison:
 ## Vector Database Architecture
 
 Vector databases are specialized systems designed to efficiently store and search high-dimensional vectors. They use advanced indexing techniques to provide sub-linear search complexity.
+
+> **Networking analogy**: A vector database is like a **content-addressable memory (CAM) table** in a switch, but for document meanings. A switch's CAM table maps MAC addresses to ports for fast lookups. A vector database maps document embeddings (numerical "meaning fingerprints") to documents for fast semantic search. Just as a CAM lookup is O(1) instead of flooding every port, a vector database uses approximate nearest neighbor (ANN) algorithms to find relevant documents without scanning every one -- critical when you have thousands of configs and runbooks.
+
+### Choosing a Vector Database
+
+For learning and prototyping, **ChromaDB** is the simplest option -- it runs locally with no setup. For production network documentation systems, consider Pinecone (managed cloud) or Qdrant (self-hosted, good for air-gapped networks).
 
 ### Vector Database Options
 
@@ -1275,13 +1294,26 @@ Your responses should:
 6. Admit when information is not in the provided documentation"""
     
     def _call_llm(self, system_prompt: str, user_prompt: str) -> str:
-        """Call LLM for generation"""
+        """Call LLM for generation.
+
+        This example uses OpenAI's API, but you can swap in any LLM.
+        To use Claude instead, replace the OpenAI client with:
+            from anthropic import Anthropic
+            client = Anthropic()
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=1500
+            )
+            return response.content[0].text
+        """
         try:
             from openai import OpenAI
-            
+
             client = OpenAI()
             response = client.chat.completions.create(
-                model=self.llm_model or "gpt-4",
+                model=self.llm_model or "gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
@@ -1289,9 +1321,9 @@ Your responses should:
                 temperature=0.3,  # Lower temp for factual responses
                 max_tokens=1500
             )
-            
+
             return response.choices[0].message.content
-        
+
         except ImportError:
             # Fallback for demo
             return f"[LLM Response would be generated here]\n\nQuery: {user_prompt[:200]}..."
@@ -1303,12 +1335,12 @@ class NetworkRAGExample:
         # Initialize components
         embedder = SentenceTransformerEmbedding("all-MiniLM-L6-v2")
         vector_db = ChromaVectorDB(persist_directory="./network_rag_db")
-        
-        # Create RAG pipeline
+
+        # Create RAG pipeline -- using OpenAI here, but Claude works too
         rag = RAGPipeline(
             embedding_model=embedder,
             vector_db=vector_db,
-            llm_model="gpt-4",
+            llm_model="gpt-4o",
             chunk_size=512,
             chunk_overlap=50
         )
@@ -1658,7 +1690,7 @@ async def startup_event():
         rag_pipeline = RAGPipeline(
             embedding_model=embedder,
             vector_db=vector_db,
-            llm_model="gpt-4",
+            llm_model="gpt-4o",
             chunk_size=512,
             chunk_overlap=50
         )
@@ -2000,7 +2032,7 @@ vector_db = ChromaVectorDB(persist_directory="./bgp_docs")
 rag = RAGPipeline(
     embedding_model=embedder,
     vector_db=vector_db,
-    llm_model="gpt-4"
+    llm_model="gpt-4o"
 )
 
 # Ingest BGP documentation
@@ -2300,7 +2332,7 @@ class QueryExpansion:
     """Expand queries for better retrieval"""
     
     @staticmethod
-    def expand_query(query: str, llm_model: str = "gpt-4") -> List[str]:
+    def expand_query(query: str, llm_model: str = "gpt-4o") -> List[str]:
         """Generate query variations"""
         try:
             from openai import OpenAI
@@ -3091,7 +3123,7 @@ retrieval:
 
 # Generation settings
 generation:
-  model: "gpt-4"
+  model: "gpt-4o"
   temperature: 0.3
   max_tokens: 1500
   system_prompt: "You are a network engineering expert..."

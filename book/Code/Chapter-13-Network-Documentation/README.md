@@ -112,14 +112,14 @@ See the GitHub Actions workflow in the chapter for automated doc generation on c
 
 ## Cost Considerations
 
-| Operation | Model | Cost/Device |
-|-----------|-------|-------------|
-| Simple extraction | Haiku | ~$0.01 |
-| Full documentation | Sonnet | ~$0.05 |
+| Operation | Model | Approx. Cost/Device |
+|-----------|-------|---------------------|
+| Simple extraction (CDP parse, interface list) | Claude Haiku | ~$0.001 |
+| Full documentation (4 sections) | Claude Sonnet | ~$0.01-0.05 |
 
-For 500 devices daily: ~$25/run or $750/month
+For 500 devices daily: ~$5-25/run depending on config size.
 
-**Cost optimization**: Only regenerate changed devices.
+**Cost optimization**: Only regenerate docs for devices whose configs actually changed (diff against last run).
 
 ## Next Chapter
 

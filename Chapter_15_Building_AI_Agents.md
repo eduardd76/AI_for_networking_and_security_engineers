@@ -28,6 +28,10 @@ Perception → Reasoning → Planning → Action → Feedback
      ↑___________________________________|
 ```
 
+> **Networking analogy**: If you've worked with event-driven network automation (e.g., StackStorm, Ansible AWX triggered by syslog events), AI agents follow a similar pattern. The difference: instead of hardcoded playbooks for each event, an AI agent uses an LLM to *reason* about what to do. Think of it as replacing static route-maps with a routing protocol -- the system can adapt to situations it wasn't explicitly programmed for.
+>
+> **Example**: A traditional automation script might say "if interface goes down, send a Slack alert." An AI agent might say "interface Gi0/1 went down. Let me check CDP neighbors to see what's connected, look at the syslog for the root cause, check if there's a redundant path, and then send a targeted alert with all this context."
+
 The power of modern AI agents lies in their ability to:
 
 - **Understand context** through natural language and multi-modal inputs
@@ -1251,7 +1255,7 @@ messages = [
 
 while True:
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=1024,
         tools=tools,
         messages=messages
@@ -1853,7 +1857,7 @@ from pydantic import BaseSettings
 
 class AgentConfig(BaseSettings):
     # Model settings
-    model_name: str = "claude-3-5-sonnet-20241022"
+    model_name: str = "claude-sonnet-4-20250514"
     temperature: float = 0.3
     max_tokens: int = 4096
     
