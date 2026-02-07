@@ -123,9 +123,9 @@ Interesting! The abbreviated command uses fewer tokens (5 vs 7). But wait—befo
 Let's do some real math. As of early 2026, here are the token prices for popular models:
 
 **Claude (Anthropic)**:
-- Haiku: $0.25 per million input tokens, $1.25 per million output tokens
-- Sonnet: $3.00 per million input tokens, $15.00 per million output tokens
-- Opus: $15.00 per million input tokens, $75.00 per million output tokens
+- Haiku 4.5: $0.80 per million input tokens, $4.00 per million output tokens
+- Sonnet 4.5: $3.00 per million input tokens, $15.00 per million output tokens
+- Opus 4: $15.00 per million input tokens, $75.00 per million output tokens
 
 **GPT-4 (OpenAI)**:
 - GPT-4o-mini: $0.15 per million input tokens, $0.60 per million output tokens
@@ -145,7 +145,7 @@ The AI responds with a detailed security analysis:
 - Findings, explanations, recommendations: ~2,000 tokens
 - **Total output: 2,000 tokens**
 
-Cost with Claude Sonnet:
+Cost with Claude Sonnet 4.5:
 ```
 Input:  13,000 tokens × ($3.00 / 1,000,000) = $0.039
 Output:  2,000 tokens × ($15.00 / 1,000,000) = $0.030
@@ -178,9 +178,9 @@ Here's the current landscape:
 |-------|----------------|---------------------|
 | GPT-4o-mini | 128,000 tokens | ~100,000 usable |
 | GPT-4o | 128,000 tokens | ~100,000 usable |
-| Claude Haiku | 200,000 tokens | ~180,000 usable |
-| Claude Sonnet | 200,000 tokens | ~180,000 usable |
-| Claude Opus | 200,000 tokens | ~180,000 usable |
+| Claude Haiku 4.5 | 200,000 tokens | ~180,000 usable |
+| Claude Sonnet 4.5 | 200,000 tokens | ~180,000 usable |
+| Claude Opus 4 | 200,000 tokens | ~180,000 usable |
 | Gemini 1.5 Pro | 2,000,000 tokens | ~1,800,000 usable |
 
 *"Usable" accounts for system prompts, instructions, and output space.
@@ -252,8 +252,8 @@ Let's calculate:
 That's over a million tokens. It won't fit in:
 - GPT-4o-mini (128K) ❌
 - GPT-4o (128K) ❌
-- Claude Sonnet (200K) ❌
-- Claude Opus (200K) ❌
+- Claude Sonnet 4.5 (200K) ❌
+- Claude Opus 4 (200K) ❌
 
 Your only options:
 1. **Gemini 1.5 Pro** (2M context) — expensive but works
@@ -306,9 +306,9 @@ Let me share a real comparison I ran. I took the same misconfigured router confi
 | Model | Issues Found | Quality of Explanation | Cost | Time |
 |-------|--------------|------------------------|------|------|
 | GPT-4o-mini | 4/5 | Good, but brief | $0.003 | 2.1s |
-| Claude Haiku | 5/5 | Good, concise | $0.008 | 1.8s |
-| Claude Sonnet | 5/5 | Excellent, detailed | $0.069 | 4.2s |
-| Claude Opus | 5/5 | Exceptional, contextual | $0.340 | 8.7s |
+| Claude Haiku 4.5 | 5/5 | Good, concise | $0.018 | 1.8s |
+| Claude Sonnet 4.5 | 5/5 | Excellent, detailed | $0.069 | 4.2s |
+| Claude Opus 4 | 5/5 | Exceptional, contextual | $0.340 | 8.7s |
 
 Interesting findings:
 - GPT-4o-mini missed the OSPF area mismatch—the subtlest issue
@@ -411,9 +411,9 @@ import tiktoken  # OpenAI's tokenizer library
 
 # Pricing per 1M tokens (as of January 2026)
 PRICING = {
-    "claude-haiku": {"input": 0.25, "output": 1.25, "context": 200_000},
-    "claude-sonnet": {"input": 3.00, "output": 15.00, "context": 200_000},
-    "claude-opus": {"input": 15.00, "output": 75.00, "context": 200_000},
+    "claude-haiku-4.5": {"input": 0.80, "output": 4.00, "context": 200_000},
+    "claude-sonnet-4.5": {"input": 3.00, "output": 15.00, "context": 200_000},
+    "claude-opus-4": {"input": 15.00, "output": 75.00, "context": 200_000},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60, "context": 128_000},
     "gpt-4o": {"input": 2.50, "output": 10.00, "context": 128_000},
 }
@@ -480,23 +480,23 @@ Tokens: 11,958
 
 CONTEXT WINDOW FIT:
 --------------------------------------------------------------------------------
-claude-haiku    (200,000 max): ✅  +186,042 tokens remaining
-claude-sonnet   (200,000 max): ✅  +186,042 tokens remaining  
-gpt-4o-mini     (128,000 max): ✅  +114,042 tokens remaining
-gpt-4o          (128,000 max): ✅  +114,042 tokens remaining
+claude-haiku-4.5  (200,000 max): ✅  +186,042 tokens remaining
+claude-sonnet-4.5 (200,000 max): ✅  +186,042 tokens remaining
+gpt-4o-mini       (128,000 max): ✅  +114,042 tokens remaining
+gpt-4o            (128,000 max): ✅  +114,042 tokens remaining
 
 COST ESTIMATES (assuming 2,000 output tokens):
 --------------------------------------------------------------------------------
-gpt-4o-mini     → $0.0030
-claude-haiku    → $0.0055
-gpt-4o          → $0.0499
-claude-sonnet   → $0.0659
+gpt-4o-mini       → $0.0030
+claude-haiku-4.5  → $0.0175
+gpt-4o            → $0.0499
+claude-sonnet-4.5 → $0.0659
 
 BATCH PROJECTION (1,000 files):
 --------------------------------------------------------------------------------
-gpt-4o-mini     → $3.00/month
-claude-haiku    → $5.50/month
-claude-sonnet   → $65.90/month
+gpt-4o-mini       → $3.00/month
+claude-haiku-4.5  → $17.50/month
+claude-sonnet-4.5 → $65.90/month
 ================================================================================
 ```
 
@@ -536,7 +536,7 @@ anthropic.NotFoundError: model 'claude-3-sonnet' not found
 
 **What happened**: Model names change. What was `claude-3-sonnet` became `claude-3-5-sonnet-20241022` and now might be `claude-sonnet-4-20250514`.
 
-**Solution**: Check the provider's documentation for current model names. They update more often than you'd expect.
+**Solution**: Check the provider's documentation for current model names. They update more often than you'd expect. For example, as of 2025-2026 the Claude model IDs are `claude-sonnet-4-20250514`, `claude-haiku-4-5-20251001`, and `claude-opus-4-20250115`.
 
 ### Error 4: Unexpectedly High Costs
 
@@ -686,15 +686,15 @@ In Chapter 3, we'll dive deep into model selection. You'll learn how to benchmar
 | Code/configs | ~300-350 tokens |
 | Dense technical | ~350-400 tokens |
 
-### Current Pricing (January 2026)
+### Current Pricing (2025-2026)
 
 | Model | Input (per 1M) | Output (per 1M) | Context |
 |-------|---------------|-----------------|---------|
 | GPT-4o-mini | $0.15 | $0.60 | 128K |
 | GPT-4o | $2.50 | $10.00 | 128K |
-| Claude Haiku | $0.25 | $1.25 | 200K |
-| Claude Sonnet | $3.00 | $15.00 | 200K |
-| Claude Opus | $15.00 | $75.00 | 200K |
+| Claude Haiku 4.5 | $0.80 | $4.00 | 200K |
+| Claude Sonnet 4.5 | $3.00 | $15.00 | 200K |
+| Claude Opus 4 | $15.00 | $75.00 | 200K |
 | Gemini 1.5 Pro | $1.25 | $5.00 | 2M |
 
 ### Model Selection Quick Guide
@@ -702,10 +702,10 @@ In Chapter 3, we'll dive deep into model selection. You'll learn how to benchmar
 | Task | Recommended | Why |
 |------|-------------|-----|
 | Syntax check | GPT-4o-mini | Cheap, fast, sufficient |
-| Log parsing | Haiku | Good balance |
-| Config analysis | Sonnet | Needs reasoning |
-| Troubleshooting | Sonnet/Opus | Complex reasoning |
-| Critical security | Opus | Can't afford mistakes |
+| Log parsing | Haiku 4.5 | Good balance |
+| Config analysis | Sonnet 4.5 | Needs reasoning |
+| Troubleshooting | Sonnet 4.5/Opus 4 | Complex reasoning |
+| Critical security | Opus 4 | Can't afford mistakes |
 
 ---
 
