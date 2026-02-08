@@ -118,7 +118,7 @@ class LLMOpsPipeline:
                 'latency_ms': (600, 1200),
                 'accuracy': 0.90
             },
-            'claude-3-opus': {
+            'claude-opus-4-20250115': {
                 'input_cost_per_1m': 15.00,
                 'output_cost_per_1m': 75.00,
                 'latency_ms': (400, 900),
@@ -130,7 +130,7 @@ class LLMOpsPipeline:
                 'latency_ms': (200, 600),
                 'accuracy': 0.88
             },
-            'claude-3-5-haiku': {
+            'claude-haiku-4-5-20251001': {
                 'input_cost_per_1m': 0.80,
                 'output_cost_per_1m': 4.00,
                 'latency_ms': (150, 400),
@@ -495,7 +495,7 @@ ACL: {config}"""
     exp2 = pipeline.create_experiment(
         name="ACL Analysis - Few-Shot",
         prompt_version="v1.1",
-        model="claude-3-5-haiku",
+        model="claude-haiku-4-5-20251001",
         prompt_content="""Analyze this Cisco ACL:
 
 Example 1: permit any any → UNSAFE
@@ -589,7 +589,7 @@ def example_3_model_comparison():
     models_to_test = [
         ('gpt-3.5-turbo', 'Fast & Cheap'),
         ('gpt-4', 'Highest Accuracy'),
-        ('claude-3-5-haiku', 'Balanced'),
+        ('claude-haiku-4-5-20251001', 'Balanced'),
     ]
 
     test_dataset = [{'input': 'test', 'expected': 'result'}] * 100  # 100 test cases
@@ -705,7 +705,7 @@ def example_5_governance_check():
     exp_valid = pipeline.create_experiment(
         name="Compliant Config Analyzer",
         prompt_version="v1.0",
-        model="claude-3-5-haiku",
+        model="claude-haiku-4-5-20251001",
         prompt_content="Analyze configuration for compliance issues: {config}"
     )
 

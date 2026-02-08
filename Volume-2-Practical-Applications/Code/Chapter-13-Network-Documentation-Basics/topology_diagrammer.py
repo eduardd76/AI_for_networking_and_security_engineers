@@ -106,7 +106,7 @@ Normalize interface names (e.g., "Gi" -> "GigabitEthernet").
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Haiku for cost efficiency
+            model="claude-haiku-4-5-20251001",  # Haiku for cost efficiency
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -168,7 +168,7 @@ Start with: flowchart TB
 Mermaid syntax only (no markdown code fences):"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]

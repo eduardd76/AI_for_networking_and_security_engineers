@@ -23,7 +23,7 @@ def example_1_simulated_netmiko():
     print("Example 1: AI + Netmiko Pattern")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Simulated output (in production, use Netmiko)
     show_run = """
@@ -64,7 +64,7 @@ def example_2_error_interpretation():
     print("Example 2: Error Interpretation")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Simulated error
     error = """
@@ -89,7 +89,7 @@ def example_3_command_validation():
     print("Example 3: Command Validation")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     commands = [
         "interface GigabitEthernet0/1",

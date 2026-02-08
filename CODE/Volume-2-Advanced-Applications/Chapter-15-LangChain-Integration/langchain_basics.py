@@ -50,7 +50,7 @@ def example_1_simple_chain():
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create prompt template
     template = """You are a network engineer analyzing a device configuration.
@@ -103,7 +103,7 @@ def example_2_structured_output():
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create output parser
     parser = PydanticOutputParser(pydantic_object=ConfigAnalysis)
@@ -165,7 +165,7 @@ def example_3_chat_template():
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create chat prompt
     prompt = ChatPromptTemplate.from_messages([
@@ -200,7 +200,7 @@ def example_4_config_generation():
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create prompt
     template = """Generate a Cisco IOS configuration for the following requirements:

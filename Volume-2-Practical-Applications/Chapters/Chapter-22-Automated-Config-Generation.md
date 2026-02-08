@@ -196,7 +196,7 @@ Rules:
 Configuration:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -331,7 +331,7 @@ Return ONLY config commands, exact {vendor} syntax.
 Configuration:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -463,7 +463,7 @@ Return complete configuration using these specific values.
 Configuration:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -746,7 +746,7 @@ Return the corrected configuration (commands only).
 Corrected Config:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )

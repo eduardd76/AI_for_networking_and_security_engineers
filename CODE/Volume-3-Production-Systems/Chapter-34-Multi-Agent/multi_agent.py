@@ -329,7 +329,7 @@ class DiagnosisAgent:
         """Initialize the diagnosis agent."""
         self.name = "DiagnosisAgent"
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 
@@ -446,7 +446,7 @@ class ConfigAgent:
         """Initialize the config agent."""
         self.name = "ConfigAgent"
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 
@@ -519,7 +519,7 @@ class SecurityAgent:
         """Initialize the security agent."""
         self.name = "SecurityAgent"
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 
@@ -610,7 +610,7 @@ class PerformanceAgent:
         """Initialize the performance agent."""
         self.name = "PerformanceAgent"
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 
@@ -720,7 +720,7 @@ class SupervisorAgent:
         """Initialize the supervisor."""
         self.name = "SupervisorAgent"
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 

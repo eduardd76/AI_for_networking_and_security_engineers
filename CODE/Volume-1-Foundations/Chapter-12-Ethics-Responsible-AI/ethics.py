@@ -60,7 +60,7 @@ def example_2_approval_workflow():
     print("Example 2: Approval Workflow")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # AI generates commands
     response = llm.invoke("Generate commands to shutdown interface Gi0/1")
@@ -83,7 +83,7 @@ def example_3_audit_logging():
     print("Example 3: Audit Logging")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "How do I configure OSPF?"
     response = llm.invoke(question)
@@ -95,7 +95,7 @@ def example_3_audit_logging():
         "action": "query",
         "question": question,
         "response_length": len(response.content),
-        "model": "claude-3-5-sonnet-20241022",
+        "model": "claude-sonnet-4-20250514",
         "approved": False,
         "executed": False
     }

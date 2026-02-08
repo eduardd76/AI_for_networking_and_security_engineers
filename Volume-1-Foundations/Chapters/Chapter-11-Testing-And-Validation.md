@@ -155,7 +155,7 @@ class PromptTest:
 
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = "claude-3-5-haiku-20241022"
+        self.model = "claude-haiku-4-5-20251001"
 
     def call_llm(self, prompt: str, max_tokens: int = 500) -> str:
         """Call LLM with prompt."""
@@ -326,7 +326,7 @@ class RegressionTest:
         """
         # Call LLM
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -440,7 +440,7 @@ ONLY JSON array.
 """
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=3000,
             temperature=0.7,  # Higher temp for variety
             messages=[{"role": "user", "content": prompt}]
@@ -467,7 +467,7 @@ Return JSON array:
 """
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=3000,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt}]
@@ -496,7 +496,7 @@ JSON array.
 """
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=2000,
             temperature=0.8,
             messages=[{"role": "user", "content": prompt}]
@@ -605,7 +605,7 @@ class TestCostTracking:
 
         # Log some requests
         monitor.log_request(
-            model="claude-3-5-haiku",
+            model="claude-haiku-4-5-20251001",
             task_type="classification",
             input_tokens=100,
             output_tokens=50,

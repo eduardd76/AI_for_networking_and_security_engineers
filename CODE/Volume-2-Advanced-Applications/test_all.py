@@ -86,7 +86,7 @@ def test_with_anthropic_key():
 
         # Test simple LLM call
         print("\n1. Testing basic LLM call...")
-        llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+        llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
         response = llm.invoke("Say 'API working!'")
 
         if "API working" in response.content:

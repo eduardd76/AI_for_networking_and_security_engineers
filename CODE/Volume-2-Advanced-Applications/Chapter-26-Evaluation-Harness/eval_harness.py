@@ -449,7 +449,7 @@ def example_5_llm_generated_config_test():
 
 Output ONLY the ACL configuration, no explanations."""
 
-    llm = ChatAnthropic(model="claude-3-5-haiku-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
     print("\n🤖 Generating config with Claude...")
     response = llm.invoke(prompt)

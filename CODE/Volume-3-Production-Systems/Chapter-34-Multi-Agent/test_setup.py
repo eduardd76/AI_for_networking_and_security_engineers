@@ -77,7 +77,7 @@ def test_basic_functionality():
 
         # Create a simple LLM instance
         llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0,
             max_tokens=100
         )

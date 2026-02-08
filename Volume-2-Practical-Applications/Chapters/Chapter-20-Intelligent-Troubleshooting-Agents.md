@@ -558,7 +558,7 @@ class TroubleshootingAgent:
         
         # Initialize the LLM (the "brain")
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0  # Deterministic for troubleshooting
         )
@@ -907,7 +907,7 @@ class MultiStageTroubleshooter:
     def __init__(self, api_key: str):
         """Initialize the multi-stage troubleshooter."""
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0  # Deterministic for troubleshooting
         )
@@ -1446,7 +1446,7 @@ class ConversationalTroubleshootingAgent:
         
         # Initialize LLM
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.2  # Slightly higher for more natural conversation
         )

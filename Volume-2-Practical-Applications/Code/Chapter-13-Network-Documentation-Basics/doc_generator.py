@@ -146,7 +146,7 @@ class ConfigDocumentationGenerator:
 
     Attributes:
         client: Anthropic API client instance
-        model: Claude model to use (default: claude-3-5-sonnet)
+        model: Claude model to use (default: claude-sonnet-4-20250514)
         temperature: Model temperature (0 for deterministic output)
 
     Example:
@@ -158,14 +158,14 @@ class ConfigDocumentationGenerator:
 
     # Model pricing (per 1M tokens) - January 2026
     PRICING = {
-        "claude-3-5-sonnet-20241022": {"input": 3.00, "output": 15.00},
-        "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.00},
+        "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
+        "claude-haiku-4-5-20251001": {"input": 0.80, "output": 4.00},
     }
 
     def __init__(
         self,
         api_key: str = None,
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-sonnet-4-20250514",
         temperature: float = 0
     ):
         """

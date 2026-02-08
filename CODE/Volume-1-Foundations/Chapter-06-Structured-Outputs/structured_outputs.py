@@ -73,7 +73,7 @@ def example_1_simple_structured_output():
     print("Example 1: Simple Structured Output")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create parser
     parser = PydanticOutputParser(pydantic_object=InterfaceInfo)
@@ -116,7 +116,7 @@ def example_2_security_analysis():
     print("Example 2: Security Issue Detection")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Schema for issues
     class SecurityAnalysis(BaseModel):
@@ -173,7 +173,7 @@ def example_3_device_inventory():
     print("Example 3: Device Inventory")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     class Device(BaseModel):
         hostname: str
@@ -233,7 +233,7 @@ def example_4_routing_table_parsing():
     print("Example 4: Routing Table Parsing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     class Route(BaseModel):
         network: str

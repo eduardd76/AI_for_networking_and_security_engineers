@@ -168,11 +168,11 @@ class ProductionMonitor:
             'gpt-4': {'input': 30.00, 'output': 60.00},
             'gpt-4-turbo': {'input': 10.00, 'output': 30.00},
             'gpt-3.5-turbo': {'input': 0.50, 'output': 1.50},
-            'claude-3-opus': {'input': 15.00, 'output': 75.00},
+            'claude-opus-4-20250115': {'input': 15.00, 'output': 75.00},
             'claude-3-sonnet': {'input': 3.00, 'output': 15.00},
-            'claude-3-5-sonnet': {'input': 3.00, 'output': 15.00},
+            'claude-sonnet-4-20250514': {'input': 3.00, 'output': 15.00},
             'claude-3-haiku': {'input': 0.25, 'output': 1.25},
-            'claude-3-5-haiku': {'input': 0.80, 'output': 4.00},
+            'claude-haiku-4-5-20251001': {'input': 0.80, 'output': 4.00},
         }
 
         # SLO definitions
@@ -647,7 +647,7 @@ def example_1_metrics_collection():
     print("\n📊 Simulating 50K requests/day workload...\n")
 
     # Simulate production traffic (50K requests/day = ~35 req/min)
-    models = ['claude-3-5-sonnet', 'claude-3-5-haiku', 'gpt-4-turbo', 'gpt-3.5-turbo']
+    models = ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'gpt-4-turbo', 'gpt-3.5-turbo']
     teams = ['network-ops', 'security', 'noc', 'automation']
     projects = ['bgp-analyzer', 'log-parser', 'config-gen', 'troubleshooter']
 
@@ -755,7 +755,7 @@ def example_2_structured_logging():
         trace_id=trace_id,
         span_id="span-003",
         duration_ms=1234,
-        model="claude-3-5-sonnet",
+        model="claude-sonnet-4-20250514",
         input_tokens=2500,
         output_tokens=800
     )
@@ -812,20 +812,20 @@ def example_3_cost_tracking():
     # Simulate realistic production traffic
     workload = [
         # Network Ops team - Heavy users
-        ('network-ops', 'bgp-analyzer', 'claude-3-5-sonnet', 40, 500, 800),
-        ('network-ops', 'config-validator', 'claude-3-5-haiku', 30, 300, 400),
+        ('network-ops', 'bgp-analyzer', 'claude-sonnet-4-20250514', 40, 500, 800),
+        ('network-ops', 'config-validator', 'claude-haiku-4-5-20251001', 30, 300, 400),
         ('network-ops', 'troubleshooter', 'gpt-4-turbo', 20, 600, 1000),
 
         # Security team - Moderate users
-        ('security', 'threat-detector', 'claude-3-5-sonnet', 25, 400, 600),
-        ('security', 'compliance-checker', 'claude-3-5-haiku', 15, 250, 350),
+        ('security', 'threat-detector', 'claude-sonnet-4-20250514', 25, 400, 600),
+        ('security', 'compliance-checker', 'claude-haiku-4-5-20251001', 15, 250, 350),
 
         # NOC team - Light users
         ('noc', 'log-parser', 'gpt-3.5-turbo', 35, 200, 300),
-        ('noc', 'alert-triage', 'claude-3-5-haiku', 20, 180, 250),
+        ('noc', 'alert-triage', 'claude-haiku-4-5-20251001', 20, 180, 250),
 
         # Automation team - API heavy
-        ('automation', 'config-generator', 'claude-3-5-sonnet', 50, 450, 700),
+        ('automation', 'config-generator', 'claude-sonnet-4-20250514', 50, 450, 700),
         ('automation', 'test-generator', 'gpt-3.5-turbo', 40, 220, 320),
     ]
 
@@ -888,7 +888,7 @@ def example_4_alerting_rules():
     for i in range(20):
         monitor.track_request(
             trace_id=f"trace-{i}",
-            model='claude-3-5-haiku',
+            model='claude-haiku-4-5-20251001',
             input_tokens=300,
             output_tokens=400,
             latency_ms=800,
@@ -976,7 +976,7 @@ def example_5_performance_dashboard():
     print("\n🚀 Simulating 24-hour production workload...\n")
 
     # Simulate realistic production traffic patterns
-    models = ['claude-3-5-sonnet', 'claude-3-5-haiku', 'gpt-4-turbo', 'gpt-3.5-turbo']
+    models = ['claude-sonnet-4-20250514', 'claude-haiku-4-5-20251001', 'gpt-4-turbo', 'gpt-3.5-turbo']
     teams = ['network-ops', 'security', 'noc', 'automation']
 
     # Peak hours: more traffic, some errors, varied latency

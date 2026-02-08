@@ -235,7 +235,7 @@ Format as JSON:
 Return ONLY valid JSON."""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -630,7 +630,7 @@ IMPORTANT: Rollback steps should be in REVERSE order of the change steps.
 Return ONLY valid JSON."""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )

@@ -172,7 +172,7 @@ ONLY JSON, no explanation.
 """
 
         response = self.ai_client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=1000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -231,7 +231,7 @@ ONLY JSON array, nothing else.
 """
 
         response = self.ai_client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -274,7 +274,7 @@ ONLY JSON.
 """
 
         response = self.ai_client.messages.create(
-            model="claude-3-5-sonnet-20241022",  # Use Sonnet for complex reasoning
+            model="claude-sonnet-4-20250514",  # Use Sonnet for complex reasoning
             max_tokens=1000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -403,7 +403,7 @@ ONLY JSON.
 """
 
         response = self.ai_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -559,7 +559,7 @@ Return JSON:
 """
 
         response = ai_client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -620,7 +620,7 @@ Return JSON:
 """
 
         response = ai_client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -718,7 +718,7 @@ Return JSON:
 """
 
     response = client.messages.create(
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5-20251001",
         max_tokens=1500,
         temperature=0,
         messages=[{"role": "user", "content": prompt}]
@@ -861,7 +861,7 @@ Return JSON:
 """
 
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=1000,
         temperature=0,
         messages=[{"role": "user", "content": prompt}]

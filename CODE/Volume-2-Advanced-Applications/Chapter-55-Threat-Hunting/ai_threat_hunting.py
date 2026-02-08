@@ -89,7 +89,7 @@ Identify:
 
 Provide structured threat detection output."""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=ThreatDetection)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -162,7 +162,7 @@ Assess:
 5. Investigation steps
 6. Containment actions"""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=ThreatDetection)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -233,7 +233,7 @@ Identify:
 5. Next likely targets
 6. Immediate containment steps"""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=ThreatDetection)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -313,7 +313,7 @@ Determine:
 5. Containment priority
 6. Remediation actions"""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=ThreatDetection)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -435,7 +435,7 @@ INTEGRATION POINTS:
 from threat_hunter import ThreatHuntingAgent
 
 agent = ThreatHuntingAgent(
-    llm_model="claude-3-5-sonnet-20241022",
+    llm_model="claude-sonnet-4-20250514",
     threat_intel_feeds=["alienvault", "abuse.ch"],
     mitre_mapping=True,
     auto_response_enabled=True

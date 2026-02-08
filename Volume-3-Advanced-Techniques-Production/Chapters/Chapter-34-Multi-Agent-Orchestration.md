@@ -207,7 +207,7 @@ Return your analysis as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -268,7 +268,7 @@ What is the root cause? Be specific and actionable.
 Root Cause:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -383,7 +383,7 @@ Return analysis as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -512,7 +512,7 @@ Return findings as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -602,7 +602,7 @@ Return analysis as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -676,7 +676,7 @@ Generate a professional incident report in Markdown with these sections:
 Report:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -841,7 +841,7 @@ For "Branch office has slow performance":
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -923,7 +923,7 @@ Synthesize a clear, actionable response that:
 Response:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )

@@ -243,7 +243,7 @@ Provide a clear, specific answer. If the information isn't in the context, say s
 
     # Call LLM
     print("Generating answer with LLM...")
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     response = llm.invoke(prompt)
 
     print("\nAnswer:")
@@ -292,7 +292,7 @@ def advanced_hybrid_with_reranking():
 
     # Step 2: Rerank using LLM
     print("Step 2: Reranking with LLM...")
-    llm = ChatAnthropic(model="claude-3-5-haiku-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
     rerank_prompt = f"""Question: {query}
 
@@ -334,7 +334,7 @@ def production_pipeline_example():
 
     # Build hybrid retriever
     retriever = create_hybrid_retriever(SAMPLE_DOCS)
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     print("\nAnswering multiple questions:\n")
 

@@ -331,10 +331,10 @@ pip install --upgrade langchain langchain-anthropic langchain-openai langgraph
 If you see API parameter warnings, you may need:
 ```python
 # Older LangChain
-ChatAnthropic(model_name="claude-3-5-sonnet-20241022")
+ChatAnthropic(model_name="claude-sonnet-4-20250514")
 
 # Newer LangChain
-ChatAnthropic(model="claude-3-5-sonnet-20241022")
+ChatAnthropic(model="claude-sonnet-4-20250514")
 ```
 
 ### ChromaDB errors
@@ -360,7 +360,7 @@ Running all examples once: **~$0.15-0.25**
 2. Test examples individually
 3. Use `.env` to switch to cheaper models:
    ```bash
-   DEFAULT_MODEL=claude-3-5-haiku-20241022  # 10x cheaper
+   DEFAULT_MODEL=claude-haiku-4-5-20251001  # 10x cheaper
    ```
 4. Cache results during development
 

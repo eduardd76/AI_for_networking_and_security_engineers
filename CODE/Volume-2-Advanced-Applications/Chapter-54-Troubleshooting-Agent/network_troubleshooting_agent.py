@@ -77,7 +77,7 @@ Provide structured troubleshooting guidance including:
 
 Be specific and actionable."""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=TroubleshootingResult)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -142,7 +142,7 @@ def analyze_interface_flapping():
 
 Provide structured troubleshooting analysis."""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=TroubleshootingResult)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -200,7 +200,7 @@ Provide diagnostic steps focusing on:
 - How to isolate the problem
 - Quick fixes to try first"""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=TroubleshootingResult)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"
@@ -277,7 +277,7 @@ For each issue, assess:
 
 Then provide recommended order to address them."""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     issues_text = "\n".join([
         f"Issue {i['id']}: {i['description']} (Impact: {i['impact']})"
@@ -371,7 +371,7 @@ REQUIRES APPROVAL:
 from troubleshooting_agent import TroubleshootingAgent
 
 agent = TroubleshootingAgent(
-    llm_model="claude-3-5-sonnet-20241022",
+    llm_model="claude-sonnet-4-20250514",
     mcp_tools_enabled=True,
     auto_execute_safe_commands=True,
     require_approval_for_changes=True

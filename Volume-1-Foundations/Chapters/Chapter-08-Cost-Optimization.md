@@ -340,8 +340,8 @@ class ModelRouter:
 
     # Model pricing (per 1M tokens)
     PRICING = {
-        "claude-3-5-haiku": {"input": 0.25, "output": 1.25},
-        "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
+        "claude-haiku-4-5-20251001": {"input": 0.25, "output": 1.25},
+        "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
         "gpt-4o-mini": {"input": 0.15, "output": 0.60},
         "gpt-4o": {"input": 2.50, "output": 10.00},
     }
@@ -349,16 +349,16 @@ class ModelRouter:
     # Routing rules
     ROUTING_TABLE = {
         (TaskType.CLASSIFICATION, TaskComplexity.LOW): "gpt-4o-mini",
-        (TaskType.CLASSIFICATION, TaskComplexity.MEDIUM): "claude-3-5-haiku",
+        (TaskType.CLASSIFICATION, TaskComplexity.MEDIUM): "claude-haiku-4-5-20251001",
         (TaskType.EXTRACTION, TaskComplexity.LOW): "gpt-4o-mini",
-        (TaskType.EXTRACTION, TaskComplexity.MEDIUM): "claude-3-5-haiku",
+        (TaskType.EXTRACTION, TaskComplexity.MEDIUM): "claude-haiku-4-5-20251001",
         (TaskType.VALIDATION, TaskComplexity.LOW): "gpt-4o-mini",
-        (TaskType.VALIDATION, TaskComplexity.MEDIUM): "claude-3-5-haiku",
-        (TaskType.ANALYSIS, TaskComplexity.MEDIUM): "claude-3-5-haiku",
-        (TaskType.ANALYSIS, TaskComplexity.HIGH): "claude-3-5-sonnet",
-        (TaskType.TROUBLESHOOTING, TaskComplexity.HIGH): "claude-3-5-sonnet",
-        (TaskType.GENERATION, TaskComplexity.MEDIUM): "claude-3-5-haiku",
-        (TaskType.GENERATION, TaskComplexity.HIGH): "claude-3-5-sonnet",
+        (TaskType.VALIDATION, TaskComplexity.MEDIUM): "claude-haiku-4-5-20251001",
+        (TaskType.ANALYSIS, TaskComplexity.MEDIUM): "claude-haiku-4-5-20251001",
+        (TaskType.ANALYSIS, TaskComplexity.HIGH): "claude-sonnet-4-20250514",
+        (TaskType.TROUBLESHOOTING, TaskComplexity.HIGH): "claude-sonnet-4-20250514",
+        (TaskType.GENERATION, TaskComplexity.MEDIUM): "claude-haiku-4-5-20251001",
+        (TaskType.GENERATION, TaskComplexity.HIGH): "claude-sonnet-4-20250514",
     }
 
     def __init__(self):
@@ -391,7 +391,7 @@ class ModelRouter:
         """
         # Select model
         key = (task_type, complexity)
-        model = self.ROUTING_TABLE.get(key, "claude-3-5-haiku")  # Default to Haiku
+        model = self.ROUTING_TABLE.get(key, "claude-haiku-4-5-20251001")  # Default to Haiku
 
         print(f"Routing {task_type.value} ({complexity.value}) → {model}")
 
@@ -471,7 +471,7 @@ class ModelRouter:
             "avg_cost_per_request": f"${self.stats['total_cost'] / max(self.stats['requests'], 1):.6f}"
         }
 
-    def estimate_savings(self, baseline_model: str = "claude-3-5-sonnet") -> Dict:
+    def estimate_savings(self, baseline_model: str = "claude-sonnet-4-20250514") -> Dict:
         """
         Calculate savings compared to using single model for everything.
 
@@ -623,7 +623,7 @@ class BatchProcessor:
             # Call API once for entire batch
             try:
                 response = self.client.messages.create(
-                    model="claude-3-5-haiku-20241022",  # Use cheap model
+                    model="claude-haiku-4-5-20251001",  # Use cheap model
                     max_tokens=4000,
                     temperature=0,
                     messages=[{"role": "user", "content": prompt}]
@@ -697,7 +697,7 @@ Return ONLY the JSON array, no other text.
         try:
             prompt = f"Analyze security issues: {config['content']}"
             response = self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=1000,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}]
@@ -913,7 +913,7 @@ if __name__ == "__main__":
     cache = ResponseCache(ttl=3600)  # 1 hour TTL
     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-    def call_with_cache(prompt: str, model: str = "claude-3-5-haiku-20241022"):
+    def call_with_cache(prompt: str, model: str = "claude-haiku-4-5-20251001"):
         """Call API with caching."""
         # Check cache first
         cached_response = cache.get(prompt, model, temperature=0.0)
@@ -1177,8 +1177,8 @@ if __name__ == "__main__":
     monitor = CostMonitor()
 
     # Simulate some requests
-    monitor.log_request("claude-3-5-sonnet", "analysis", 5000, 1000, 0.08, "user1")
-    monitor.log_request("claude-3-5-haiku", "classification", 1000, 200, 0.003, "user2")
+    monitor.log_request("claude-sonnet-4-20250514", "analysis", 5000, 1000, 0.08, "user1")
+    monitor.log_request("claude-haiku-4-5-20251001", "classification", 1000, 200, 0.003, "user2")
     monitor.log_request("gpt-4o-mini", "extraction", 2000, 500, 0.001, "user1")
 
     print("="*80)
@@ -1263,7 +1263,7 @@ class OptimizedAISystem:
         # Step 2: Check cache
         model = self.router.ROUTING_TABLE.get(
             (task_type, complexity),
-            "claude-3-5-haiku"
+            "claude-haiku-4-5-20251001"
         )
 
         cached = self.cache.get(optimized_prompt, model, 0.0)

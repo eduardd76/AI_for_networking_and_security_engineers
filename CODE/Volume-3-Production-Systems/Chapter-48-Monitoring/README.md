@@ -112,7 +112,7 @@ monitor = ProductionMonitor(service_name="network-ai-prod")
 # Track every request
 monitor.track_request(
     trace_id="trace-001",
-    model="claude-3-5-sonnet",
+    model="claude-sonnet-4-20250514",
     input_tokens=400,
     output_tokens=700,
     latency_ms=950,

@@ -571,7 +571,7 @@ def run_agent(goal, observations, history):
         # User prompt: specific task
         user=build_agent_prompt(goal, observations, history, ...),
         
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=2000
     )
     

@@ -167,7 +167,7 @@ Format your response as:
 ... etc"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": debiased_prompt}]
         )
@@ -593,7 +593,7 @@ if __name__ == "__main__":
             "location": "NYC datacenter",
             "config_length": 1500
         },
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         response="Found 2 security issues: 1) Weak MD5 auth...",
         tokens_used=850,
         cost=0.0068,
@@ -1046,7 +1046,7 @@ def ai_suggest_change_with_approval(config: str, system: str):
 
     # Get AI recommendation
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=1000,
         messages=[{
             "role": "user",
@@ -1366,7 +1366,7 @@ if detect_prompt_injection(user_input):
 def process_packet_with_ai(packet):
     """This will be impossibly slow."""
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         messages=[{"role": "user", "content": f"Should I forward this packet? {packet}"}]
     )
     # API latency: 500-2000ms
@@ -1860,7 +1860,7 @@ Provide:
 3. Risk level (low/medium/high)"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -1878,7 +1878,7 @@ Provide:
             system=system,
             prompt=prompt,
             context_data={'config_length': len(config)},
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             response=ai_response,
             tokens_used=tokens_used,
             cost=cost,

@@ -124,7 +124,7 @@ class SimpleNetworkRAG:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )
@@ -607,7 +607,7 @@ class ProductionNetworkRAG:
 
     def __init__(self, api_key: str, persist_directory: str = "./chroma_db"):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )

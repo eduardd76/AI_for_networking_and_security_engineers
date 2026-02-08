@@ -85,11 +85,11 @@ class TokenEconomicsManager:
             'gpt-4': {'input': 30.00, 'output': 60.00},
             'gpt-4-turbo': {'input': 10.00, 'output': 30.00},
             'gpt-3.5-turbo': {'input': 0.50, 'output': 1.50},
-            'claude-3-opus': {'input': 15.00, 'output': 75.00},
+            'claude-opus-4-20250115': {'input': 15.00, 'output': 75.00},
             'claude-3-sonnet': {'input': 3.00, 'output': 15.00},
-            'claude-3-5-sonnet': {'input': 3.00, 'output': 15.00},
+            'claude-sonnet-4-20250514': {'input': 3.00, 'output': 15.00},
             'claude-3-haiku': {'input': 0.25, 'output': 1.25},
-            'claude-3-5-haiku': {'input': 0.80, 'output': 4.00},
+            'claude-haiku-4-5-20251001': {'input': 0.80, 'output': 4.00},
         }
 
     def calculate_cost(
@@ -266,7 +266,7 @@ class TokenEconomicsManager:
         by_model = self.get_usage_by_model()
 
         # 1. Model downgrade opportunities
-        expensive_models = ['gpt-4', 'claude-3-opus']
+        expensive_models = ['gpt-4', 'claude-opus-4-20250115']
         for model in expensive_models:
             if model in by_model:
                 usage = by_model[model]
@@ -373,7 +373,7 @@ def example_1_basic_cost_tracking():
         (200, 300, 'gpt-4', 'config_validation'),
         (150, 200, 'claude-3-sonnet', 'log_analysis'),
         (100, 150, 'gpt-3.5-turbo', 'quick_query'),
-        (500, 800, 'claude-3-opus', 'complex_troubleshooting'),
+        (500, 800, 'claude-opus-4-20250115', 'complex_troubleshooting'),
     ]
 
     print("\n📊 Tracking Usage:\n")
@@ -537,7 +537,7 @@ def example_5_optimization_recommendations():
         manager.track_usage(200, 300, 'gpt-4', 'validation')
 
     for _ in range(50):
-        manager.track_usage(300, 500, 'claude-3-opus', 'analysis')
+        manager.track_usage(300, 500, 'claude-opus-4-20250115', 'analysis')
 
     print(f"\n💰 Current Monthly Spend: ${manager.total_spend:.2f}\n")
 

@@ -329,7 +329,7 @@ async def chat(
 
     # Initialize LLM
     llm = ChatAnthropic(
-        model="claude-3-5-haiku-20241022",
+        model="claude-haiku-4-5-20251001",
         temperature=0
     )
 
@@ -399,7 +399,7 @@ async def chat_stream(
     """
     async def generate():
         llm = ChatAnthropic(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             temperature=0,
             streaming=True
         )

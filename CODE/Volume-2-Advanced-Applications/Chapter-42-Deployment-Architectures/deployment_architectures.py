@@ -613,7 +613,7 @@ Provide architecture recommendation with:
 
 Focus on: cost, compliance, team skills, and scalability."""
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     parser = PydanticOutputParser(pydantic_object=ArchitectureRecommendation)
 
     full_prompt = f"{prompt}\n\n{parser.get_format_instructions()}"

@@ -76,7 +76,7 @@ def example_2_analyze_chunks():
     print("Example 2: Analyze Chunks Separately")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     config = """
 interface GigabitEthernet0/1
@@ -123,7 +123,7 @@ def example_3_summarize_and_combine():
     print("Example 3: Map-Reduce Pattern")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Simulated large log file
     logs = [

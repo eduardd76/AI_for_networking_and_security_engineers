@@ -496,7 +496,7 @@ Always structure your output as:
 """
 
 response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     max_tokens=2000,
     temperature=0,
     system=system_prompt,  # Inject expertise
@@ -582,7 +582,7 @@ def compare_temperatures(prompt: str):
 
     for temp in [0.0, 0.5, 1.0]:
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=200,
             temperature=temp,
             messages=[{"role": "user", "content": prompt}]
@@ -633,7 +633,7 @@ compare_temperatures(prompt)
 **Example**:
 ```python
 response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     max_tokens=200,
     top_p=0.9,  # Consider top 90% of probability
     messages=[{"role": "user", "content": prompt}]
@@ -856,7 +856,7 @@ if __name__ == "__main__":
     prompt = prompts.log_classification(log)
 
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=50,
         temperature=0,
         messages=[{"role": "user", "content": prompt}]
@@ -908,7 +908,7 @@ class PromptTester:
         self,
         prompt_template: Callable[[str], str],
         test_cases: List[TestCase],
-        model: str = "claude-3-5-sonnet-20241022",
+        model: str = "claude-sonnet-4-20250514",
         temperature: float = 0.0
     ) -> Dict[str, Any]:
         """
@@ -1133,7 +1133,7 @@ Do not guess or invent information.
 **Fix**: Set temperature=0 for determinism
 ```python
 response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     max_tokens=1000,
     temperature=0,  # Deterministic
     messages=[{"role": "user", "content": prompt}]

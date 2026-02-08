@@ -29,7 +29,7 @@ def example_1_basic_vs_detailed():
     print("Example 1: Basic vs Detailed Prompts")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     config = "interface GigabitEthernet0/1\n description WAN\n ip address 10.1.1.1 255.255.255.0"
 
@@ -66,7 +66,7 @@ def example_2_role_prompting():
     print("Example 2: Role-Based Prompting")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "Should I use OSPF or EIGRP for my campus network?"
 
@@ -101,7 +101,7 @@ def example_3_few_shot_prompting():
     print("Example 3: Few-Shot Prompting")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     prompt = """Extract device info from syslog messages in this format:
 
@@ -132,7 +132,7 @@ def example_4_chain_of_thought():
     print("Example 4: Chain of Thought")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Without chain of thought
     print("\nWithout chain of thought:")
@@ -165,7 +165,7 @@ def example_5_constraints():
     print("Example 5: Adding Constraints")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "Explain how BGP route selection works"
 
@@ -200,7 +200,7 @@ def example_6_prompt_templates():
     print("Example 6: Prompt Templates")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create a template for config analysis
     template = PromptTemplate(
@@ -259,7 +259,7 @@ def example_7_negative_prompting():
     print("Example 7: Negative Prompting")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "How do I configure OSPF on a Cisco router?"
 

@@ -127,7 +127,7 @@ class VectorLogAnalyzer:
         self.api_key_openai = api_key_openai or os.environ.get("OPENAI_API_KEY")
 
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=self.api_key_anthropic,
             temperature=0
         )

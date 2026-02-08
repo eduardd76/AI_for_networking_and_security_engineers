@@ -49,7 +49,7 @@ def check_interface(interface: str) -> str:
 
 class SimpleAgent:
     def __init__(self):
-        self.llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+        self.llm = ChatAnthropic(model="claude-sonnet-4-20250514")
 
     def execute(self, task: str):
         llm_with_tools = self.llm.bind_tools([check_interface])

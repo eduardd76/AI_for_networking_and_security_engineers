@@ -128,7 +128,7 @@ class ReActAgent:
 
             # Get agent's next thought and action
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
                 messages=self.conversation_history
             )
@@ -523,7 +523,7 @@ Example:
 Return ONLY the JSON array, no other text."""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=3000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -703,7 +703,7 @@ class ToolCallingAgent:
         while True:
             # Call Claude with tools
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-20250514",
                 max_tokens=4096,
                 tools=self.tools,
                 messages=messages
@@ -953,7 +953,7 @@ Reflect on this failure:
 Keep reflection concise (2-3 sentences)."""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
         )

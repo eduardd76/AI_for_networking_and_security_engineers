@@ -165,7 +165,7 @@ Return findings as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -253,7 +253,7 @@ Focus on actionable remediation steps, not just descriptions.
 Report:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -499,7 +499,7 @@ Return findings as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -552,7 +552,7 @@ Create a baseline profile as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -768,7 +768,7 @@ Return as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -1037,7 +1037,7 @@ Return as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}]
         )

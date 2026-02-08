@@ -33,7 +33,7 @@ def example_1_caching():
     # Enable caching
     set_llm_cache(InMemoryCache())
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "What is OSPF?"
 
@@ -75,7 +75,7 @@ def example_2_use_cheaper_models():
     print(f"\nQuestion: {question}\n")
 
     # Haiku (cheap)
-    llm_haiku = ChatAnthropic(model="claude-3-5-haiku-20241022", temperature=0)
+    llm_haiku = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
     response_haiku = llm_haiku.invoke(question)
     est_tokens = len(question.split()) + len(response_haiku.content.split())
     cost_haiku = (est_tokens / 1_000_000) * (pricing['haiku']['input'] + pricing['haiku']['output']) / 2
@@ -83,7 +83,7 @@ def example_2_use_cheaper_models():
     print(f"  {response_haiku.content[:100]}...\n")
 
     # Sonnet (better)
-    llm_sonnet = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm_sonnet = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
     response_sonnet = llm_sonnet.invoke(question)
     est_tokens = len(question.split()) + len(response_sonnet.content.split())
     cost_sonnet = (est_tokens / 1_000_000) * (pricing['sonnet']['input'] + pricing['sonnet']['output']) / 2
@@ -103,7 +103,7 @@ def example_3_batch_processing():
     print("Example 3: Batch Processing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     interfaces = [
         "GigabitEthernet0/1",
@@ -140,7 +140,7 @@ def example_4_prompt_optimization():
     print("Example 4: Prompt Optimization")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Verbose prompt (wastes tokens)
     verbose_prompt = """I have a networking question that I would like you to help me with.

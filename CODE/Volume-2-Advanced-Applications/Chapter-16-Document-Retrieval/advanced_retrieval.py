@@ -224,7 +224,7 @@ def example_3_multi_query(vectorstore):
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create multi-query retriever
     retriever = MultiQueryRetriever.from_llm(
@@ -259,7 +259,7 @@ def example_4_contextual_compression(vectorstore):
     print("="*60)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Create compressor
     compressor = LLMChainExtractor.from_llm(llm)

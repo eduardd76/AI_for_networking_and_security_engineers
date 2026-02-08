@@ -534,7 +534,7 @@ You calculated 50,000 tokens. Your bill shows 52,500.
 anthropic.NotFoundError: model 'claude-3-sonnet' not found
 ```
 
-**What happened**: Model names change. What was `claude-3-sonnet` became `claude-3-5-sonnet-20241022` and now might be `claude-sonnet-4-20250514`.
+**What happened**: Model names change. What was `claude-3-sonnet` became `claude-sonnet-4-20250514` and now might be `claude-sonnet-4-20250514`.
 
 **Solution**: Check the provider's documentation for current model names. They update more often than you'd expect. For example, as of 2025-2026 the Claude model IDs are `claude-sonnet-4-20250514`, `claude-haiku-4-5-20251001`, and `claude-opus-4-20250115`.
 

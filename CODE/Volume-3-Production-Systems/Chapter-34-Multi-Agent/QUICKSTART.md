@@ -168,7 +168,7 @@ class BackupAgent:
 
     def __init__(self):
         self.name = "BackupAgent"
-        self.llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+        self.llm = ChatAnthropic(model="claude-sonnet-4-20250514")
 
     def backup_config(self, device: str) -> AgentResponse:
         # Your backup logic

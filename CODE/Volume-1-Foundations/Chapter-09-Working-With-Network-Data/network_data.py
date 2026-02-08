@@ -23,7 +23,7 @@ def example_1_config_analysis():
     print("Example 1: Config Analysis")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     config = """
 hostname EDGE-RTR-01
@@ -66,7 +66,7 @@ def example_2_log_analysis():
     print("Example 2: Log Analysis")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     logs = """
 Jan 18 10:15:32 10.1.1.1 %LINK-3-UPDOWN: Interface Gi0/1, changed state to down
@@ -95,7 +95,7 @@ def example_3_multi_vendor():
     print("Example 3: Multi-Vendor Configs")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     cisco_config = "interface GigabitEthernet0/1\n ip address 10.1.1.1 255.255.255.0"
     juniper_config = "set interfaces ge-0/0/1 unit 0 family inet address 10.1.1.1/24"
@@ -120,7 +120,7 @@ def example_4_show_command_parsing():
     print("Example 4: Show Command Parsing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     show_int_brief = """
 Interface              IP-Address      OK? Method Status                Protocol

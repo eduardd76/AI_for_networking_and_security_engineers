@@ -53,7 +53,7 @@ class NetworkLogAnalyzer:
     def __init__(self):
         """Initialize the analyzer."""
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0
         )
 

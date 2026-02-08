@@ -466,7 +466,7 @@ class QualityAssessor:
 
     def __init__(self, api_key: Optional[str] = None):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0,
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY")
         )
@@ -599,7 +599,7 @@ class ROIAnalyzer:
 
     def __init__(self, api_key: Optional[str] = None):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             temperature=0,
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY")
         )

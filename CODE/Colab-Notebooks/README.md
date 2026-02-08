@@ -158,7 +158,7 @@ api_key = getpass('Enter your API key: ')
 ### Cost Management
 ```python
 # Use cheaper Haiku model for testing
-llm = ChatAnthropic(model="claude-3-5-haiku-20241022", temperature=0)
+llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
 # Typical costs per notebook run:
 # - API Basics: $0.05-0.10

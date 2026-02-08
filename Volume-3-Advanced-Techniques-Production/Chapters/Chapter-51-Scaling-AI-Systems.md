@@ -175,7 +175,7 @@ def generate_config(self, device_name: str, requirements: str) -> Dict:
 
         # Generate config using Claude
         response = anthropic_client.messages.create(
-            model='claude-3-5-sonnet-20241022',
+            model='claude-sonnet-4-20250514',
             max_tokens=2000,
             messages=[
                 {
@@ -580,7 +580,7 @@ class BatchProcessor:
             """Generate config for single device."""
             try:
                 response = self.client.messages.create(
-                    model='claude-3-5-sonnet-20241022',
+                    model='claude-sonnet-4-20250514',
                     max_tokens=2000,
                     messages=[
                         {
@@ -836,7 +836,7 @@ if __name__ == "__main__":
     print("\nRequest 1:")
     start = time.time()
     response1 = client.create_message(
-        model='claude-3-5-sonnet-20241022',
+        model='claude-sonnet-4-20250514',
         max_tokens=500,
         messages=[{"role": "user", "content": "What is BGP?"}]
     )
@@ -846,7 +846,7 @@ if __name__ == "__main__":
     print("\nRequest 2 (identical):")
     start = time.time()
     response2 = client.create_message(
-        model='claude-3-5-sonnet-20241022',
+        model='claude-sonnet-4-20250514',
         max_tokens=500,
         messages=[{"role": "user", "content": "What is BGP?"}]
     )

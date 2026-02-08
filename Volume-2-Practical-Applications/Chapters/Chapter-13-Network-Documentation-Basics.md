@@ -363,7 +363,7 @@ Return as JSON:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -390,7 +390,7 @@ Include ALL interfaces (physical, loopback, tunnel, etc.)
 Markdown table:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -432,7 +432,7 @@ Format as markdown with sections and bullet points.
 Documentation:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -473,7 +473,7 @@ Cover:
 Markdown documentation:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -648,7 +648,7 @@ Return JSON array of neighbors:
 JSON:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Haiku for cost efficiency
+            model="claude-haiku-4-5-20251001",  # Haiku for cost efficiency
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -688,7 +688,7 @@ Generate Mermaid flowchart syntax showing:
 Mermaid syntax:"""
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=1500,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]

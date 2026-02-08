@@ -23,7 +23,7 @@ def example_1_test_accuracy():
     print("Example 1: Accuracy Testing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Known correct answers
     test_cases = [
@@ -72,7 +72,7 @@ def example_2_consistency_testing():
     print("Example 2: Consistency Testing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     question = "What are the OSPF area types?"
 
@@ -103,7 +103,7 @@ def example_3_output_validation():
     print("Example 3: Output Validation")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     prompt = """Generate a Cisco IOS config for VLAN 10 named "Users".
 
@@ -136,7 +136,7 @@ def example_4_regression_testing():
     print("Example 4: Regression Testing")
     print("="*60)
 
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0)
+    llm = ChatAnthropic(model="claude-sonnet-4-20250514", temperature=0)
 
     # Baseline tests (run before changes)
     baseline_tests = [

@@ -53,7 +53,7 @@ def analyze_config(config):
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 
-llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+llm = ChatAnthropic(model="claude-sonnet-4-20250514")
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a network config analyzer."),
     ("human", "Analyze this config: {config}")
@@ -72,7 +72,7 @@ result = chain.invoke({"config": config})
 from langchain_anthropic import ChatAnthropic
 
 llm = ChatAnthropic(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     api_key="your-key",
     max_tokens=1000,
     temperature=0.0
@@ -155,7 +155,7 @@ class NetworkConfigAnalyzer:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )
@@ -264,7 +264,7 @@ class ConversationalConfigAnalyzer:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.3
         )
@@ -354,7 +354,7 @@ class NetworkTroubleshooter:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )
@@ -533,7 +533,7 @@ class NetworkConfigGenerator:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )
@@ -749,7 +749,7 @@ class ConfigValidator:
 
     def __init__(self, api_key: str):
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0
         )
@@ -879,7 +879,7 @@ class ShowCommandTool(BaseTool):
 def create_network_agent(api_key: str):
     """Create a network troubleshooting agent with tools."""
     llm = ChatAnthropic(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         api_key=api_key,
         temperature=0.0
     )
@@ -965,7 +965,7 @@ class NetworkAssistant:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.llm = ChatAnthropic(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.3
         )

@@ -164,14 +164,14 @@ class ContextChecker:
 
     # Model context limits
     CONTEXT_LIMITS = {
-        "claude-3-5-sonnet-20241022": 200_000,
-        "claude-3-5-haiku-20241022": 200_000,
+        "claude-sonnet-4-20250514": 200_000,
+        "claude-haiku-4-5-20251001": 200_000,
         "gpt-4o": 128_000,
         "gpt-4o-mini": 128_000,
         "gemini-1.5-pro": 2_000_000,
     }
 
-    def __init__(self, model: str = "claude-3-5-sonnet-20241022"):
+    def __init__(self, model: str = "claude-sonnet-4-20250514"):
         self.model = model
         self.context_limit = self.CONTEXT_LIMITS.get(model, 200_000)
 
@@ -250,7 +250,7 @@ class ContextChecker:
 
 # Example usage
 if __name__ == "__main__":
-    checker = ContextChecker(model="claude-3-5-sonnet-20241022")
+    checker = ContextChecker(model="claude-sonnet-4-20250514")
 
     # Test with sample config
     with open("sample_config.txt", "r") as f:
@@ -281,7 +281,7 @@ if __name__ == "__main__":
 ================================================================================
 CONTEXT WINDOW CHECK
 ================================================================================
-Model: claude-3-5-sonnet-20241022
+Model: claude-sonnet-4-20250514
 Context Limit: 200,000 tokens
 
 Token Breakdown:
@@ -610,7 +610,7 @@ Return ONLY JSON, no other text.
 
         try:
             response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model="claude-sonnet-4-20250514",
                 max_tokens=2000,
                 temperature=0,
                 messages=[{"role": "user", "content": prompt}]
@@ -710,7 +710,7 @@ Common issues and fixes...
 
 # System prompt with cache control
 response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     max_tokens=1000,
     system=[
         {
@@ -734,7 +734,7 @@ response = client.messages.create(
 
 # Second request (within 5 min): 90% cheaper!
 response2 = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-20250514",
     max_tokens=1000,
     system=[
         {

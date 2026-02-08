@@ -253,7 +253,7 @@ Important:
 """
 
     response = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-sonnet-4-20250514",
         max_tokens=2000,
         temperature=0,  # Deterministic
         messages=[{"role": "user", "content": prompt}]
@@ -608,7 +608,7 @@ Rules:
 """
 
         response = self.client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=3000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -791,7 +791,7 @@ def extract_with_validation_retry(
             prompt += f"\n\nPrevious attempt had errors. Ensure data matches schema exactly."
 
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-20250514",
             max_tokens=2000,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]

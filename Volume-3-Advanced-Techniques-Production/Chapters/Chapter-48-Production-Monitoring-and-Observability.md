@@ -127,9 +127,9 @@ class InstrumentedAnthropicClient:
 
     # Pricing per 1M tokens (update these based on current pricing)
     PRICING = {
-        'claude-3-5-sonnet-20241022': {'input': 3.0, 'output': 15.0},
+        'claude-sonnet-4-20250514': {'input': 3.0, 'output': 15.0},
         'claude-3-haiku-20240307': {'input': 0.25, 'output': 1.25},
-        'claude-3-opus-20240229': {'input': 15.0, 'output': 75.0}
+        'claude-opus-4-20250115': {'input': 15.0, 'output': 75.0}
     }
 
     def __init__(self, api_key: str, user_id: str = 'unknown', application: str = 'default'):
@@ -241,7 +241,7 @@ class InstrumentedAnthropicClient:
         """Calculate cost in dollars for this request."""
         if model not in self.PRICING:
             logger.warning(f"Unknown model pricing: {model}, using Sonnet rates")
-            model = 'claude-3-5-sonnet-20241022'
+            model = 'claude-sonnet-4-20250514'
 
         pricing = self.PRICING[model]
 
@@ -264,7 +264,7 @@ if __name__ == "__main__":
 
     # Make a request (metrics automatically captured)
     result = client.create_message(
-        model='claude-3-5-sonnet-20241022',
+        model='claude-sonnet-4-20250514',
         max_tokens=1000,
         messages=[
             {"role": "user", "content": "Explain BGP path selection in 2 sentences"}
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         user_id='john.doe',
         department='IT',
         application='network-troubleshooting',
-        model='claude-3-5-sonnet-20241022',
+        model='claude-sonnet-4-20250514',
         input_tokens=1000,
         output_tokens=500,
         cost_dollars=0.012,
@@ -911,7 +911,7 @@ if __name__ == "__main__":
     alert = {
         'summary': 'High LLM error rate detected',
         'severity': 'critical',
-        'description': 'Error rate is 8.5% for model claude-3-5-sonnet-20241022',
+        'description': 'Error rate is 8.5% for model claude-sonnet-4-20250514',
         'timestamp': '2024-01-15T14:30:00Z'
     }
 
