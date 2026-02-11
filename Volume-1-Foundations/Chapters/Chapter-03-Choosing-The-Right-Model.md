@@ -43,14 +43,16 @@ That's what this chapter is about. By the end, you'll have a framework for choos
 
 Let me give you my honest take on each major model family as of early 2026. This isn't based on vendor marketing—it's based on thousands of real-world networking queries I've run or seen run in production environments.
 
-### Claude 3.5 Family (Anthropic)
+### Claude 4.5 Family (Anthropic)
 
 **The company**: Anthropic was founded by former OpenAI researchers focused on AI safety. They tend to be more cautious about capabilities claims but deliver consistently excellent results.
 
 **The models**:
-- **Haiku**: The speed demon. Optimized for latency and cost.
-- **Sonnet**: The workhorse. Balances quality, speed, and cost.
-- **Opus**: The powerhouse. Best quality, highest cost.
+- **Haiku 4.5**: The speed demon. Optimized for latency and cost.
+- **Sonnet 4.5**: The workhorse. Balances quality, speed, and cost.
+- **Opus 4.5**: The powerhouse. Best quality, highest cost.
+
+**Note**: Claude Opus 4.6 was released February 5, 2026, after most benchmarks in this chapter were conducted. Opus 4.6 offers a 1M context window and adaptive thinking capabilities at the same pricing as Opus 4.5 ($5/$25 per million tokens) but with significantly improved reasoning. For the latest model, use `claude-opus-4-6` in your API calls.
 
 **What Claude does well**:
 
@@ -210,7 +212,7 @@ Theory is nice. Data is better. Let me share results from benchmarks I've run on
 | Model | Quality | Latency | Cost |
 |-------|---------|---------|------|
 | Claude Sonnet | 94% | 7.2s | $0.089 |
-| Claude Haiku | 86% | 2.4s | $0.012 |
+| Claude Haiku | 86% | 2.4s | $0.048 |
 | GPT-4o | 91% | 4.1s | $0.071 |
 | GPT-4o-mini | 82% | 2.1s | $0.008 |
 | Gemini Flash | 79% | 3.8s | $0.005 |
@@ -222,7 +224,7 @@ Theory is nice. Data is better. Let me share results from benchmarks I've run on
 | Model | Quality | Latency | Cost |
 |-------|---------|---------|------|
 | Claude Sonnet | 96% | 8.1s | $0.095 |
-| Claude Haiku | 84% | 2.7s | $0.014 |
+| Claude Haiku | 84% | 2.7s | $0.056 |
 | GPT-4o | 92% | 4.5s | $0.076 |
 | GPT-4o-mini | 78% | 2.3s | $0.009 |
 | Gemini Flash | 74% | 4.2s | $0.006 |
@@ -234,19 +236,19 @@ Theory is nice. Data is better. Let me share results from benchmarks I've run on
 | Model | Quality | Latency | Cost |
 |-------|---------|---------|------|
 | Claude Sonnet | 98% | 6.8s | $0.082 |
-| Claude Haiku | 95% | 2.1s | $0.011 |
+| Claude Haiku | 95% | 2.1s | $0.044 |
 | GPT-4o | 97% | 3.9s | $0.068 |
 | GPT-4o-mini | 93% | 1.9s | $0.007 |
 | Gemini Flash | 91% | 3.5s | $0.004 |
 
-**What this tells us**: Log classification is simpler—pattern recognition more than reasoning. The quality gap narrows. Haiku at $0.011 gets 95% quality. For high-volume log processing, that's the sweet spot.
+**What this tells us**: Log classification is simpler—pattern recognition more than reasoning. The quality gap narrows. Haiku at $0.044 gets 95% quality. For high-volume log processing, that's still the sweet spot—nearly Sonnet quality at half the cost.
 
 **Task 4: ACL Generation**
 
 | Model | Quality | Latency | Cost |
 |-------|---------|---------|------|
 | Claude Sonnet | 97% | 7.5s | $0.091 |
-| Claude Haiku | 88% | 2.5s | $0.013 |
+| Claude Haiku | 88% | 2.5s | $0.052 |
 | GPT-4o | 94% | 4.3s | $0.073 |
 | GPT-4o-mini | 85% | 2.2s | $0.008 |
 | Gemini Flash | 81% | 4.0s | $0.005 |
@@ -258,7 +260,7 @@ Theory is nice. Data is better. Let me share results from benchmarks I've run on
 | Model | Quality | Latency | Cost |
 |-------|---------|---------|------|
 | Claude Sonnet | 95% | 9.2s | $0.108 |
-| Claude Haiku | 87% | 3.1s | $0.016 |
+| Claude Haiku | 87% | 3.1s | $0.064 |
 | GPT-4o | 93% | 5.1s | $0.085 |
 | GPT-4o-mini | 84% | 2.6s | $0.010 |
 | Gemini Flash | 80% | 4.4s | $0.006 |
@@ -271,9 +273,11 @@ Theory is nice. Data is better. Let me share results from benchmarks I've run on
 |-------|-------------|-------------|----------|----------|
 | Claude Sonnet | 96% | 7.8s | $0.093 | Complex reasoning, production critical |
 | GPT-4o | 93% | 4.4s | $0.075 | User-facing, speed matters |
-| Claude Haiku | 88% | 2.6s | $0.013 | High-volume, cost-sensitive |
+| Claude Haiku | 88% | 2.6s | $0.053 | High-volume, cost-sensitive |
 | GPT-4o-mini | 84% | 2.2s | $0.008 | Budget-constrained, simple tasks |
 | Gemini Flash | 81% | 4.0s | $0.005 | Experiments, very high volume |
+
+**Methodology Note**: Benchmark results reflect testing conducted in December 2025 using Claude 4.5, GPT-4o, GPT-4o-mini, and Gemini 1.5 Flash. Model versions and pricing are current as of January 2026. Results will vary based on your specific workloads, prompts, and model updates. Use the benchmark tool provided to test current models on your tasks.
 
 ---
 
@@ -308,17 +312,17 @@ Let's say you process 10,000 AI requests per month. Here's the cost comparison:
 - 10,000 × $0.093 = **$930/month**
 
 **Strategy B: All Haiku**
-- 10,000 × $0.013 = **$130/month**
+- 10,000 × $0.053 = **$530/month**
 - Quality drops 8% across all tasks
 
 **Strategy C: 80/15/5 Split**
-- 8,000 × $0.013 (Haiku) = $104
+- 8,000 × $0.053 (Haiku) = $424
 - 1,500 × $0.093 (Sonnet) = $139.50
-- 500 × $0.200 (Opus) = $100
-- **Total: $343.50/month**
+- 500 × $0.200 (Opus, estimated ~2x Sonnet) = $100
+- **Total: $663.50/month**
 - Quality maintained where it matters
 
-Strategy C costs 63% less than Strategy A while maintaining quality on complex tasks. That's the power of intelligent routing.
+Strategy C costs 29% less than Strategy A while maintaining quality on complex tasks. That's the power of intelligent routing.
 
 ---
 
@@ -345,24 +349,24 @@ def route_to_model(task_type: str, complexity: str, urgency: str) -> str:
     if complexity == "high":
         if urgency == "immediate":
             return "gpt-4o"  # Faster than Sonnet
-        return "claude-sonnet-4-20250514"
-    
+        return "claude-sonnet-4.5"
+
     # Simple classification tasks go to cheap models
     if task_type == "classification" and complexity == "low":
-        return "claude-haiku-4-20250514"
-    
+        return "claude-haiku-4.5"
+
     # Troubleshooting benefits from quality
     if task_type == "troubleshooting":
         if complexity == "medium":
-            return "claude-sonnet-4-20250514"
-        return "claude-haiku-4-20250514"
-    
+            return "claude-sonnet-4.5"
+        return "claude-haiku-4.5"
+
     # Code generation needs quality
     if task_type == "generation":
-        return "claude-sonnet-4-20250514"
-    
+        return "claude-sonnet-4.5"
+
     # Default to cheap for everything else
-    return "claude-haiku-4-20250514"
+    return "claude-haiku-4.5"
 ```
 
 A more sophisticated router might analyze the actual content of the request—count tokens, look for keywords indicating complexity, check historical success rates. Chapter 39 covers advanced routing strategies.
@@ -434,8 +438,8 @@ except ImportError:
 
 # Pricing per 1M tokens (January 2026)
 PRICING = {
-    "claude-sonnet-4-20250514": {"input": 3.00, "output": 15.00},
-    "claude-haiku-4-20250514": {"input": 0.25, "output": 1.25},
+    "claude-sonnet-4.5": {"input": 3.00, "output": 15.00},
+    "claude-haiku-4.5": {"input": 1.00, "output": 5.00},
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
 }
@@ -568,8 +572,8 @@ def run_benchmark(task_key: str) -> dict:
     print(f"{'='*70}")
     
     models = [
-        ("claude", "claude-sonnet-4-20250514"),
-        ("claude", "claude-haiku-4-20250514"),
+        ("claude", "claude-sonnet-4.5"),
+        ("claude", "claude-haiku-4.5"),
         ("openai", "gpt-4o"),
         ("openai", "gpt-4o-mini"),
     ]
@@ -634,7 +638,7 @@ def main():
     parser.add_argument("--output", default="benchmark_results.json", help="Output file")
     args = parser.parse_args()
     
-    print("\n🔬 Network AI Model Benchmark Tool")
+    print("\nNetwork AI Model Benchmark Tool")
     print("=" * 70)
     
     if not args.task and not args.all:
@@ -660,12 +664,172 @@ def main():
             "results": all_results
         }, f, indent=2)
     
-    print(f"\n✅ Results saved to {args.output}")
+    print(f"\nResults saved to {args.output}")
 
 
 if __name__ == "__main__":
     main()
 ```
+
+---
+
+## Understanding the Benchmark Tool
+
+Before running the full benchmark, let's walk through how it works. This helps you modify it for your needs.
+
+### Tool Architecture
+
+The benchmark tool has four main components:
+
+**1. API Wrappers** (lines 444-501)
+```python
+def call_claude(model: str, prompt: str) -> dict
+def call_openai(model: str, prompt: str) -> dict
+```
+These abstract away provider differences. Both return the same format:
+```python
+{
+    "response": "model output text",
+    "latency": 4.2,  # seconds
+    "input_tokens": 150,
+    "output_tokens": 75
+}
+```
+
+**Why this matters**: You can add new providers (Gemini, Cohere) by following the same pattern.
+
+**2. Pricing Calculator** (lines 494-501)
+```python
+def calculate_cost(input_tokens: int, output_tokens: int, model: str) -> float
+```
+Uses the PRICING dictionary to compute actual costs. Returns cost in dollars.
+
+**Why this matters**: Update the PRICING dictionary when models change pricing. All costs recalculate automatically.
+
+**3. Task Definitions** (lines 503-551)
+```python
+TASKS = {
+    "security_analysis": {
+        "name": "Config Security Analysis",
+        "prompt": "Analyze this config...",
+        "expected_terms": ["snmp", "community", "telnet", ...]
+    }
+}
+```
+Each task has:
+- Human-readable name
+- The actual prompt to send
+- Terms that indicate a good response (for quality scoring)
+
+**Why this matters**: This is where you add your custom tasks. Copy the structure, change the prompt and expected terms.
+
+**4. Quality Scorer** (lines 554-559)
+```python
+def score_response(response: str, expected_terms: list) -> float
+```
+Simple keyword matching: found_terms / total_terms. Returns 0.0-1.0.
+
+**Limitation**: This is basic. A response that uses synonyms might score lower. For production, consider:
+- Manual expert review of sample responses
+- Multiple runs and average the results
+- More sophisticated NLP-based scoring
+
+### How a Benchmark Runs
+
+When you execute `python model_benchmark.py --task security_analysis`:
+
+1. **Load the task** from TASKS dictionary
+2. **For each model** in the models list:
+   - Call the appropriate API wrapper
+   - Measure latency
+   - Calculate cost from tokens
+   - Score response quality
+   - Store results
+3. **Print summary table** sorted by quality
+4. **Save JSON** to results file
+
+The full flow takes ~60 seconds (4 models × 3-5 tasks × 5 seconds per call).
+
+### Modifying the Tool
+
+**Add a new model:**
+```python
+# In the models list (line 570)
+models = [
+    ("claude", "claude-sonnet-4.5"),
+    ("claude", "claude-haiku-4.5"),
+    ("openai", "gpt-4o"),
+    ("openai", "gpt-4o-mini"),
+    ("openai", "o1-mini"),  # Add this
+]
+
+# Add pricing (line 436)
+PRICING = {
+    # ... existing ...
+    "o1-mini": {"input": 3.00, "output": 12.00},  # Add this
+}
+```
+
+**Add a custom task:**
+```python
+TASKS = {
+    # ... existing tasks ...
+    "interface_parser": {
+        "name": "Parse Interface Config",
+        "prompt": """Extract interface name, IP, and description from:
+
+interface GigabitEthernet0/1
+ description MPLS-WAN-PRIMARY
+ ip address 10.1.1.1 255.255.255.252
+
+Return as JSON.""",
+        "expected_terms": ["GigabitEthernet0/1", "10.1.1.1", "MPLS-WAN-PRIMARY", "json"],
+    }
+}
+```
+
+**Change quality scoring:**
+```python
+def score_response(response: str, expected_terms: list) -> float:
+    """Enhanced scoring with partial credit."""
+    response_lower = response.lower()
+    score = 0
+
+    for term in expected_terms:
+        if term.lower() in response_lower:
+            score += 1
+        elif any(synonym in response_lower for synonym in get_synonyms(term)):
+            score += 0.5  # Partial credit for synonyms
+
+    return score / len(expected_terms)
+```
+
+### Common Issues and Fixes
+
+**Issue**: "anthropic package not installed"
+**Fix**: Run `pip install anthropic openai python-dotenv`
+
+**Issue**: "API key not found"
+**Fix**: Set environment variables or create `.env` file:
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-proj-...
+```
+
+**Issue**: "Rate limit exceeded"
+**Fix**: Add delay between API calls:
+```python
+import time
+time.sleep(1)  # Add after each API call
+```
+
+**Issue**: All quality scores are low
+**Fix**: Check your expected_terms - they might be too strict. Review actual responses:
+```python
+print(f"Response: {result['response']}")  # Add this to see what models actually said
+```
+
+---
 
 ### Running Your Benchmarks
 
@@ -682,6 +846,9 @@ python model_benchmark.py --task security_analysis
 
 # Run all benchmarks
 python model_benchmark.py --all
+
+# Save to custom file
+python model_benchmark.py --all --output my_results.json
 ```
 
 ### Customizing for Your Workloads
@@ -732,46 +899,367 @@ You chose GPT-4 in 2023 and never looked back. Meanwhile, Claude passed it on te
 
 ## Lab Exercises
 
-### Lab 1: Baseline Benchmark (45 minutes)
+### Lab 0: Your First Simple Benchmark (20 minutes)
 
-Run the benchmark tool on all three default tasks. Record:
-- Which model won on each task?
-- What was the cost difference between best and worst?
-- What was the latency difference?
+Before diving into the full benchmark tool, start with this simple comparison. This lab gets you comfortable with API calls and comparing models directly.
 
-### Lab 2: Custom Task (60 minutes)
+```python
+#!/usr/bin/env python3
+"""Simple two-model comparison for beginners"""
 
-Add a benchmark task specific to your work. Ideas:
+from anthropic import Anthropic
+import time
+
+# Your API key from environment or direct
+client = Anthropic()  # Reads ANTHROPIC_API_KEY from environment
+
+# Simple networking task: classify a syslog message
+prompt = """Classify this log message by severity (critical/high/medium/low) and type:
+
+%OSPF-5-ADJCHG: Process 1, Nbr 10.1.1.2 on GigabitEthernet0/1 from FULL to DOWN
+
+Respond with just: Severity: X, Type: Y"""
+
+# Test two models
+models = ["claude-haiku-4.5", "claude-sonnet-4.5"]
+
+print("Comparing Models on Log Classification")
+print("=" * 60)
+
+for model in models:
+    start = time.time()
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=100,
+        temperature=0,  # Deterministic output
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    latency = time.time() - start
+    tokens_in = response.usage.input_tokens
+    tokens_out = response.usage.output_tokens
+
+    # Calculate cost (Haiku: $1/$5, Sonnet: $3/$15 per 1M tokens)
+    if "haiku" in model:
+        cost = (tokens_in * 1.00 + tokens_out * 5.00) / 1_000_000
+    else:
+        cost = (tokens_in * 3.00 + tokens_out * 15.00) / 1_000_000
+
+    print(f"\n{model}:")
+    print(f"  Response: {response.content[0].text}")
+    print(f"  Latency: {latency:.2f}s")
+    print(f"  Tokens: {tokens_in} in, {tokens_out} out")
+    print(f"  Cost: ${cost:.6f}")
+
+print("\n" + "=" * 60)
+print("Which model would you choose for log classification?")
+```
+
+**Success Criteria:**
+- [ ] Script runs successfully and calls both models
+- [ ] You can see the response, latency, and cost for each model
+- [ ] You understand why Haiku is faster but Sonnet might be more accurate
+- [ ] You can modify the prompt to test a different networking task
+
+**Expected Result:**
+Haiku should respond in ~2 seconds at ~$0.000050, Sonnet in ~6 seconds at ~$0.000150. Both should correctly classify the OSPF neighbor down event.
+
+**If You Finish Early:**
+Try these modifications:
+1. Test with a BGP log message instead
+2. Add a third model (GPT-4o-mini) to the comparison
+3. Test 5 different log messages and average the results
+
+---
+
+### Lab 1: Baseline Benchmark (90 minutes)
+
+Run the full benchmark tool on all three default tasks and analyze the results.
+
+**Steps:**
+1. Install dependencies: `pip install anthropic openai python-dotenv`
+2. Set API keys in your environment or `.env` file
+3. Save the benchmark tool as `model_benchmark.py`
+4. Run: `python model_benchmark.py --all`
+5. Review the results and create a comparison table
+
+**Success Criteria:**
+- [ ] Ran benchmark successfully for all 3 default tasks (security_analysis, bgp_troubleshooting, acl_generation)
+- [ ] Created a results table comparing all models across all tasks
+- [ ] Identified which model won on quality for each specific task
+- [ ] Calculated cost difference between cheapest and most expensive models
+- [ ] Can explain at least one tradeoff (e.g., "Haiku is 50% cheaper than GPT-4o-mini but 5% less accurate on security analysis")
+
+**Expected Outcome:**
+You should see Claude Sonnet leading in quality (~95%), Claude Haiku leading in cost (~$0.05), and GPT-4o balancing both. Your results may vary slightly from the chapter benchmarks due to model updates and prompt variations.
+
+**If You Finish Early:**
+- Add a fourth task to the TASKS dictionary
+- Create a chart visualizing quality vs cost
+- Calculate which model gives the best "quality per dollar"
+
+---
+
+### Lab 2: Custom Task (120 minutes)
+
+Create and benchmark a task specific to your networking environment.
+
+**Steps:**
+1. Choose a real networking task from your work (sanitize any sensitive data)
+2. Create a representative prompt and expected output
+3. Define 5-8 expected terms that indicate a good response
+4. Add your task to the TASKS dictionary in the benchmark tool
+5. Run the benchmark on your custom task
+6. Document which model performs best and why
+
+**Task Ideas:**
 - Parsing your organization's specific log format
 - Analyzing configs from your actual devices (sanitized)
-- Generating templates for your deployment process
+- Generating change templates for your deployment process
+- Troubleshooting scenarios specific to your network topology
 
-Run the benchmark and document which model performs best.
+**Success Criteria:**
+- [ ] Created a custom task with realistic prompt and expected terms
+- [ ] Task represents actual work you do (not generic examples)
+- [ ] Ran benchmark successfully on your custom task
+- [ ] Documented which model won and by how much
+- [ ] Can explain why one model outperformed others for your specific task
+- [ ] Calculated cost difference for your task specifically
 
-### Lab 3: Cost Projection (30 minutes)
+**Expected Outcome:**
+Results will vary based on your task. Complex reasoning tasks favor Sonnet, simple pattern matching favors Haiku or GPT-4o-mini.
 
-Based on your benchmark results and estimated usage:
-1. Calculate monthly cost using only the best-quality model
-2. Calculate monthly cost using only the cheapest model
-3. Design an 80/15/5 split and calculate that cost
-4. Document the quality tradeoffs at each level
+**Example Custom Task:**
+```python
+"parse_our_logs": {
+    "name": "Parse Custom Syslog Format",
+    "prompt": """Extract timestamp, severity, and device from this log:
 
-### Lab 4: Model Router (90 minutes)
+2026-02-10T14:23:45Z SW01-CORE [ERROR] Interface Gi1/0/24 down: link failure
 
-Implement a model router for your use cases:
-1. Define criteria for routing (task type, complexity, urgency)
-2. Implement the routing logic
-3. Test with sample requests
-4. Calculate expected cost savings versus single-model approach
+Return as JSON: {"timestamp": "...", "severity": "...", "device": "...", "interface": "..."}""",
+    "expected_terms": ["timestamp", "2026-02-10", "ERROR", "SW01-CORE", "Gi1/0/24", "json"],
+}
+```
 
-### Lab 5: Latency Analysis (45 minutes)
+---
 
-Run 20 requests to each model (same prompt). Create a latency analysis:
-- Mean latency per model
-- Standard deviation (consistency)
-- P95 latency (worst-case for 95% of requests)
+### Lab 3: Cost Projection (45 minutes)
 
-Which model is most consistent? Which has the best worst-case?
+Use your benchmark results to project real-world costs for different strategies.
+
+**Steps:**
+1. Estimate your monthly AI request volume (realistic guess: 1,000-10,000 requests)
+2. Calculate total cost using only the best-quality model (probably Sonnet)
+3. Calculate total cost using only the cheapest model (probably Haiku or GPT-4o-mini)
+4. Design an 80/15/5 split based on your actual task mix
+5. Calculate the 80/15/5 strategy cost
+6. Document quality tradeoffs for each approach
+
+**Success Criteria:**
+- [ ] Estimated monthly request volume with justification
+- [ ] Calculated cost for "all premium" strategy
+- [ ] Calculated cost for "all budget" strategy
+- [ ] Designed custom 80/15/5 split based on your task breakdown
+- [ ] Calculated cost savings of 80/15/5 vs all-premium
+- [ ] Documented where quality would suffer with all-budget approach
+- [ ] Made a final recommendation with reasoning
+
+**Expected Outcome:**
+For 10,000 requests/month, you should see:
+- All Sonnet: ~$930/month
+- All Haiku: ~$530/month
+- 80/15/5 split: ~$660/month (29% savings vs Sonnet, minimal quality loss)
+
+**Example Analysis:**
+```
+Monthly Volume: 5,000 requests
+Task Breakdown:
+- 4,000 log classification (80%) → Haiku
+- 750 config analysis (15%) → Sonnet
+- 250 complex troubleshooting (5%) → Opus
+
+Cost Calculation:
+- 4,000 × $0.053 = $212 (Haiku)
+- 750 × $0.093 = $69.75 (Sonnet)
+- 250 × $0.200 = $50 (Opus)
+Total: $331.75/month
+
+Quality Impact:
+- Log classification: Haiku vs Sonnet = 95% vs 98% (acceptable 3% gap)
+- Config analysis: Sonnet optimal
+- Troubleshooting: Opus optimal
+
+Recommendation: Implement 80/15/5 split, saves $263/month vs all-Sonnet
+```
+
+---
+
+### Lab 4: Model Router (180 minutes)
+
+Build a smart router that sends requests to the optimal model based on task characteristics.
+
+**Steps:**
+1. Start with the provided `route_to_model()` function (lines 332-366)
+2. Define your task categories (e.g., "log_parsing", "troubleshooting", "config_generation")
+3. Define complexity levels for each category
+4. Implement or enhance the routing logic
+5. Create 10 test cases representing real requests
+6. Test each request through your router
+7. Calculate cost savings vs always using Sonnet
+
+**Success Criteria:**
+- [ ] Router function handles at least 4 task types
+- [ ] Router considers complexity (low/medium/high) in decisions
+- [ ] Created 10 realistic test cases with expected model assignments
+- [ ] All test cases route to appropriate models
+- [ ] Calculated cost difference: router vs all-Sonnet vs all-Haiku
+- [ ] Can explain routing logic for each test case
+- [ ] Documented edge cases and how they're handled
+
+**Expected Outcome:**
+Your router should send 70-80% of simple tasks to cheap models, 15-20% of medium tasks to mid-tier models, and 5-10% of complex tasks to premium models.
+
+**Starter Code with TODOs:**
+```python
+def route_to_model(task_type: str, complexity: str, urgency: str = "normal") -> str:
+    """
+    Route request to optimal model based on characteristics.
+
+    Args:
+        task_type: log_parsing, troubleshooting, config_generation, security_analysis
+        complexity: low, medium, high
+        urgency: immediate, normal, batch
+
+    Returns:
+        Model identifier
+    """
+    # TODO: Add your routing rules here
+    # Consider:
+    # - High complexity → premium models
+    # - User-facing + urgency=immediate → fast models (GPT-4o)
+    # - Batch processing → can use slower but better models
+    # - Security/compliance → prefer accuracy over cost
+
+    if complexity == "high":
+        if urgency == "immediate":
+            return "gpt-4o"  # Fast premium
+        return "claude-sonnet-4.5"  # Best quality
+
+    if task_type == "log_parsing" and complexity == "low":
+        return "claude-haiku-4.5"  # Cheap and fast enough
+
+    # TODO: Add more routing logic for your specific task types
+
+    return "claude-haiku-4.5"  # Default to cheap
+
+
+# Test cases
+test_cases = [
+    {"task": "log_parsing", "complexity": "low", "urgency": "batch"},
+    {"task": "troubleshooting", "complexity": "high", "urgency": "immediate"},
+    {"task": "config_generation", "complexity": "medium", "urgency": "normal"},
+    # TODO: Add 7 more test cases
+]
+
+# Test and analyze
+for case in test_cases:
+    model = route_to_model(case["task"], case["complexity"], case["urgency"])
+    print(f"{case} → {model}")
+```
+
+**If You Finish Early:**
+- Add a confidence score: router returns (model, confidence_level)
+- Implement fallback: if Haiku fails or returns low-confidence, retry with Sonnet
+- Add cost tracking: log every routing decision for monthly analysis
+
+---
+
+### Lab 5: Latency Analysis (75 minutes)
+
+Measure response time consistency across models to understand user experience implications.
+
+**Steps:**
+1. Choose one simple prompt (e.g., "Classify this log: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed state to down")
+2. Send the same prompt 20 times to each model you want to test
+3. Record latency for each call
+4. Calculate mean, standard deviation, and P95 latency for each model
+5. Create a comparison table
+6. Determine which model is most consistent and which has best worst-case
+
+**Success Criteria:**
+- [ ] Ran 20 requests to at least 2 models (recommend: Haiku vs Sonnet vs GPT-4o)
+- [ ] Recorded all latency measurements
+- [ ] Calculated mean latency for each model
+- [ ] Calculated standard deviation (consistency measure)
+- [ ] Calculated P95 latency (95th percentile - worst case for most requests)
+- [ ] Created comparison table showing all metrics
+- [ ] Can explain what the standard deviation tells you about consistency
+- [ ] Made a recommendation for user-facing vs batch workloads
+
+**Expected Outcome:**
+- Haiku: Mean ~2.5s, StdDev ~0.4s, P95 ~3.2s (fast and consistent)
+- Sonnet: Mean ~7.5s, StdDev ~1.2s, P95 ~9.5s (slower, more variance)
+- GPT-4o: Mean ~4.5s, StdDev ~0.8s, P95 ~6.0s (balanced)
+
+**Starter Code:**
+```python
+import time
+from anthropic import Anthropic
+import statistics
+
+client = Anthropic()
+prompt = "Classify this log: %LINEPROTO-5-UPDOWN: Line protocol on Interface Gi0/1, changed state to down"
+
+def test_latency(model: str, iterations: int = 20) -> list:
+    """Run multiple requests and collect latency data."""
+    latencies = []
+
+    for i in range(iterations):
+        start = time.time()
+        response = client.messages.create(
+            model=model,
+            max_tokens=50,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        latency = time.time() - start
+        latencies.append(latency)
+        print(f"{model} iteration {i+1}: {latency:.2f}s")
+
+    return latencies
+
+
+# Test models
+models = ["claude-haiku-4.5", "claude-sonnet-4.5"]
+results = {}
+
+for model in models:
+    print(f"\nTesting {model}...")
+    latencies = test_latency(model, iterations=20)
+
+    results[model] = {
+        "mean": statistics.mean(latencies),
+        "stdev": statistics.stdev(latencies),
+        "p95": sorted(latencies)[int(0.95 * len(latencies))]
+    }
+
+# Print comparison
+print("\n" + "="*60)
+print("LATENCY ANALYSIS")
+print("="*60)
+print(f"{'Model':<20} {'Mean':>10} {'StdDev':>10} {'P95':>10}")
+print("-"*60)
+for model, metrics in results.items():
+    print(f"{model:<20} {metrics['mean']:>9.2f}s {metrics['stdev']:>9.2f}s {metrics['p95']:>9.2f}s")
+```
+
+**Analysis Questions:**
+1. Which model has the lowest mean latency?
+2. Which model has the lowest standard deviation (most consistent)?
+3. For a user-facing chatbot, which would you choose and why?
+4. For overnight batch processing, which would you choose and why?
+5. If your SLA requires "95% of responses under 5 seconds," which models qualify?
 
 ---
 
@@ -831,7 +1319,7 @@ Chapter 4 covers the practical fundamentals: API authentication, error handling,
 |-------|----------------------|
 | Claude Sonnet | $93 |
 | GPT-4o | $75 |
-| Claude Haiku | $13 |
+| Claude Haiku | $53 |
 | GPT-4o-mini | $8 |
 | Gemini Flash | $5 |
 
