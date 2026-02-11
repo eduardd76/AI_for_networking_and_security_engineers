@@ -32,7 +32,7 @@ Wait. Wednesday processed more configs (50 vs 20) but cost less ($8 vs $47)?
 
 The answer lies in understanding two fundamental concepts that every network engineer using AI must master: **tokens** and **model selection**. These concepts determine not just your costs, but also what's possible—which configs can be analyzed in a single request, how fast you'll get results, and how accurate those results will be.
 
-Let's dive deep into both.
+Here's how both work.
 
 ---
 
@@ -123,9 +123,9 @@ Interesting! The abbreviated command uses fewer tokens (5 vs 7). But wait—befo
 Let's do some real math. As of early 2026, here are the token prices for popular models:
 
 **Claude (Anthropic)**:
-- Haiku 4.5: $0.80 per million input tokens, $4.00 per million output tokens
+- Haiku 4.5: $1.00 per million input tokens, $5.00 per million output tokens
 - Sonnet 4.5: $3.00 per million input tokens, $15.00 per million output tokens
-- Opus 4: $15.00 per million input tokens, $75.00 per million output tokens
+- Opus 4.5/4.6: $5.00 per million input tokens, $25.00 per million output tokens (≤200K tokens)
 
 **GPT-4 (OpenAI)**:
 - GPT-4o-mini: $0.15 per million input tokens, $0.60 per million output tokens
@@ -159,6 +159,8 @@ That seems cheap! But scale it up:
 
 And if you're running analysis daily on a large network:
 - 1,000 devices × 365 days × $0.069 = **$25,185/year**
+
+**Note**: Pricing as of January 2026. For batch processing (50%+ discount), see Chapter 8.
 
 Suddenly the cost matters. A lot.
 
@@ -306,9 +308,9 @@ Let me share a real comparison I ran. I took the same misconfigured router confi
 | Model | Issues Found | Quality of Explanation | Cost | Time |
 |-------|--------------|------------------------|------|------|
 | GPT-4o-mini | 4/5 | Good, but brief | $0.003 | 2.1s |
-| Claude Haiku 4.5 | 5/5 | Good, concise | $0.018 | 1.8s |
+| Claude Haiku 4.5 | 5/5 | Good, concise | $0.023 | 1.8s |
 | Claude Sonnet 4.5 | 5/5 | Excellent, detailed | $0.069 | 4.2s |
-| Claude Opus 4 | 5/5 | Exceptional, contextual | $0.340 | 8.7s |
+| Claude Opus 4.5 | 5/5 | Exceptional, contextual | $0.113 | 8.7s |
 
 Interesting findings:
 - GPT-4o-mini missed the OSPF area mismatch—the subtlest issue
@@ -398,7 +400,9 @@ This tool will become part of your standard workflow. Before running any large-s
 
 ### The Code
 
-Create a new file called `token_calculator.py`. The full implementation is in the `CODE/Volume-1-Foundations/Chapter-02-Introduction-To-LLMs/` directory, but here's the core logic:
+> **💻 Complete Implementation**: The full working code with CLI interface, interactive mode, and pricing display is available in the [**Chapter 2 Colab notebook**](../Colab-Notebooks/Vol1_Ch2_Token_Calculator.ipynb). The code below shows the core logic.
+
+Create a new file called `token_calculator.py`. Here's the core logic:
 
 ```python
 #!/usr/bin/env python3
@@ -410,10 +414,11 @@ Shows how configs, logs, and queries tokenize across different models.
 import tiktoken  # OpenAI's tokenizer library
 
 # Pricing per 1M tokens (as of January 2026)
+# Check https://anthropic.com/pricing and https://openai.com/api/pricing for latest
 PRICING = {
-    "claude-haiku-4.5": {"input": 0.80, "output": 4.00, "context": 200_000},
+    "claude-haiku-4.5": {"input": 1.00, "output": 5.00, "context": 200_000},
     "claude-sonnet-4.5": {"input": 3.00, "output": 15.00, "context": 200_000},
-    "claude-opus-4": {"input": 15.00, "output": 75.00, "context": 200_000},
+    "claude-opus-4.5": {"input": 5.00, "output": 25.00, "context": 200_000},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60, "context": 128_000},
     "gpt-4o": {"input": 2.50, "output": 10.00, "context": 128_000},
 }
@@ -495,7 +500,7 @@ claude-sonnet-4.5 → $0.0659
 BATCH PROJECTION (1,000 files):
 --------------------------------------------------------------------------------
 gpt-4o-mini       → $3.00/month
-claude-haiku-4.5  → $17.50/month
+claude-haiku-4.5  → $21.90/month
 claude-sonnet-4.5 → $65.90/month
 ================================================================================
 ```
@@ -554,7 +559,7 @@ You budgeted $100/month. Your bill is $1,200.
 
 ## Lab Exercises
 
-### Lab 1: Tokenization Exploration (20 minutes)
+### Lab 1: Tokenization Exploration (30 minutes)
 
 Use the token calculator's interactive mode to tokenize these strings:
 
@@ -571,7 +576,13 @@ Questions to answer:
 - Why do IP addresses use so many tokens?
 - What's the cost difference between full and abbreviated commands at scale?
 
-### Lab 2: Cost Analysis for Your Network (30 minutes)
+**Success Criteria**:
+- ✓ "interface GigabitEthernet0/0" tokenizes to 7 tokens
+- ✓ "int Gi0/0" tokenizes to 5 tokens (29% savings)
+- ✓ IP address "192.168.1.1" tokenizes to 7 tokens
+- ✓ You can explain why dots (.) are separate tokens
+
+### Lab 2: Cost Analysis for Your Network (60 minutes)
 
 Calculate the monthly AI analysis cost for your actual network:
 
@@ -582,7 +593,13 @@ Calculate the monthly AI analysis cost for your actual network:
 
 Build a spreadsheet that your manager can understand.
 
-### Lab 3: Context Window Stress Test (45 minutes)
+**Success Criteria**:
+- ✓ Spreadsheet shows: device count, avg tokens/config, analyses/month, monthly cost
+- ✓ Includes comparison of at least 3 models (Haiku, Sonnet, GPT-4o-mini)
+- ✓ Calculates annual cost projection
+- ✓ Manager can understand it without you explaining
+
+### Lab 3: Context Window Stress Test (90 minutes)
 
 Find the largest configuration file in your environment. Then:
 
@@ -596,7 +613,12 @@ Document:
 - Which failed?
 - What's the largest config you can analyze with each model?
 
-### Lab 4: Model Quality Comparison (60 minutes)
+**Success Criteria**:
+- ✓ Created comparison table showing model, context window, result (pass/fail)
+- ✓ Identified maximum analyzable config size for each model
+- ✓ Documented workarounds for configs that exceed limits (chunking, summarization)
+
+### Lab 4: Model Quality Comparison (120 minutes)
 
 Take 5 configurations with known issues (create them if needed). Run each through:
 - Claude Haiku
@@ -609,7 +631,15 @@ Compare:
 - What was the cost difference?
 - Which model has the best cost/quality ratio for your needs?
 
-### Lab 5: Build a Cost Dashboard (90 minutes)
+**Success Criteria**:
+- ✓ Comparison table with: model, issues found, explanation quality (1-5), cost, time
+- ✓ Total cost tracked (5 configs × 3 models = ~$1-2 spent)
+- ✓ Decision framework documented: "Use X for Y tasks"
+- ✓ Can justify your model choice to your manager
+
+### Lab 5: Build a Cost Dashboard (3-4 hours, Advanced)
+
+**Note**: This is an advanced lab requiring strong Python skills. Consider moving to after Chapter 8 (Cost Optimization).
 
 Extend the token calculator to:
 1. Log every analysis to a SQLite database
@@ -618,6 +648,13 @@ Extend the token calculator to:
 4. Alert when daily spending exceeds a threshold
 
 This becomes your production cost monitoring system.
+
+**Success Criteria**:
+- ✓ SQLite database created with proper schema
+- ✓ All analyses logged automatically
+- ✓ Cost report generates correctly (daily/weekly)
+- ✓ Alert triggers when threshold exceeded
+- ✓ Dashboard runs as cron job or scheduled task
 
 ---
 
@@ -686,15 +723,17 @@ In Chapter 3, we'll dive deep into model selection. You'll learn how to benchmar
 | Code/configs | ~300-350 tokens |
 | Dense technical | ~350-400 tokens |
 
-### Current Pricing (2025-2026)
+### Current Pricing (January 2026)
+
+**Note**: Check [Anthropic Pricing](https://anthropic.com/pricing) and [OpenAI Pricing](https://openai.com/api/pricing) for latest rates.
 
 | Model | Input (per 1M) | Output (per 1M) | Context |
 |-------|---------------|-----------------|---------|
 | GPT-4o-mini | $0.15 | $0.60 | 128K |
 | GPT-4o | $2.50 | $10.00 | 128K |
-| Claude Haiku 4.5 | $0.80 | $4.00 | 200K |
+| Claude Haiku 4.5 | $1.00 | $5.00 | 200K |
 | Claude Sonnet 4.5 | $3.00 | $15.00 | 200K |
-| Claude Opus 4 | $15.00 | $75.00 | 200K |
+| Claude Opus 4.5 | $5.00 | $25.00 | 200K |
 | Gemini 1.5 Pro | $1.25 | $5.00 | 2M |
 
 ### Model Selection Quick Guide
