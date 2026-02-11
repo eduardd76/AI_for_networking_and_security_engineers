@@ -84,6 +84,187 @@ An AI might recommend complex security measures because they appear in many "bes
 
 ### Detection and Mitigation
 
+Don't jump to the complex bias detector. See how it evolves from simple keyword counting to production-ready bias detection.
+
+### Building BiasDetector: Progressive Development
+
+#### Version 1: Simple Vendor Counter (20 lines)
+
+Start with the absolute basics - count how often vendors are mentioned:
+
+```python
+import re
+from typing import Dict
+
+class BiasDetector:
+    """V1: Simple vendor mention counter."""
+
+    def check_vendor_bias(self, recommendation: str) -> Dict:
+        """Count vendor mentions."""
+        vendors = {
+            'cisco': len(re.findall(r'\bcisco\b', recommendation, re.I)),
+            'juniper': len(re.findall(r'\bjuniper\b', recommendation, re.I)),
+            'arista': len(re.findall(r'\barista\b', recommendation, re.I)),
+        }
+
+        total = sum(vendors.values())
+        if total == 0:
+            return {'bias_detected': False}
+
+        # Simple threshold: if one vendor is >70%, flag it
+        max_vendor = max(vendors, key=vendors.get)
+        if (vendors[max_vendor] / total) > 0.7:
+            return {'bias_detected': True, 'vendor': max_vendor}
+
+        return {'bias_detected': False}
+```
+
+**What it does:** Counts vendor names, flags if one dominates.
+
+**What's missing:** No solution diversity check, no debiasing, no API integration.
+
+---
+
+#### Version 2: Add Solution Diversity Check (35 lines)
+
+Add detection for single-solution bias:
+
+```python
+import re
+from typing import Dict
+
+class BiasDetector:
+    """V2: Add diversity checking."""
+
+    def check_vendor_bias(self, recommendation: str) -> Dict:
+        """Check if recommendation favors specific vendors."""
+        vendors = {
+            'cisco': len(re.findall(r'\bcisco\b', recommendation, re.I)),
+            'juniper': len(re.findall(r'\bjuniper\b', recommendation, re.I)),
+            'arista': len(re.findall(r'\barista\b', recommendation, re.I)),
+            'nokia': len(re.findall(r'\bnokia\b', recommendation, re.I)),
+        }
+
+        total = sum(vendors.values())
+        if total == 0:
+            return {'bias_detected': False, 'reason': 'vendor_agnostic'}
+
+        max_vendor = max(vendors, key=vendors.get)
+        max_percentage = (vendors[max_vendor] / total) * 100
+
+        if max_percentage > 70:
+            return {
+                'bias_detected': True,
+                'type': 'vendor_bias',
+                'vendor': max_vendor,
+                'percentage': max_percentage
+            }
+
+        return {'bias_detected': False}
+
+    def check_solution_diversity(self, recommendation: str) -> Dict:
+        """Check if AI provided multiple approaches."""
+        alternatives = ['alternatively', 'another option', 'you could also', 'different approach']
+
+        alt_count = sum(1 for alt in alternatives if alt in recommendation.lower())
+
+        if alt_count == 0:
+            return {'bias_detected': True, 'type': 'single_solution_bias'}
+
+        return {'bias_detected': False, 'alternatives_provided': alt_count}
+```
+
+**What it adds:** Diversity detection, better reporting.
+
+**What's still missing:** Debiasing functionality, AI API integration.
+
+---
+
+#### Version 3: Add Debiasing Capability (55 lines)
+
+Add ability to request debiased responses from AI:
+
+```python
+import re
+from typing import Dict
+from anthropic import Anthropic
+import os
+
+class BiasDetector:
+    """V3: Add debiasing via AI."""
+
+    def __init__(self):
+        self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    def check_vendor_bias(self, recommendation: str) -> Dict:
+        """Check vendor bias."""
+        vendors = {
+            'cisco': len(re.findall(r'\bcisco\b', recommendation, re.I)),
+            'juniper': len(re.findall(r'\bjuniper\b', recommendation, re.I)),
+            'arista': len(re.findall(r'\barista\b', recommendation, re.I)),
+            'nokia': len(re.findall(r'\bnokia\b', recommendation, re.I)),
+        }
+
+        total = sum(vendors.values())
+        if total == 0:
+            return {'bias_detected': False, 'reason': 'vendor_agnostic'}
+
+        max_vendor = max(vendors, key=vendors.get)
+        max_percentage = (vendors[max_vendor] / total) * 100
+
+        if max_percentage > 70:
+            return {
+                'bias_detected': True,
+                'type': 'vendor_bias',
+                'vendor': max_vendor,
+                'percentage': max_percentage,
+                'recommendation': 'Request vendor-neutral alternatives'
+            }
+
+        return {'bias_detected': False, 'vendors': vendors}
+
+    def check_solution_diversity(self, recommendation: str) -> Dict:
+        """Check solution diversity."""
+        alternatives = ['alternatively', 'another option', 'you could also', 'different approach']
+        alt_count = sum(1 for alt in alternatives if alt in recommendation.lower())
+
+        if alt_count == 0:
+            return {'bias_detected': True, 'type': 'single_solution_bias', 'recommendation': 'Ask for alternative approaches'}
+
+        return {'bias_detected': False, 'alternatives_provided': alt_count}
+
+    def request_debiased_response(self, original_prompt: str) -> str:
+        """Request vendor-neutral, multi-option response."""
+        debiased_prompt = f"""{original_prompt}
+
+Requirements:
+1. Provide 2-3 different approaches
+2. Use vendor-neutral terminology
+3. Explain tradeoffs
+
+Format as:
+**Option 1: [Name]** - Pros/Cons/Best for
+**Option 2: [Name]** - Pros/Cons/Best for"""
+
+        response = self.client.messages.create(
+            model="claude-sonnet-4.5",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": debiased_prompt}]
+        )
+
+        return response.content[0].text
+```
+
+**What it adds:** Debiasing via AI API, structured prompt for alternatives.
+
+**What's still missing:** Better structured prompt template, error handling, usage examples.
+
+---
+
+#### Version 4: Production-Ready (75 lines)
+
+Add full documentation and production features - this is the complete implementation:
+
 **Detection Strategy**:
 ```python
 # bias_detector.py
@@ -167,7 +348,7 @@ Format your response as:
 ... etc"""
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4.5",
             max_tokens=2000,
             messages=[{"role": "user", "content": debiased_prompt}]
         )
@@ -214,6 +395,95 @@ if __name__ == "__main__":
 
 ---
 
+### Check Your Understanding: Bias Detection
+
+Before moving to audit trails, verify you understand how bias affects AI recommendations:
+
+<details>
+<summary><strong>Question 1:</strong> Why does vendor bias matter in network automation?</summary>
+
+**Answer**: Vendor bias leads to suboptimal solutions and lock-in.
+
+**Example scenario**: You ask AI "How should I configure high availability?" If AI was trained mostly on Cisco docs, it might recommend Cisco VSS even when:
+- Your team has Juniper expertise
+- Juniper Virtual Chassis costs 30% less
+- You already have Juniper support contracts
+
+**Real impact**: You end up with the solution that appeared most in training data, not the best solution for YOUR context.
+
+**How to detect**: Count vendor mentions in response - if >70% are one vendor, request alternatives.
+
+</details>
+
+<details>
+<summary><strong>Question 2:</strong> What's the difference between vendor bias and solution diversity bias?</summary>
+
+**Answer**:
+- **Vendor bias**: AI favors specific manufacturers (Cisco, Juniper, etc.)
+- **Solution diversity bias**: AI provides only ONE approach when multiple valid options exist
+
+**Example**:
+
+**Vendor-biased response**:
+```
+Use Cisco VSS for high availability. Configure Cisco Catalyst switches with VSS.
+```
+(100% Cisco mentions)
+
+**Solution-diversity biased response**:
+```
+Use VRRP for high availability. Configure VRRP on your routers.
+```
+(Only mentions VRRP, ignores HSRP, GLBP, CARP alternatives)
+
+**Good response** (neither bias):
+```
+Three approaches for HA:
+1. VRRP (vendor-neutral, works everywhere)
+2. HSRP (Cisco-specific but mature)
+3. Keepalived (software-based, free)
+
+Choose based on vendor ecosystem and budget.
+```
+
+**Key insight**: Both biases limit your options - vendor bias favors brands, diversity bias limits approaches.
+
+</details>
+
+<details>
+<summary><strong>Question 3:</strong> How would you request a debiased response from Claude?</summary>
+
+**Answer**: Add explicit requirements to your prompt:
+
+**Biased prompt**:
+```
+How should I configure OSPF?
+```
+
+**Debiased prompt**:
+```
+How should I configure OSPF?
+
+Requirements:
+1. Provide 2-3 different approaches
+2. Use vendor-neutral terminology
+3. If mentioning specific vendors, include multiple options
+4. Explain tradeoffs
+5. Consider different scales (small/medium/large)
+
+Format as:
+**Option 1**: [description, pros, cons, best for]
+**Option 2**: [description, pros, cons, best for]
+```
+
+**Result**: AI is forced to consider multiple approaches and explicitly state tradeoffs.
+
+**Pro tip**: Save debiased prompt templates for common tasks (config review, troubleshooting, design) and reuse them.
+
+</details>
+
+---
+
 ## Section 2: Explainability and Audit Trails
 
 ### Why Explainability Matters
@@ -229,6 +499,212 @@ If you can't answer this question with complete precision, you have a problem.
 - **Trust**: Teams won't adopt AI they can't explain
 
 ### Building a Comprehensive Audit System
+
+Build an audit system step-by-step, from simple logging to production-grade compliance.
+
+### Building AIAuditLogger: Progressive Development
+
+#### Version 1: Basic Log-to-File (25 lines)
+
+Start simple - just log operations to a JSON file:
+
+```python
+import json
+from datetime import datetime
+from pathlib import Path
+
+class AIAuditLogger:
+    """V1: Simple file-based logging."""
+
+    def __init__(self, log_file: str = "ai_audit.json"):
+        self.log_file = Path(log_file)
+
+    def log_operation(self, operation_type: str, prompt: str, response: str):
+        """Log an AI operation."""
+        entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'operation_type': operation_type,
+            'prompt': prompt,
+            'response': response
+        }
+
+        # Append to file
+        logs = []
+        if self.log_file.exists():
+            with open(self.log_file) as f:
+                logs = json.load(f)
+
+        logs.append(entry)
+
+        with open(self.log_file, 'w') as f:
+            json.dump(logs, f, indent=2)
+```
+
+**What it does:** Appends entries to JSON file.
+
+**What's missing:** No database, no search, no user tracking, no hashing for verification.
+
+---
+
+#### Version 2: Add SQLite Database (45 lines)
+
+Move from JSON file to proper database:
+
+```python
+import sqlite3
+from datetime import datetime
+
+class AIAuditLogger:
+    """V2: SQLite-based logging."""
+
+    def __init__(self, db_path: str = "ai_audit.db"):
+        self.db_path = db_path
+        self._init_database()
+
+    def _init_database(self):
+        """Create database schema."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                user TEXT,
+                system TEXT,
+                prompt TEXT NOT NULL,
+                response TEXT NOT NULL,
+                tokens_used INTEGER,
+                cost REAL
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+
+    def log_operation(self, operation_type: str, user: str, system: str,
+                     prompt: str, response: str, tokens_used: int, cost: float):
+        """Log operation to database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO audit_log (timestamp, operation_type, user, system,
+                                  prompt, response, tokens_used, cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (datetime.utcnow().isoformat(), operation_type, user, system,
+              prompt, response, tokens_used, cost))
+
+        conn.commit()
+        conn.close()
+```
+
+**What it adds:** SQLite database, user tracking, cost tracking.
+
+**What's still missing:** Search functionality, hashing for verification, risk levels, approval tracking.
+
+---
+
+#### Version 3: Add Search and Risk Levels (70 lines)
+
+Add ability to search logs and track risk levels:
+
+```python
+import sqlite3
+from datetime import datetime
+from enum import Enum
+from typing import List, Dict, Optional
+
+class RiskLevel(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class AIAuditLogger:
+    """V3: Add search and risk levels."""
+
+    def __init__(self, db_path: str = "ai_audit.db"):
+        self.db_path = db_path
+        self._init_database()
+
+    def _init_database(self):
+        """Create database with risk levels."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                operation_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                user TEXT NOT NULL,
+                system TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                response TEXT NOT NULL,
+                tokens_used INTEGER,
+                cost REAL,
+                applied BOOLEAN DEFAULT 0
+            )
+        """)
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON audit_log(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_risk_level ON audit_log(risk_level)")
+
+        conn.commit()
+        conn.close()
+
+    def log_operation(self, operation_id: str, operation_type: str,
+                     risk_level: RiskLevel, user: str, system: str,
+                     prompt: str, response: str, tokens_used: int, cost: float):
+        """Log operation."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO audit_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (operation_id, datetime.utcnow().isoformat(), operation_type,
+              risk_level.value, user, system, prompt, response, tokens_used, cost, False))
+
+        conn.commit()
+        conn.close()
+
+    def search_operations(self, start_date: Optional[str] = None,
+                         risk_level: Optional[RiskLevel] = None) -> List[Dict]:
+        """Search audit log."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        query = "SELECT * FROM audit_log WHERE 1=1"
+        params = []
+
+        if start_date:
+            query += " AND timestamp >= ?"
+            params.append(start_date)
+
+        if risk_level:
+            query += " AND risk_level = ?"
+            params.append(risk_level.value)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        columns = [desc[0] for desc in cursor.description]
+        return [dict(zip(columns, row)) for row in rows]
+```
+
+**What it adds:** Search functionality, risk levels, indexing for performance.
+
+**What's still missing:** Hashing for verification, approval tracking, incident reports.
+
+---
+
+#### Version 4: Production-Ready (95 lines)
+
+Add all production features - this is the complete implementation:
 
 ```python
 # ai_audit_logger.py
@@ -593,7 +1069,7 @@ if __name__ == "__main__":
             "location": "NYC datacenter",
             "config_length": 1500
         },
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4.5",
         response="Found 2 security issues: 1) Weak MD5 auth...",
         tokens_used=850,
         cost=0.0068,
@@ -644,6 +1120,279 @@ Not all operations are equal. Reading a config is low-risk. Changing BGP policy 
 | **Critical** | Production changes, BGP/routing | Yes - multi-person approval |
 
 ### Building an Approval Workflow
+
+Build an approval workflow step-by-step, from simple status tracking to production-ready multi-person approval.
+
+### Building ApprovalWorkflow: Progressive Development
+
+#### Version 1: Simple Status Tracking (30 lines)
+
+Start with basic request tracking in memory:
+
+```python
+from enum import Enum
+from datetime import datetime
+from typing import Dict
+
+class ApprovalStatus(Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class ApprovalWorkflow:
+    """V1: In-memory approval tracking."""
+
+    def __init__(self):
+        self.requests = {}  # Dict of request_id -> status
+
+    def create_request(self, request_id: str, proposed_change: str) -> str:
+        """Create approval request."""
+        self.requests[request_id] = {
+            'status': ApprovalStatus.PENDING,
+            'proposed_change': proposed_change,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        return request_id
+
+    def approve(self, request_id: str) -> bool:
+        """Approve a request."""
+        if request_id in self.requests:
+            self.requests[request_id]['status'] = ApprovalStatus.APPROVED
+            return True
+        return False
+
+    def get_status(self, request_id: str) -> ApprovalStatus:
+        """Get request status."""
+        return self.requests.get(request_id, {}).get('status')
+```
+
+**What it does:** Tracks requests in memory with simple approve/reject.
+
+**What's missing:** No database (data lost on restart), no expiration, no multi-person approval, no tracking of who approved.
+
+---
+
+#### Version 2: Add Database and Expiration (50 lines)
+
+Add persistent storage and time-based expiration:
+
+```python
+import sqlite3
+from enum import Enum
+from datetime import datetime, timedelta
+from typing import Dict
+
+class ApprovalStatus(Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+class ApprovalWorkflow:
+    """V2: Add database and expiration."""
+
+    def __init__(self, db_path: str = "approvals.db"):
+        self.db_path = db_path
+        self._init_database()
+
+    def _init_database(self):
+        """Create approval database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS change_requests (
+                request_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                proposed_change TEXT NOT NULL,
+                status TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+
+    def create_request(self, request_id: str, proposed_change: str,
+                      ttl_hours: int = 24) -> str:
+        """Create request with expiration."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        timestamp = datetime.utcnow().isoformat()
+        expires_at = (datetime.utcnow() + timedelta(hours=ttl_hours)).isoformat()
+
+        cursor.execute("""
+            INSERT INTO change_requests VALUES (?, ?, ?, ?, ?)
+        """, (request_id, timestamp, proposed_change, ApprovalStatus.PENDING.value, expires_at))
+
+        conn.commit()
+        conn.close()
+
+        return request_id
+
+    def approve(self, request_id: str) -> Dict:
+        """Approve if not expired."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT expires_at, status FROM change_requests WHERE request_id = ?", (request_id,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return {'success': False, 'error': 'Not found'}
+
+        expires_at, status = row
+
+        # Check expiration
+        if datetime.utcnow() > datetime.fromisoformat(expires_at):
+            cursor.execute("UPDATE change_requests SET status = ? WHERE request_id = ?",
+                         (ApprovalStatus.EXPIRED.value, request_id))
+            conn.commit()
+            conn.close()
+            return {'success': False, 'error': 'Expired'}
+
+        cursor.execute("UPDATE change_requests SET status = ? WHERE request_id = ?",
+                     (ApprovalStatus.APPROVED.value, request_id))
+        conn.commit()
+        conn.close()
+
+        return {'success': True}
+```
+
+**What it adds:** SQLite persistence, time-based expiration.
+
+**What's still missing:** Multi-person approval, risk-based approver requirements, approval comments, rejection tracking.
+
+---
+
+#### Version 3: Add Multi-Person Approval (75 lines)
+
+Add support for multiple approvers based on risk level:
+
+```python
+import sqlite3
+import json
+from enum import Enum
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional
+
+class ApprovalStatus(Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+class RiskLevel(Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class ApprovalWorkflow:
+    """V3: Multi-person approval."""
+
+    def __init__(self, db_path: str = "approvals.db"):
+        self.db_path = db_path
+        self._init_database()
+
+    def _init_database(self):
+        """Create database schema."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS change_requests (
+                request_id TEXT PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                proposed_change TEXT NOT NULL,
+                status TEXT NOT NULL,
+                approvers_required INTEGER NOT NULL,
+                approvals TEXT,
+                expires_at TEXT NOT NULL
+            )
+        """)
+
+        conn.commit()
+        conn.close()
+
+    def create_request(self, request_id: str, risk_level: RiskLevel,
+                      proposed_change: str, ttl_hours: int = 24) -> str:
+        """Create request with risk-based approval requirements."""
+        # Determine required approvals
+        approvers_required = {
+            RiskLevel.LOW: 0,
+            RiskLevel.MEDIUM: 1,
+            RiskLevel.HIGH: 1,
+            RiskLevel.CRITICAL: 2
+        }[risk_level]
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO change_requests VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (request_id, datetime.utcnow().isoformat(), risk_level.value,
+              proposed_change, ApprovalStatus.PENDING.value, approvers_required,
+              json.dumps([]), (datetime.utcnow() + timedelta(hours=ttl_hours)).isoformat()))
+
+        conn.commit()
+        conn.close()
+
+        return request_id
+
+    def approve(self, request_id: str, approver: str, comments: str = "") -> Dict:
+        """Add approval."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT approvals, approvers_required FROM change_requests
+            WHERE request_id = ?
+        """, (request_id,))
+
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return {'success': False, 'error': 'Not found'}
+
+        approvals_json, approvers_required = row
+        approvals = json.loads(approvals_json)
+
+        # Add new approval
+        approvals.append({
+            'approver': approver,
+            'timestamp': datetime.utcnow().isoformat(),
+            'comments': comments
+        })
+
+        # Check if enough approvals
+        new_status = ApprovalStatus.PENDING.value
+        if len(approvals) >= approvers_required:
+            new_status = ApprovalStatus.APPROVED.value
+
+        cursor.execute("""
+            UPDATE change_requests SET approvals = ?, status = ?
+            WHERE request_id = ?
+        """, (json.dumps(approvals), new_status, request_id))
+
+        conn.commit()
+        conn.close()
+
+        return {'success': True, 'status': new_status, 'approvals': len(approvals)}
+```
+
+**What it adds:** Risk-based approver requirements, approval tracking with comments.
+
+**What's still missing:** Rejection handling, pending request queries, apply checking.
+
+---
+
+#### Version 4: Production-Ready (100 lines)
+
+Add all production features - this is the complete implementation:
 
 ```python
 # approval_workflow.py
@@ -1046,7 +1795,7 @@ def ai_suggest_change_with_approval(config: str, system: str):
 
     # Get AI recommendation
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4.5",
         max_tokens=1000,
         messages=[{
             "role": "user",
@@ -1076,6 +1825,115 @@ def ai_suggest_change_with_approval(config: str, system: str):
 
 ---
 
+### Check Your Understanding: Human-in-the-Loop
+
+Verify you understand when and why humans should approve AI-generated changes:
+
+<details>
+<summary><strong>Question 1:</strong> Why require human approval for AI recommendations instead of just auditing after the fact?</summary>
+
+**Answer**: Prevention vs detection - approval catches problems BEFORE they cause incidents.
+
+**Scenario comparison**:
+
+**Audit-only approach** (no approval):
+```
+3:00 AM: AI changes BGP policy
+3:15 AM: Traffic drops
+3:16 AM: Pager goes off
+3:45 AM: You discover AI misunderstood the requirement
+4:30 AM: You roll back the change
+```
+**Result**: 1.5 hour outage, angry customers, incident report
+
+**Approval-required approach**:
+```
+3:00 AM: AI suggests BGP policy change
+3:01 AM: Sends approval request to on-call engineer
+3:05 AM: Engineer reviews, spots issue, rejects
+```
+**Result**: No outage, no incident
+
+**Key insight**: Auditing tells you what went wrong. Approval prevents it from going wrong.
+
+**When to use each**:
+- **Audit only**: Read-only operations, analysis, documentation
+- **Approval required**: Anything that modifies production configs, routing, security
+
+</details>
+
+<details>
+<summary><strong>Question 2:</strong> How many approvers should a CRITICAL change require, and why?</summary>
+
+**Answer**: 2 approvers for CRITICAL, 1 for HIGH, 0 for LOW/MEDIUM.
+
+**Reasoning**:
+
+**CRITICAL changes** (2 approvers):
+- BGP routing policy
+- Firewall rules
+- Production network changes
+- **Why 2**: Single person might miss subtle issues, two-person review catches more
+
+**Example**: AI suggests BGP filter:
+- First approver: Checks filter syntax is correct
+- Second approver: Verifies it doesn't block legitimate customer prefixes
+
+**HIGH changes** (1 approver):
+- Staging environment changes
+- Non-critical production updates
+- **Why 1**: Balances safety with velocity
+
+**LOW/MEDIUM** (0 approvers):
+- Documentation generation
+- Read-only analysis
+- **Why 0**: No risk, audit trail is sufficient
+
+**Real-world example**: A single approver once missed that an AI-generated ACL would block NTP. Second approver caught it. Two-person review for CRITICAL changes saved an incident.
+
+</details>
+
+<details>
+<summary><strong>Question 3:</strong> What should happen to a pending approval request after 24 hours?</summary>
+
+**Answer**: It should EXPIRE and require resubmission.
+
+**Why expiration matters**:
+
+**Without expiration**:
+```
+Monday 9am: AI suggests change for current config
+Tuesday 10am: Engineer approves (30 hours later)
+Tuesday 10:01am: System applies change
+```
+**Problem**: Config might have changed in those 30 hours. The approved change is now based on stale information.
+
+**With expiration (24-hour TTL)**:
+```
+Monday 9am: AI suggests change
+Tuesday 10am: Engineer tries to approve
+System: "Request expired - config may have changed, please re-analyze"
+Tuesday 10:05am: Re-run analysis with current config
+Tuesday 10:10am: Approve based on current state
+```
+
+**Expiration benefits**:
+1. Forces re-validation with current config
+2. Prevents stale approvals from being applied
+3. Encourages timely review
+
+**Default TTL**: 24 hours for most changes, 4 hours for CRITICAL (time-sensitive)
+
+**Implementation**:
+```python
+if datetime.utcnow() > datetime.fromisoformat(expires_at):
+    return {'error': 'Request expired - please re-analyze'}
+```
+
+</details>
+
+---
+
 ## Section 4: Security and Privacy
 
 ### Sensitive Data in Prompts
@@ -1097,6 +1955,181 @@ If you send this to an API, you've leaked:
 - Internal IP addresses
 
 ### Data Sanitization
+
+Build a data sanitizer step-by-step, from basic pattern matching to comprehensive security scanning.
+
+### Building DataSanitizer: Progressive Development
+
+#### Version 1: Basic Password Redaction (20 lines)
+
+Start with the most critical secrets - passwords:
+
+```python
+import re
+
+class DataSanitizer:
+    """V1: Simple password redaction."""
+
+    def sanitize(self, text: str) -> str:
+        """Remove passwords from text."""
+        sanitized = text
+
+        # Redact enable secrets
+        sanitized = re.sub(
+            r'enable secret \d+ [^\s]+',
+            'enable secret [REDACTED]',
+            sanitized
+        )
+
+        # Redact username secrets
+        sanitized = re.sub(
+            r'(username \S+ .*?secret) [^\s]+',
+            r'\1 [REDACTED]',
+            sanitized
+        )
+
+        return sanitized
+```
+
+**What it does:** Redacts two most common password types.
+
+**What's missing:** No SNMP, TACACS, RADIUS keys; no tracking of what was redacted; no risk assessment.
+
+---
+
+#### Version 2: Add Multiple Secret Types (40 lines)
+
+Expand to cover more secret types:
+
+```python
+import re
+from typing import Dict, List
+
+class DataSanitizer:
+    """V2: Multiple secret types."""
+
+    PATTERNS = {
+        'enable_secret': (r'enable secret \d+ [^\s]+', 'enable secret [REDACTED]'),
+        'username_secret': (r'username \S+ .*?secret [^\s]+', lambda m: m.group(0).rsplit('secret', 1)[0] + 'secret [REDACTED]'),
+        'snmp_community': (r'snmp-server community [^\s]+', 'snmp-server community [REDACTED]'),
+        'tacacs_key': (r'(tacacs-server .* key) [^\s]+', r'\1 [REDACTED]'),
+        'radius_key': (r'(radius-server .* key) [^\s]+', r'\1 [REDACTED]'),
+        'bgp_password': (r'(neighbor \S+ password) [^\s]+', r'\1 [REDACTED]'),
+    }
+
+    def sanitize(self, text: str) -> Dict:
+        """Sanitize and track redactions."""
+        sanitized = text
+        redactions = []
+
+        for name, (pattern, replacement) in self.PATTERNS.items():
+            # Find matches
+            matches = re.finditer(pattern, sanitized)
+            for match in matches:
+                redactions.append({
+                    'type': name,
+                    'original': match.group(0)
+                })
+
+            # Replace
+            if callable(replacement):
+                sanitized = re.sub(pattern, replacement, sanitized)
+            else:
+                sanitized = re.sub(pattern, replacement, sanitized)
+
+        return {
+            'sanitized_text': sanitized,
+            'redactions': redactions
+        }
+```
+
+**What it adds:** Multiple secret types, redaction tracking.
+
+**What's still missing:** Risk level assessment, IP address handling, validation.
+
+---
+
+#### Version 3: Add Risk Assessment (65 lines)
+
+Add risk level calculation and IP address handling:
+
+```python
+import re
+from typing import Dict, List, Tuple
+from dataclasses import dataclass
+
+@dataclass
+class SanitizationResult:
+    """Result of sanitization."""
+    sanitized_text: str
+    redactions: List[Dict]
+    risk_level: str
+
+class DataSanitizer:
+    """V3: Add risk assessment."""
+
+    PATTERNS = {
+        'enable_secret': (r'enable secret \d+ [^\s]+', 'enable secret [REDACTED]'),
+        'username_secret': (r'username \S+ .*?secret [^\s]+', lambda m: m.group(0).rsplit('secret', 1)[0] + 'secret [REDACTED]'),
+        'snmp_community': (r'snmp-server community [^\s]+', 'snmp-server community [REDACTED]'),
+        'tacacs_key': (r'(tacacs-server .* key) [^\s]+', r'\1 [REDACTED]'),
+        'radius_key': (r'(radius-server .* key) [^\s]+', r'\1 [REDACTED]'),
+        'bgp_password': (r'(neighbor \S+ password) [^\s]+', r'\1 [REDACTED]'),
+        'ospf_authentication': (r'(ip ospf authentication-key) [^\s]+', r'\1 [REDACTED]'),
+        'api_key': (r'(api[_-]key|apikey)[\s:=]+[^\s]+', r'\1 [REDACTED]', re.IGNORECASE),
+    }
+
+    def __init__(self, keep_internal_ips: bool = False):
+        self.keep_internal_ips = keep_internal_ips
+
+    def sanitize(self, text: str) -> SanitizationResult:
+        """Sanitize with risk assessment."""
+        sanitized = text
+        redactions = []
+
+        # Apply patterns
+        for name, pattern_info in self.PATTERNS.items():
+            if len(pattern_info) == 3:
+                pattern, replacement, flags = pattern_info
+            else:
+                pattern, replacement = pattern_info
+                flags = 0
+
+            matches = re.finditer(pattern, sanitized, flags)
+            for match in matches:
+                redactions.append({
+                    'type': name,
+                    'original': match.group(0),
+                    'position': match.span()
+                })
+
+            if callable(replacement):
+                sanitized = re.sub(pattern, replacement, sanitized, flags=flags)
+            else:
+                sanitized = re.sub(pattern, replacement, sanitized, flags=flags)
+
+        # Determine risk level
+        high_risk_types = ['enable_secret', 'username_secret', 'api_key']
+        risk_level = 'high' if any(
+            r['type'] in high_risk_types for r in redactions
+        ) else 'medium' if redactions else 'low'
+
+        return SanitizationResult(
+            sanitized_text=sanitized,
+            redactions=redactions,
+            risk_level=risk_level
+        )
+```
+
+**What it adds:** Risk level calculation, structured result, more secret types.
+
+**What's still missing:** Public IP redaction, validation function, comprehensive safety checks.
+
+---
+
+#### Version 4: Production-Ready (85 lines)
+
+Add all production features - this is the complete implementation:
 
 ```python
 # data_sanitizer.py
@@ -1304,7 +2337,7 @@ tacacs-server host 10.2.2.2 key MyTacacsKey
     # Validate before sending to AI
     is_safe, issues = sanitizer.validate_safe_for_ai(config)
     if not is_safe:
-        print("\n⚠️  SAFETY ISSUES:")
+        print("\nWARNING: SAFETY ISSUES:")
         for issue in issues:
             print(f"  - {issue}")
 ```
@@ -1362,18 +2395,18 @@ if detect_prompt_injection(user_input):
 
 **1. Real-Time Packet Processing**
 ```python
-# ❌ DON'T use AI for this
+# DON'T: Use AI for this
 def process_packet_with_ai(packet):
     """This will be impossibly slow."""
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4.5",
         messages=[{"role": "user", "content": f"Should I forward this packet? {packet}"}]
     )
     # API latency: 500-2000ms
     # Packet forwarding decision needed: <1ms
     # This will never work
 
-# ✅ DO use traditional logic
+# DO: Use traditional logic
 def process_packet(packet):
     """Fast, deterministic."""
     if packet.dest_ip in acl_deny_list:
@@ -1383,13 +2416,13 @@ def process_packet(packet):
 
 **2. Deterministic Tasks with Known Rules**
 ```python
-# ❌ DON'T use AI for VLAN assignment
+# DON'T: Use AI for VLAN assignment
 def assign_vlan_with_ai(port_description):
     """Overkill and unreliable."""
     response = client.messages.create(...)
     # What if AI suggests VLAN 99 when policy says VLAN 10?
 
-# ✅ DO use configuration management
+# DO: Use configuration management
 VLAN_MAP = {
     'workstation': 10,
     'server': 20,
@@ -1401,7 +2434,7 @@ def assign_vlan(device_type):
 
 **3. Tasks Where Accuracy Must Be 100%**
 ```python
-# ❌ DON'T use AI for BGP route filtering
+# DON'T: Use AI for BGP route filtering
 def filter_routes_with_ai(route):
     """Can't tolerate any mistakes."""
     response = client.messages.create(...)
@@ -1410,7 +2443,7 @@ def filter_routes_with_ai(route):
     # - Create routing loops
     # - Cause outages
 
-# ✅ DO use explicit route-maps
+# DO: Use explicit route-maps
 route_map FILTER_CUSTOMER permit 10
  match ip address prefix-list CUSTOMER_PREFIXES
 route_map FILTER_CUSTOMER deny 999
@@ -1418,14 +2451,14 @@ route_map FILTER_CUSTOMER deny 999
 
 **4. When Cost Outweighs Benefit**
 ```python
-# ❌ DON'T use AI to check if interface is up
+# DON'T: Use AI to check if interface is up
 def check_interface_with_ai(interface_name):
     """Costs $0.01, returns same info as 'show ip interface brief'."""
     # Cost: $0.01 per check
     # Latency: 1-2 seconds
     # Value: none
 
-# ✅ DO use SNMP or direct command
+# DO: Use SNMP or direct command
 def check_interface(interface_name):
     """Free, instant."""
     output = device.send_command(f"show ip interface {interface_name} | i line protocol")
@@ -1663,6 +2696,146 @@ if __name__ == "__main__":
 
 ---
 
+### Check Your Understanding: When NOT to Use AI
+
+Verify you understand the red flags that indicate AI is the wrong tool:
+
+<details>
+<summary><strong>Question 1:</strong> Why is AI inappropriate for real-time packet processing?</summary>
+
+**Answer**: Latency mismatch - AI needs seconds, packet forwarding needs microseconds.
+
+**The math**:
+- **AI API call**: 500-2000ms (0.5-2 seconds)
+- **Packet forwarding decision**: <1ms (microseconds)
+- **Mismatch**: 1000x too slow
+
+**What happens if you try**:
+```python
+def process_packet_with_ai(packet):
+    response = client.messages.create(
+        model="claude-sonnet-4.5",
+        messages=[{"role": "user", "content": f"Forward this packet? {packet}"}]
+    )
+    # Takes 1-2 seconds per packet
+    # Router needs to process 10,000 packets/second
+    # Result: Network grinds to a halt
+```
+
+**Correct approach**:
+```python
+def process_packet(packet):
+    if packet.dest_ip in acl_deny_list:
+        return DROP
+    return FORWARD
+    # Takes <1ms
+```
+
+**When AI IS appropriate**: Analyzing packet captures offline, detecting patterns in historical traffic, generating ACL rules from requirements.
+
+**When AI is NOT appropriate**: Real-time packet-by-packet decisions.
+
+**Rule**: If latency requirement is <100ms, don't use AI.
+
+</details>
+
+<details>
+<summary><strong>Question 2:</strong> Give an example of a deterministic task where AI adds no value.</summary>
+
+**Answer**: VLAN assignment based on port description.
+
+**Deterministic (correct)**:
+```python
+VLAN_MAP = {
+    'workstation': 10,
+    'server': 20,
+    'iot': 30,
+    'guest': 99
+}
+
+def assign_vlan(device_type):
+    return VLAN_MAP.get(device_type, 999)  # Default to quarantine
+```
+- Instant (<1ms)
+- 100% accurate
+- No cost
+- Deterministic (same input → same output always)
+
+**Using AI (incorrect)**:
+```python
+def assign_vlan_with_ai(device_type):
+    response = client.messages.create(
+        model="claude-sonnet-4.5",
+        messages=[{"role": "user", "content": f"What VLAN for {device_type}?"}]
+    )
+    # Cost: $0.002 per call
+    # Latency: 1-2 seconds
+    # Accuracy: 95% (might suggest VLAN 11 instead of 10)
+```
+
+**Why AI is wrong here**:
+1. **Rules are known**: You have a policy document that says "workstations go to VLAN 10"
+2. **Deterministic**: No ambiguity, no judgment needed
+3. **Cost**: AI costs $0.002 per call, lookup costs $0
+4. **Speed**: AI is 1000x slower
+5. **Accuracy**: AI might get it wrong, lookup never does
+
+**When to use AI instead**: When rules are ambiguous ("Is this device a workstation or a server based on its network behavior?")
+
+</details>
+
+<details>
+<summary><strong>Question 3:</strong> What are the 4 "red flags" that indicate AI is inappropriate for a task?</summary>
+
+**Answer**:
+
+**Red Flag 1: REAL_TIME requirement**
+- Task needs <10ms response
+- Example: Packet filtering, QoS decisions
+- Why AI fails: API latency is 500-2000ms
+
+**Red Flag 2: PERFECT_REQUIRED accuracy**
+- Task cannot tolerate ANY mistakes
+- Example: BGP route filtering, firewall rules
+- Why AI fails: LLMs are probabilistic (95-99% accurate, not 100%)
+
+**Red Flag 3: SIMPLE_LOGIC**
+- Task follows known, documented rules
+- Example: VLAN assignment, interface naming
+- Why AI fails: Overkill - simple if/else is faster, cheaper, perfect
+
+**Red Flag 4: DETERMINISTIC_RULES**
+- Same input must always produce same output
+- Example: Configuration validation against policy
+- Why AI fails: LLMs aren't deterministic (even with temperature=0, can vary slightly)
+
+**Decision framework check**:
+```python
+AI_RED_FLAGS = {
+    TaskCharacteristic.REAL_TIME,
+    TaskCharacteristic.PERFECT_REQUIRED,
+    TaskCharacteristic.SIMPLE_LOGIC,
+    TaskCharacteristic.DETERMINISTIC_RULES
+}
+
+# If task has ANY red flag → don't use AI
+```
+
+**Green flags** (when AI IS appropriate):
+- AMBIGUOUS requirements
+- UNSTRUCTURED data
+- COMPLEX_LOGIC (no simple rules)
+- PATTERN_BASED (need to find patterns in data)
+- BATCH processing (minutes/hours OK)
+
+**Example**:
+- **Red flag task**: "Check if interface is up" → Use SNMP
+- **Green flag task**: "Explain why this interface is flapping" → Use AI
+
+</details>
+
+---
+
 ## Section 6: Responsible Deployment Practices
 
 ### Gradual Rollout Strategy
@@ -1860,7 +3033,7 @@ Provide:
 3. Risk level (low/medium/high)"""
 
         response = self.client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4.5",
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -1878,7 +3051,7 @@ Provide:
             system=system,
             prompt=prompt,
             context_data={'config_length': len(config)},
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4.5",
             response=ai_response,
             tokens_used=tokens_used,
             cost=cost,
@@ -1951,10 +3124,1020 @@ snmp-server community public RW
         print(f"\nAnalysis:\n{result['analysis']}")
 
         if result.get('approval_required'):
-            print(f"\n⚠️  Approval required: {result['approval_request_id']}")
+            print(f"\nWARNING: Approval required: {result['approval_request_id']}")
     else:
         print(f"Error: {result['error']}")
 ```
+
+---
+
+## Lab 0: Detect Bias in AI Responses (20 min)
+
+**Goal**: Build a simple bias detector that checks if AI recommendations favor specific vendors.
+
+**Success Criteria**:
+- [ ] Create `bias_detector.py` with BiasDetector class
+- [ ] Implement `check_vendor_bias()` method
+- [ ] Test with biased and unbiased recommendations
+- [ ] See bias detection working with percentage calculations
+- [ ] Understand how vendor mentions are counted
+
+**Expected Outcome**:
+```bash
+$ python bias_detector.py
+
+Testing biased recommendation...
+Vendor bias check: {'bias_detected': True, 'type': 'vendor_bias', 'vendor': 'cisco', 'percentage': 100.0}
+
+Testing neutral recommendation...
+Vendor bias check: {'bias_detected': False, 'vendors': {'cisco': 1, 'juniper': 1, 'arista': 1}}
+```
+
+**Instructions**:
+
+1. **Copy BiasDetector V1** from earlier in the chapter (around line 87)
+
+2. **Save as** `bias_detector.py`
+
+3. **Test with a biased recommendation**:
+```python
+if __name__ == "__main__":
+    detector = BiasDetector()
+
+    # Biased recommendation (all Cisco)
+    biased = """
+    For high availability, use Cisco VSS on Catalyst 9400 switches.
+    Cisco provides excellent redundancy with Cisco StackWise.
+    """
+
+    result = detector.check_vendor_bias(biased)
+    print("Biased check:", result)
+```
+
+4. **Run it**:
+```bash
+python bias_detector.py
+```
+
+You should see `bias_detected: True` with `vendor: cisco` and `percentage: 100.0`.
+
+5. **Test with a neutral recommendation**:
+```python
+    # Neutral recommendation (multiple vendors)
+    neutral = """
+    For HA, consider Cisco VSS, Juniper Virtual Chassis, or Arista MLAG.
+    Each vendor has strengths depending on your environment.
+    """
+
+    result = detector.check_vendor_bias(neutral)
+    print("Neutral check:", result)
+```
+
+6. **Verify** it returns `bias_detected: False` with vendor counts showing balanced mentions.
+
+7. **Experiment** with different thresholds:
+```python
+# Try lowering the bias threshold from 70% to 50%
+if (vendors[max_vendor] / total) > 0.5:  # Changed from 0.7
+    return {'bias_detected': True, 'vendor': max_vendor}
+```
+
+**If You Finish Early**:
+
+1. **Add more vendors**:
+```python
+vendors = {
+    'cisco': len(re.findall(r'\bcisco\b', recommendation, re.I)),
+    'juniper': len(re.findall(r'\bjuniper\b', recommendation, re.I)),
+    'arista': len(re.findall(r'\barista\b', recommendation, re.I)),
+    'nokia': len(re.findall(r'\bnokia\b', recommendation, re.I)),
+    'huawei': len(re.findall(r'\bhuawei\b', recommendation, re.I)),
+    'dell': len(re.findall(r'\bdell\b', recommendation, re.I)),
+}
+```
+
+2. **Add solution diversity check** from BiasDetector V2
+
+3. **Create test cases** for different bias scenarios:
+```python
+test_cases = [
+    ("Pure Cisco", "Use Cisco routers with Cisco switches"),
+    ("Balanced", "Use Cisco, Juniper, or Arista equipment"),
+    ("Vendor-agnostic", "Use OSPF for routing and LACP for bonding"),
+]
+
+for name, rec in test_cases:
+    result = detector.check_vendor_bias(rec)
+    print(f"{name}: {result}")
+```
+
+**Common Issues**:
+
+- **No bias detected when expected**: Check regex pattern `\bcisco\b` requires word boundaries
+- **False positives**: Words like "Cisco" in URLs or filenames get counted - this is OK for V1
+- **Case sensitivity**: The `re.I` flag makes searches case-insensitive
+
+**Verification Questions**:
+1. What percentage threshold triggers bias detection? (70%)
+2. Why use word boundaries (`\b`) in the regex? (Avoid matching "francisco" as "cisco")
+3. What happens if total vendor mentions is 0? (Returns `bias_detected: False, reason: vendor_agnostic`)
+
+---
+
+## Lab 1: Build Audit Logger (45 min)
+
+**Goal**: Create a SQLite-based audit logger that tracks all AI operations with searchable history.
+
+**Success Criteria**:
+- [ ] Create `audit_logger.py` with AIAuditLogger class
+- [ ] Initialize SQLite database with proper schema
+- [ ] Log an AI operation with full context
+- [ ] Search logs by risk level
+- [ ] Generate an incident report
+
+**Expected Outcome**:
+```bash
+$ python audit_logger.py
+
+Logged operation: a3d4e5f6-7890-1234-5678-90abcdef1234
+
+Found 1 high-risk operations
+
+# AI Operations Incident Report
+
+**System**: router-core-01.nyc
+**Time Window**: 2024-01-01T00:00:00 to 2024-01-02T00:00:00
+**Total Operations**: 1
+
+### Operation a3d4e5f6-7890-1234-5678-90abcdef1234
+- **Time**: 2024-02-11T14:30:00.123456
+- **Type**: config_analysis
+- **Risk**: high
+- **User**: john.doe@company.com
+- **Applied**: False
+- **Human Approved**: False
+
+**Decision**: Recommend enabling BGP TTL security
+**Reasoning**: BGP peers are external, TTL security prevents spoofing
+```
+
+**Instructions**:
+
+1. **Start with AIAuditLogger V2** from the progressive builds (the SQLite version)
+
+2. **Create** `audit_logger.py` and copy the V2 code
+
+3. **Test database creation**:
+```python
+if __name__ == "__main__":
+    logger = AIAuditLogger()
+    print("Database initialized successfully!")
+```
+
+4. **Run it**:
+```bash
+python audit_logger.py
+```
+
+Should create `ai_audit.db` file in current directory.
+
+5. **Log your first operation**:
+```python
+logger.log_operation(
+    operation_id="test-001",
+    operation_type="config_analysis",
+    risk_level=RiskLevel.HIGH,
+    user="test.user@example.com",
+    system="router-test-01",
+    prompt="Analyze this config for security issues",
+    response="Found 2 issues: weak SNMP and telnet enabled",
+    tokens_used=500,
+    cost=0.004
+)
+
+print("Operation logged successfully!")
+```
+
+6. **Search for high-risk operations**:
+```python
+high_risk = logger.search_operations(risk_level=RiskLevel.HIGH)
+print(f"Found {len(high_risk)} high-risk operations")
+for op in high_risk:
+    print(f"  - {op['operation_id']}: {op['operation_type']}")
+```
+
+7. **Verify with SQLite**:
+```bash
+sqlite3 ai_audit.db "SELECT operation_id, operation_type, risk_level FROM audit_log"
+```
+
+**If You Finish Early**:
+
+1. **Add search by date range**:
+```python
+from datetime import datetime, timedelta
+
+yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
+recent_ops = logger.search_operations(start_date=yesterday)
+print(f"Operations since yesterday: {len(recent_ops)}")
+```
+
+2. **Add search by system**:
+```python
+router_ops = logger.search_operations(system="router-core-01")
+print(f"Operations on router-core-01: {len(router_ops)}")
+```
+
+3. **Upgrade to V3** (add hashing and approval tracking):
+```python
+import hashlib
+
+def log_operation_with_hash(self, operation_id, operation_type, ...):
+    # Hash prompt for verification
+    prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
+    response_hash = hashlib.sha256(response.encode()).hexdigest()
+
+    # Add to database with hashes
+    cursor.execute("""
+        INSERT INTO audit_log VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (operation_id, timestamp, operation_type, risk_level, user, system,
+          prompt, prompt_hash, response, response_hash))
+```
+
+4. **Create a query tool**:
+```python
+def query_tool():
+    logger = AIAuditLogger()
+
+    print("AI Audit Log Query Tool")
+    print("1. Search by risk level")
+    print("2. Search by system")
+    print("3. Show all operations")
+
+    choice = input("Select option: ")
+
+    if choice == "1":
+        level = input("Risk level (low/medium/high/critical): ")
+        results = logger.search_operations(risk_level=RiskLevel(level))
+    # ... implement other options
+```
+
+5. **Add export to CSV**:
+```python
+import csv
+
+def export_to_csv(operations, filename="audit_log.csv"):
+    with open(filename, 'w', newline='') as f:
+        if not operations:
+            return
+
+        writer = csv.DictWriter(f, fieldnames=operations[0].keys())
+        writer.writeheader()
+        writer.writerows(operations)
+
+    print(f"Exported {len(operations)} operations to {filename}")
+```
+
+**Common Issues**:
+
+- **Database locked**: Close all connections properly with `conn.close()`
+- **Column not found**: Check schema matches your INSERT statement exactly
+- **Enum error**: Import RiskLevel: `from enum import Enum`
+- **Timestamp format**: Use `.isoformat()` for consistent ISO 8601 format
+
+**Verification Questions**:
+1. Why use SQLite instead of JSON files? (Searchable, indexed, concurrent access)
+2. What's the purpose of risk levels? (Determine audit detail and approval requirements)
+3. How would you find all operations by a specific user? (Add WHERE clause: `cursor.execute("SELECT * FROM audit_log WHERE user = ?", (user,))`)
+
+---
+
+## Lab 2: Implement Human Approval Workflow (60 min)
+
+**Goal**: Build an approval workflow that requires human review for critical AI-generated changes before they're applied.
+
+**Success Criteria**:
+- [ ] Create `approval_workflow.py` with ApprovalWorkflow class
+- [ ] Create a change request requiring approval
+- [ ] Approve request with comments
+- [ ] Check if request is approved and safe to apply
+- [ ] Handle rejection and expiration
+
+**Expected Outcome**:
+```bash
+$ python approval_workflow.py
+
+Created request: bgp-change-12345
+
+First approval: {'success': True, 'status': 'pending', 'approvals': 1}
+Second approval: {'success': True, 'status': 'approved', 'approvals': 2}
+
+Can apply: {'can_apply': True}
+
+Applying change...
+Change applied successfully!
+```
+
+**Instructions**:
+
+1. **Start with ApprovalWorkflow V3** from the progressive builds (multi-person approval version)
+
+2. **Create** `approval_workflow.py`
+
+3. **Test creating a request**:
+```python
+if __name__ == "__main__":
+    workflow = ApprovalWorkflow()
+
+    # AI suggests a critical BGP change
+    request_id = workflow.create_request(
+        request_id="bgp-change-001",
+        risk_level=RiskLevel.CRITICAL,
+        proposed_change="neighbor 192.0.2.1 route-map FILTER-PREFIXES in",
+        ttl_hours=4
+    )
+
+    print(f"Created request: {request_id}")
+```
+
+4. **Check what approvals are required**:
+```bash
+sqlite3 approvals.db "SELECT request_id, risk_level, approvers_required, status FROM change_requests"
+```
+
+You should see `CRITICAL` risk requires 2 approvers.
+
+5. **First person approves**:
+```python
+result = workflow.approve(
+    request_id="bgp-change-001",
+    approver="alice@company.com",
+    comments="Verified route-map exists"
+)
+
+print(f"First approval: {result}")
+print(f"Status: {result['status']}")  # Should be 'pending' (needs 2nd approval)
+```
+
+6. **Second person approves**:
+```python
+result = workflow.approve(
+    request_id="bgp-change-001",
+    approver="bob@company.com",
+    comments="Checked prefix list, looks good"
+)
+
+print(f"Second approval: {result}")
+print(f"Status: {result['status']}")  # Should be 'approved'
+```
+
+7. **Check if safe to apply**:
+```python
+can_apply = workflow.apply_if_approved("bgp-change-001")
+print(f"Can apply: {can_apply}")
+
+if can_apply['can_apply']:
+    print("Applying change...")
+    # ... apply your change here ...
+    print("Change applied!")
+else:
+    print(f"Cannot apply: {can_apply['reason']}")
+```
+
+**If You Finish Early**:
+
+1. **Test rejection workflow**:
+```python
+# Create new request
+request_id_2 = workflow.create_request(
+    request_id="bgp-change-002",
+    risk_level=RiskLevel.HIGH,
+    proposed_change="neighbor 192.0.2.2 shutdown",
+    ttl_hours=2
+)
+
+# Reject it
+result = workflow.reject(
+    request_id="bgp-change-002",
+    rejector="security@company.com",
+    reason="This would break customer connectivity"
+)
+
+print(f"Rejected: {result}")
+```
+
+2. **Test expiration**:
+```python
+from datetime import timedelta
+
+# Create request that expires in 1 second
+request_id_3 = workflow.create_request(
+    request_id="test-expire",
+    risk_level=RiskLevel.MEDIUM,
+    proposed_change="test change",
+    ttl_hours=1/3600  # 1 second
+)
+
+import time
+time.sleep(2)
+
+# Try to approve expired request
+result = workflow.approve("test-expire", "user@example.com")
+print(f"Approval of expired request: {result}")  # Should fail
+```
+
+3. **View pending requests**:
+```python
+pending = workflow.get_pending_requests()
+print(f"\nPending approvals: {len(pending)}")
+for req in pending:
+    print(f"  - {req['request_id']}: {req['risk_level']}")
+    print(f"    Approvals: {len(req['approvals'])}/{req['approvers_required']}")
+```
+
+4. **Add notification function**:
+```python
+def _notify_approvers(self, request_id: str):
+    """Send notification to approvers."""
+    # In production: integrate with Slack, email, etc.
+    print(f"[NOTIFICATION] New approval request: {request_id}")
+    print(f"  Review at: https://approval-ui.example.com/{request_id}")
+
+    # For now, just print
+    # Future: slack_client.post_message(...)
+```
+
+5. **Build approval dashboard**:
+```python
+def show_dashboard():
+    workflow = ApprovalWorkflow()
+
+    pending = workflow.get_pending_requests()
+
+    print("\n=== Approval Dashboard ===")
+    print(f"Pending Requests: {len(pending)}\n")
+
+    for req in pending:
+        print(f"Request: {req['request_id']}")
+        print(f"Risk: {req['risk_level']}")
+        print(f"Status: {req['status']}")
+        print(f"Approvals: {len(req['approvals'])}/{req['approvers_required']}")
+        print(f"Expires: {req['expires_at']}")
+        print(f"Change: {req['proposed_change'][:100]}...")
+        print("---")
+
+if __name__ == "__main__":
+    show_dashboard()
+```
+
+**Common Issues**:
+
+- **Request not found**: Check request_id spelling (case-sensitive)
+- **Approval not incrementing**: Each approver can only approve once
+- **Status not changing to approved**: Check you have enough approvals (CRITICAL needs 2)
+- **Can't apply after approval**: Check expiration hasn't passed
+
+**Verification Questions**:
+1. How many approvals does a CRITICAL change require? (2)
+2. What happens if you try to approve an expired request? (Returns `{'success': False, 'error': 'Request expired'}`)
+3. Why track approver names and timestamps? (Audit trail, accountability, compliance)
+
+---
+
+## Lab 3: Sanitize Sensitive Data (45 min)
+
+**Goal**: Build a data sanitizer that removes credentials and secrets before sending configs to AI APIs.
+
+**Success Criteria**:
+- [ ] Create `data_sanitizer.py` with DataSanitizer class
+- [ ] Sanitize a config containing passwords, SNMP, TACACS keys
+- [ ] Verify all sensitive data is redacted
+- [ ] Check sanitization risk level
+- [ ] Validate config is safe for AI
+
+**Expected Outcome**:
+```bash
+$ python data_sanitizer.py
+
+=== SANITIZED CONFIG ===
+hostname router-core-01
+!
+enable secret [REDACTED]
+!
+username admin privilege 15 secret [REDACTED]
+!
+snmp-server community [REDACTED] RO
+tacacs-server host 10.2.2.2 key [REDACTED]
+
+=== REDACTIONS (4) ===
+enable_secret: enable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0
+username_secret: username admin privilege 15 secret cisco123
+snmp_community: snmp-server community public RO
+tacacs_key: tacacs-server host 10.2.2.2 key MyTacacsKey
+
+=== RISK LEVEL: high ===
+```
+
+**Instructions**:
+
+1. **Start with DataSanitizer V2** from the progressive builds (multiple secret types version)
+
+2. **Create** `data_sanitizer.py`
+
+3. **Test with a dangerous config**:
+```python
+if __name__ == "__main__":
+    sanitizer = DataSanitizer()
+
+    config = """
+hostname router-core-01
+!
+enable secret 5 $1$mERr$hx5rVt7rPNoS4wqbXKX7m0
+!
+username admin privilege 15 secret cisco123
+!
+snmp-server community public RO
+tacacs-server host 10.2.2.2 key MyTacacsKey
+!
+router bgp 65001
+ neighbor 203.0.113.2 password MyBgpSecret
+    """
+
+    result = sanitizer.sanitize(config)
+
+    print("=== SANITIZED CONFIG ===")
+    print(result['sanitized_text'])
+
+    print(f"\n=== REDACTIONS ({len(result['redactions'])}) ===")
+    for r in result['redactions']:
+        print(f"{r['type']}: {r['original']}")
+```
+
+4. **Run it**:
+```bash
+python data_sanitizer.py
+```
+
+You should see all secrets replaced with `[REDACTED]`.
+
+5. **Verify nothing was missed**:
+```python
+# Check for common password keywords
+sanitized = result['sanitized_text']
+
+if 'cisco123' in sanitized:
+    print("ERROR: Password not redacted!")
+if 'MyTacacsKey' in sanitized:
+    print("ERROR: TACACS key not redacted!")
+if 'MyBgpSecret' in sanitized:
+    print("ERROR: BGP password not redacted!")
+
+print("\nAll secrets successfully redacted!")
+```
+
+6. **Test validation**:
+```python
+is_safe, issues = sanitizer.validate_safe_for_ai(config)
+
+if not is_safe:
+    print("\nSAFETY ISSUES:")
+    for issue in issues:
+        print(f"  - {issue}")
+else:
+    print("\nConfig is safe to send to AI API")
+```
+
+**If You Finish Early**:
+
+1. **Add IP address redaction**:
+```python
+# Redact public IPs but keep RFC1918
+def is_public_ip(ip_str):
+    parts = [int(p) for p in ip_str.split('.')]
+
+    # RFC1918 ranges (keep these)
+    if parts[0] == 10:
+        return False
+    if parts[0] == 172 and 16 <= parts[1] <= 31:
+        return False
+    if parts[0] == 192 and parts[1] == 168:
+        return False
+
+    return True  # Public IP
+
+# In sanitize():
+ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
+for match in re.finditer(ip_pattern, text):
+    if is_public_ip(match.group(0)):
+        text = text.replace(match.group(0), '[PUBLIC_IP]')
+```
+
+2. **Detect private keys**:
+```python
+# Check for SSH/TLS private keys
+if 'BEGIN PRIVATE KEY' in text or 'BEGIN RSA PRIVATE KEY' in text:
+    return {'safe': False, 'error': 'Contains private key - DO NOT SEND'}
+```
+
+3. **Create before/after comparison**:
+```python
+def compare_configs(original, sanitized):
+    """Show what changed."""
+    import difflib
+
+    diff = difflib.unified_diff(
+        original.splitlines(),
+        sanitized.splitlines(),
+        lineterm='',
+        fromfile='original',
+        tofile='sanitized'
+    )
+
+    print("\n=== CHANGES ===")
+    for line in diff:
+        if line.startswith('+') and not line.startswith('+++'):
+            print(f"Added:   {line[1:]}")
+        elif line.startswith('-') and not line.startswith('---'):
+            print(f"Removed: {line[1:]}")
+```
+
+4. **Test with real router config**:
+```python
+# Grab config from actual device
+from netmiko import ConnectHandler
+
+device = {
+    'device_type': 'cisco_ios',
+    'host': '192.168.1.1',
+    'username': 'admin',
+    'password': 'password',
+}
+
+connection = ConnectHandler(**device)
+config = connection.send_command('show running-config')
+connection.disconnect()
+
+# Sanitize before sending to AI
+result = sanitizer.sanitize(config)
+print(f"Redacted {len(result['redactions'])} secrets")
+```
+
+5. **Build interactive sanitizer**:
+```python
+def interactive_sanitizer():
+    sanitizer = DataSanitizer()
+
+    print("Interactive Config Sanitizer")
+    print("Paste config (Ctrl+D when done):")
+
+    import sys
+    config = sys.stdin.read()
+
+    result = sanitizer.sanitize(config)
+
+    print("\n=== SANITIZED ===")
+    print(result['sanitized_text'])
+
+    print(f"\nRedacted {len(result['redactions'])} items")
+
+    is_safe, issues = sanitizer.validate_safe_for_ai(config)
+    if not is_safe:
+        print("\nWARNING: Issues detected:")
+        for issue in issues:
+            print(f"  - {issue}")
+```
+
+**Common Issues**:
+
+- **Passwords not caught**: Check regex patterns match your config syntax
+- **Too much redacted**: Be specific with patterns (use word boundaries `\b`)
+- **Missing regex module**: `import re` at top of file
+- **Callable replacement error**: For complex replacements, use lambda functions
+
+**Verification Questions**:
+1. Why redact hashed passwords? (Can be cracked offline, shouldn't be in API logs)
+2. Should you redact RFC1918 IP addresses? (Depends - for troubleshooting keep them, for security redact)
+3. What happens if you send credentials to an API? (They're in API provider's logs, violates data handling policies)
+
+---
+
+## Lab 4: Build Responsible AI System (90 min)
+
+**Goal**: Integrate all components (bias detection, audit logging, approval workflow, data sanitization) into a complete responsible AI system.
+
+**Success Criteria**:
+- [ ] Create `responsible_ai_system.py` integrating all components
+- [ ] Sanitize config before analysis
+- [ ] Log AI operation with full audit trail
+- [ ] Require approval for recommendations
+- [ ] Apply changes only after approval
+
+**Expected Outcome**:
+```bash
+$ python responsible_ai_system.py
+
+Operation ID: a1b2c3d4-e5f6-7890-1234-567890abcdef
+
+Analysis:
+Found 2 security issues:
+1. Weak enable password - recommend using strong secret
+2. SNMP community 'public' with RW access - major security risk
+
+WARNING: Approval required: approval-12345
+Waiting for human review before applying changes...
+
+[After approval]
+Approval status: approved
+Applying recommended fixes...
+Changes applied successfully!
+```
+
+**Instructions**:
+
+1. **Create** `responsible_ai_system.py` and import all components:
+```python
+from anthropic import Anthropic
+from audit_logger import AIAuditLogger, RiskLevel
+from approval_workflow import ApprovalWorkflow
+from data_sanitizer import DataSanitizer
+from bias_detector import BiasDetector
+import os
+```
+
+2. **Build the ResponsibleAISystem class**:
+```python
+class ResponsibleAISystem:
+    """Production AI system with all safety measures."""
+
+    def __init__(self, api_key: str, user: str):
+        self.client = Anthropic(api_key=api_key)
+        self.audit_logger = AIAuditLogger()
+        self.approval_workflow = ApprovalWorkflow()
+        self.sanitizer = DataSanitizer(keep_internal_ips=True)
+        self.bias_detector = BiasDetector()
+        self.user = user
+```
+
+3. **Implement safe config analysis**:
+```python
+    def analyze_config_safely(self, config: str, system: str):
+        """Analyze config with full safety measures."""
+
+        # Step 1: Sanitize input
+        sanitization = self.sanitizer.sanitize(config)
+        if sanitization['risk_level'] == 'high':
+            return {'success': False, 'error': 'High-risk data detected'}
+
+        # Step 2: Call AI
+        prompt = f"Analyze for security issues:\n{sanitization['sanitized_text']}"
+
+        response = self.client.messages.create(
+            model="claude-sonnet-4.5",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        ai_response = response.content[0].text
+
+        # Step 3: Log operation
+        operation_id = self.audit_logger.log_operation(
+            operation_id=str(uuid.uuid4()),
+            operation_type="config_analysis",
+            risk_level=RiskLevel.MEDIUM,
+            user=self.user,
+            system=system,
+            prompt=prompt,
+            response=ai_response,
+            tokens_used=response.usage.input_tokens + response.usage.output_tokens,
+            cost=0.005  # Calculate actual cost
+        )
+
+        # Step 4: Check for bias
+        bias_check = self.bias_detector.check_vendor_bias(ai_response)
+        if bias_check['bias_detected']:
+            print(f"WARNING: Bias detected - {bias_check}")
+
+        # Step 5: Require approval for changes
+        if "recommend" in ai_response.lower():
+            request_id = self.approval_workflow.create_request(
+                request_id=f"approval-{operation_id[:8]}",
+                risk_level=RiskLevel.HIGH,
+                proposed_change=ai_response,
+                ttl_hours=48
+            )
+
+            return {
+                'success': True,
+                'operation_id': operation_id,
+                'analysis': ai_response,
+                'approval_required': True,
+                'approval_request_id': request_id
+            }
+
+        return {
+            'success': True,
+            'operation_id': operation_id,
+            'analysis': ai_response
+        }
+```
+
+4. **Test the complete system**:
+```python
+if __name__ == "__main__":
+    system = ResponsibleAISystem(
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        user="network-engineer@company.com"
+    )
+
+    config = """
+hostname router-edge-01
+!
+enable secret weak123
+!
+snmp-server community public RW
+    """
+
+    result = system.analyze_config_safely(
+        config=config,
+        system="router-edge-01"
+    )
+
+    if result['success']:
+        print(f"Operation ID: {result['operation_id']}")
+        print(f"\nAnalysis:\n{result['analysis']}")
+
+        if result.get('approval_required'):
+            print(f"\nWARNING: Approval required: {result['approval_request_id']}")
+            print("Waiting for human review...")
+    else:
+        print(f"Error: {result['error']}")
+```
+
+5. **Run the complete workflow**:
+```bash
+python responsible_ai_system.py
+```
+
+6. **Approve the change** (in separate session or script):
+```python
+workflow = ApprovalWorkflow()
+workflow.approve(
+    request_id="approval-a1b2c3d4",
+    approver="security-team@company.com",
+    comments="Reviewed recommendations, approved"
+)
+```
+
+7. **Apply changes after approval**:
+```python
+can_apply = workflow.apply_if_approved(request_id)
+if can_apply['can_apply']:
+    print("Applying changes...")
+    # Apply your changes here
+    workflow.mark_applied(request_id, "Successfully applied")
+```
+
+**If You Finish Early**:
+
+1. **Add retry logic** for API failures
+2. **Implement rate limiting** to prevent runaway costs
+3. **Add Slack notifications** for approval requests
+4. **Build web UI** for approval dashboard
+5. **Add rollback mechanism** for failed changes
+
+**Common Issues**:
+
+- **Import errors**: Ensure all previous lab files are in same directory
+- **Database conflicts**: Each component uses its own DB file
+- **API key not set**: `export ANTHROPIC_API_KEY="your-key"`
+- **Approval timeout**: Increase `ttl_hours` parameter
+
+**Verification Questions**:
+1. What happens if sanitization detects high-risk data? (Returns error, doesn't send to AI)
+2. When is an approval required? (When AI response contains "recommend")
+3. Why log operations before creating approval requests? (Audit trail of what AI suggested, even if not approved)
+
+---
+
+## Lab Time Budget
+
+**Total Time**: ~4.5 hours hands-on work
+
+**Recommended Schedule**: 3 weeks, 1.5 hours per week
+
+### Week 1: Detection and Logging (1.5 hours)
+- **Lab 0**: Detect Bias in AI Responses (20 min)
+  - Build simple bias detector
+  - Test with biased/neutral recommendations
+  - Understand vendor mention counting
+- **Lab 1**: Build Audit Logger (45 min)
+  - Create SQLite-based logger
+  - Log AI operations with full context
+  - Search logs by risk level
+- **Break**: Review audit logs, experiment with queries (15 min)
+- **Lab 2**: Implement Human Approval Workflow (30 min start)
+  - Create approval database
+  - Test creating and approving requests
+  - **Continue next week**: Multi-person approval, expiration
+
+**Week 1 Deliverable**: Bias detector + Audit logger working, approval workflow started
+
+### Week 2: Security and Integration (1.5 hours)
+- **Lab 2**: Complete Approval Workflow (30 min finish)
+  - Test rejection and expiration
+  - View pending requests
+  - Understand risk-based approval levels
+- **Lab 3**: Sanitize Sensitive Data (45 min)
+  - Build data sanitizer
+  - Test with configs containing secrets
+  - Validate safety before AI
+- **Break**: Test sanitization with real configs (15 min)
+
+**Week 2 Deliverable**: Complete approval workflow + Data sanitizer protecting credentials
+
+### Week 3: Production System (1.5 hours)
+- **Lab 4**: Build Responsible AI System (90 min)
+  - Integrate all components
+  - Test complete workflow
+  - Handle approval/rejection flow
+  - Apply changes after approval
+
+**Week 3 Deliverable**: Production-ready responsible AI system with all safety measures
+
+### If You're Short on Time
+
+**Minimum viable (1 hour)**:
+- Lab 0 (20 min) - Understand bias
+- Lab 1 (40 min) - Basic audit logging
+
+**Standard path (2.5 hours)**:
+- Lab 0, 1, 2 - Core safety (detection, logging, approval)
+- Skip Labs 3-4 initially, return later
+
+**Full completion (4.5 hours)**:
+- All labs in order
+- Complete responsible AI system
+
+### Cost Estimate
+
+**Development phase** (building/testing labs):
+- Lab 0: ~10 API calls = $0.02
+- Lab 1: ~5 API calls (mostly DB work) = $0.01
+- Lab 2: ~0 API calls (pure workflow) = $0.00
+- Lab 3: ~15 API calls (test sanitization) = $0.03
+- Lab 4: ~20 API calls (integration testing) = $0.04
+
+**Total development**: ~$0.10
+
+**Ongoing costs** (if deployed):
+- Per config analysis with full safety: ~$0.01
+- Daily (10 analyses): ~$0.10/day
+- Monthly: ~$3.00 with comprehensive safety measures
+
+**Cost breakdown per analysis**:
+```
+Bias detection: $0.002 (debiased response if needed)
+Audit logging: $0.000 (database only)
+Approval workflow: $0.000 (database only)
+Data sanitization: $0.000 (regex only)
+AI analysis: $0.008 (main cost)
+---
+Total: ~$0.01 per analysis
+```
+
+**Compared to no safety measures**:
+- Unsafe: $0.008 per analysis (AI only)
+- Safe: $0.010 per analysis (AI + bias check)
+- **Premium for responsibility**: $0.002 (25% more, worth it)
+
+### Tips for Success
+
+**Week 1 tips**:
+- Keep databases small during testing (they'll grow in production)
+- Use `sqlite3` command-line tool to inspect tables
+- Save successful bias detector prompts for reuse
+
+**Week 2 tips**:
+- Test approval workflow with different risk levels
+- Create library of dangerous config patterns for sanitizer
+- Test sanitization with your actual network configs
+
+**Week 3 tips**:
+- Start with read-only analysis before applying changes
+- Test complete workflow in staging first
+- Document your approval process for the team
+
+**Common pitfalls**:
+1. **Skipping sanitization**: "I trust my team not to leak creds" - automate it anyway
+2. **Weak approval process**: Requiring approval but always clicking "yes" without review
+3. **No bias checking**: Vendor lock-in sneaks in over time
+4. **Insufficient logging**: Can't debug incidents without full audit trail
+
+**Success metrics**:
+- Zero credentials leaked to API logs
+- 100% of critical changes approved by 2+ people
+- Audit trail for every AI decision
+- Bias detected and corrected before lock-in
 
 ---
 
