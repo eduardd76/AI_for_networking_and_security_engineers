@@ -1,5 +1,24 @@
 # Chapter 1: What Is Generative AI?
 
+## Before You Begin
+
+**Prerequisites:**
+- **Networking knowledge**: CCNA level (BGP, OSPF, routing, configs)
+- **Python**: Version 3.10+ installed ([verify with `python --version`])
+- **API access**: Anthropic API key ([get free key at console.anthropic.com](https://console.anthropic.com))
+- **Environment**: Google Colab (free, no setup) or local Jupyter notebook
+- **Time**: 30-35 minutes reading + 20 minutes hands-on practice
+- **Cost**: ~$0.10-0.20 in API calls for the hands-on exercises
+
+**What you'll need installed** (if running locally):
+```bash
+pip install anthropic python-dotenv
+```
+
+**Not required**: Machine learning background, statistics, or advanced mathematics.
+
+---
+
 ## Table of Contents
 1. [The 3 AM Wake-Up Call](#the-3-am-wake-up-call)
 2. [What Is Generative AI, Really?](#what-is-generative-ai-really)
@@ -26,6 +45,14 @@ Now imagine a different scenario. You get the same alert, but this time you past
 That's what this book is about. Not replacing you. Not automating you out of a job. But giving you a tool that can read configurations, parse logs, and reason about network behavior the way a senior engineer would -- except it does it in seconds, at 3 AM, without needing coffee.
 
 This chapter introduces generative AI from the ground up. No machine learning background required. If you understand how a packet traverses a network, you have all the mental models you need.
+
+> **🔬 Hands-On Practice**: This chapter pairs with the [**Chapter 1 Colab notebook**](../Colab-Notebooks/Vol1_Ch1_Generative_AI.ipynb) containing **9 progressive demos**.
+>
+> **Theory here, practice there.** Read this chapter for concepts, then run the notebook for hands-on experience.
+>
+> ⏱️ **20 minutes** | 💰 **~$0.10-0.20** in API calls | 🔓 **No local setup required**
+>
+> [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eduardd76/AI_for_networking_and_security_engineers/blob/main/Volume-1-Foundations/Colab-Notebooks/Vol1_Ch1_Generative_AI.ipynb)
 
 ---
 
@@ -537,6 +564,39 @@ def sanitize_config(config: str) -> str:
 
 ---
 
+## Self-Assessment: Check Your Understanding
+
+Before moving to Chapter 2, verify you can answer these questions. If not, review the relevant section or run the Colab notebook demos.
+
+### Conceptual Understanding
+- [ ] **Explain in one sentence**: What's the difference between traditional automation and generative AI?
+  <details><summary>Answer</summary>Traditional automation follows explicit rules you write; generative AI reasons about problems using patterns learned from training data.</details>
+
+- [ ] **True or False**: AI can replace BGP for making routing decisions.
+  <details><summary>Answer</summary>False. AI is too slow (100-500ms latency), not deterministic, and can't access real-time network state. Use AI for analysis, not control plane decisions.</details>
+
+- [ ] **Identify the use case**: You need to check 500 configs for compliance with a specific security policy. Should you use traditional automation or AI?
+  <details><summary>Answer</summary>Traditional automation (rule-based). For compliance requiring 100% accuracy, use deterministic checks. AI is better for discovering unknown issues.</details>
+
+### Practical Skills
+- [ ] **Calculate cost**: A 10,000-line router config = how many tokens? What's the cost to analyze with Claude Sonnet?
+  <details><summary>Answer</summary>~50,000 chars = ~12,500 tokens. Cost: 12,500 × $0.000003 (input) + ~1,000 × $0.000015 (output) = ~$0.05</details>
+
+- [ ] **Write code**: Can you write a basic API call to Claude that asks it to explain a BGP configuration?
+  <details><summary>Answer</summary>See Colab notebook Demo 1, or the example at line 308-348 of this chapter.</details>
+
+- [ ] **Security check**: What sensitive data should you remove before sending a config to an external API?
+  <details><summary>Answer</summary>Passwords, SNMP community strings, TACACS keys, potentially IP addresses and topology details. See sanitization code at line 498-523.</details>
+
+### Application
+- [ ] **Scenario**: You get a 3 AM alert about BGP flapping. You have the config, logs, and show command output. How would you use AI to help?
+  <details><summary>Answer</summary>Paste all three sources into a prompt asking Claude to correlate symptoms, identify root cause, and suggest fixes. AI can reason across multiple data sources faster than manual analysis.</details>
+
+**If you checked all boxes**: Move to Chapter 2.
+**If you missed some**: Review the relevant sections or complete the Colab demos.
+
+---
+
 ## Key Takeaways
 
 ### For the Impatient Engineer
@@ -569,13 +629,45 @@ def sanitize_config(config: str) -> str:
 | Pre-training | Years of reading every RFC and config guide |
 | Model selection | Choosing the right platform for the job (Cat9300 vs ASR9K) |
 
+### Challenge Exercise: For Senior Engineers (CCNP/CCIE Level)
+
+**Goal**: Build a production-ready multi-vendor config validator
+
+**Requirements**:
+- Accepts configurations from any vendor (Cisco IOS/NX-OS, Juniper, Arista)
+- Automatically detects vendor from config syntax
+- Sanitizes sensitive data before API calls
+- Runs vendor-specific security checks
+- Outputs structured JSON report with severity levels (critical, high, medium, low)
+- Stays under $0.05 per config (use model selection strategically)
+- Includes rate limiting and retry logic for production reliability
+
+**Bonus challenges**:
+1. Add caching (don't re-analyze unchanged configs)
+2. Implement diff mode (analyze only changed lines)
+3. Create Git pre-commit hook integration
+4. Build a simple web UI with FastAPI
+5. Add multi-config batch processing with progress tracking
+
+**Expected time**: 2-3 hours for core functionality, 4-6 hours with bonus features
+
+**Hints**:
+- Use Haiku for initial vendor detection (cheap, fast)
+- Switch to Sonnet for detailed security analysis
+- Cache results with SHA-256 hash of sanitized config
+- See Colab notebook Demo 9 for starter code
+
+**Solution reference**: Colab notebook contains a complete implementation in Demo 9 (expandable cells). Try building it yourself first!
+
+---
+
 ### What's Next
 
 In **Chapter 2**, we dive deeper into how Large Language Models work -- the transformer architecture, attention mechanisms, and training process. Understanding the engine helps you drive better.
 
 In **Chapter 3**, we cover how to choose the right model for your specific networking use case, with benchmarks and cost analysis.
 
-But first, open the **Chapter 1 Colab notebook** and make your first API call. There's no substitute for hands-on experience -- you wouldn't learn OSPF without labbing it, and you won't learn AI without running the code.
+But first, **complete the Chapter 1 Colab notebook** if you haven't already. There's no substitute for hands-on experience -- you wouldn't learn OSPF without labbing it, and you won't learn AI without running the code.
 
 ---
 
