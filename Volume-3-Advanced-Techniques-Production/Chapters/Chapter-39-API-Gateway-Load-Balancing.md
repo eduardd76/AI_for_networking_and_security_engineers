@@ -11,18 +11,35 @@ Your AI agents hit APIs thousands of times per day. A single chatbot query might
 - Credential exposure (every service has direct API keys)
 - Rate limit exhaustion (no intelligent retry or backoff)
 
-This chapter covers production-grade API gateway patterns using tools you already understand: Nginx (like a Layer 7 switch), circuit breakers (like interface error-disable), and retry logic (like BGP route dampening).
+This chapter shows you how to build a production API gateway using Nginx, progressing from basic round-robin load balancing to a complete monitoring stack with circuit breakers, SSL termination, and distributed tracing.
 
-We're building a gateway that sits between your AI agents and external services (OpenAI, Anthropic, vector databases, monitoring APIs). Think of it as a reverse proxy with intelligence.
+Think of it as building your own mini-Cloudflare for AI APIs.
 
-## Why API Gateways Matter for AI Workloads
+## Version Progression Overview
 
-### The Problem
+This chapter follows a four-version progression:
 
-Your AI agent makes this call:
+- **V1: Basic Nginx Gateway** (30 min, Free) - Round-robin load balancing, passive health checks, basic logging
+- **V2: Production Health & Failover** (45 min, Free) - Weighted balancing, circuit breakers, retry logic, connection tuning
+- **V3: Advanced Routing & Security** (60 min, $50-100/month) - Header/URI routing, SSL/TLS, mTLS, rate limiting, idempotency
+- **V4: Complete Monitoring Stack** (90 min, $150-300/month) - Prometheus, Grafana, Loki, request tracing, alerting, multi-region
+
+Each version builds on the previous, showing the path from basic load balancing to production-grade API infrastructure.
+
+## V1: Basic Nginx Gateway
+
+### Goal
+Set up Nginx as a reverse proxy with round-robin load balancing across multiple backends.
+
+**Time to implement:** 30 minutes
+**Cost:** Free (development only)
+
+### Why API Gateways Matter
+
+**Without gateway (direct API calls):**
 
 ```python
-# Direct API call - brittle
+# Brittle - single point of failure
 response = openai.ChatCompletion.create(
     model="gpt-4",
     messages=[{"role": "user", "content": "Analyze this config"}],
@@ -30,39 +47,26 @@ response = openai.ChatCompletion.create(
 )
 ```
 
-What happens when:
-- OpenAI has an outage? (Happens monthly)
-- You hit rate limits? (429 errors)
+**What happens when:**
+- OpenAI has an outage? (Entire workflow breaks)
+- You hit rate limits? (429 errors, no retry)
 - You want to switch to Claude? (Change code everywhere)
 - You need audit logs? (No visibility)
-- Network latency spikes? (No timeout control)
 
-### The Solution: API Gateway Pattern
+**With gateway:**
 
 ```
-[AI Agent] → [API Gateway] → [OpenAI]
-                           → [Anthropic]
+[AI Agent] → [API Gateway] → [OpenAI Backend 1]
+                           → [OpenAI Backend 2]
+                           → [Anthropic Backend]
                            → [Local Model]
 ```
 
-The gateway handles:
-1. **Load balancing** - Distribute across multiple backends
-2. **Failover** - Switch providers automatically
-3. **Circuit breaking** - Stop hitting dead endpoints
-4. **Rate limiting** - Protect against quota exhaustion
-5. **Authentication** - Single point for credential management
-6. **Logging** - Track every API call, response time, token usage
-7. **Caching** - Store frequent queries (config analysis doesn't change)
+Gateway provides: load balancing, failover, circuit breaking, rate limiting, authentication, logging, caching.
 
-This is exactly like your datacenter edge: centralized policy enforcement, visibility, and control.
+### Installation
 
-## Nginx as API Gateway
-
-Nginx is your Layer 7 application switch. You've configured it as a web server, now we're using it as an intelligent reverse proxy.
-
-### Basic Setup
-
-Install Nginx on Ubuntu (or your gateway VM):
+**Ubuntu/Debian:**
 
 ```bash
 sudo apt update
@@ -71,14 +75,33 @@ sudo systemctl enable nginx
 sudo systemctl start nginx
 ```
 
-### Configuration Structure
+**Verify installation:**
 
-Nginx config is like Cisco IOS - hierarchical blocks with inheritance:
+```bash
+nginx -v
+curl http://localhost
+```
+
+**Output:**
+
+```
+nginx version: nginx/1.24.0 (Ubuntu)
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+...
+```
+
+### Basic Configuration Structure
+
+Nginx config is hierarchical like Cisco IOS - contexts inherit from parent:
 
 ```nginx
 # /etc/nginx/nginx.conf
 http {                          # Global HTTP context
-    upstream backend {          # Like a server farm
+    upstream backend_pool {     # Like a server farm
         server 10.1.1.10:8000;
         server 10.1.1.11:8000;
     }
@@ -86,13 +109,13 @@ http {                          # Global HTTP context
     server {                    # Like a VIP listener
         listen 80;
         location /api {         # Like a URI-based policy
-            proxy_pass http://backend;
+            proxy_pass http://backend_pool;
         }
     }
 }
 ```
 
-Compare to F5 config:
+**Compare to F5 config:**
 
 ```
 # F5 equivalent
@@ -109,247 +132,665 @@ ltm virtual api_vip {
 }
 ```
 
-## Load Balancing Strategies
+### V1 Implementation
 
-### Round-Robin (Default)
-
-Distribute requests evenly across backends. Like ECMP for TCP flows.
-
-**Config:**
+**File: /etc/nginx/conf.d/api-gateway.conf**
 
 ```nginx
-# /etc/nginx/conf.d/api-gateway.conf
+# Upstream backend pool
 upstream llm_backends {
-    server 10.1.1.10:8000;  # OpenAI proxy
-    server 10.1.1.11:8000;  # Anthropic proxy
-    server 10.1.1.12:8000;  # Local model
+    # Round-robin by default (no algorithm specified)
+    server 127.0.0.1:8001;  # Backend 1
+    server 127.0.0.1:8002;  # Backend 2
+    server 127.0.0.1:8003;  # Backend 3
+
+    # Passive health checks
+    # max_fails: Mark backend down after N consecutive failures
+    # fail_timeout: How long to wait before retrying a failed backend
+    # (Like interface error-disable threshold and recovery)
 }
 
 server {
     listen 80;
-    server_name api.vexpertai.local;
+    server_name api-gateway.local;
 
+    # Access logging
+    access_log /var/log/nginx/api-gateway-access.log;
+    error_log /var/log/nginx/api-gateway-error.log;
+
+    # Gateway health check
+    location /health {
+        access_log off;
+        return 200 '{"status":"healthy","service":"api-gateway"}\n';
+        add_header Content-Type application/json;
+    }
+
+    # Proxy to backend pool
     location /v1/chat/completions {
         proxy_pass http://llm_backends;
+
+        # Proxy headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Basic timeouts
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
     }
 }
 ```
 
-**Test it:**
+**Backend test server (backend.py):**
+
+```python
+#!/usr/bin/env python3
+"""Simple backend server for testing load balancing"""
+
+from flask import Flask, request, jsonify
+import os
+import time
+import random
+
+BACKEND_ID = os.environ.get('BACKEND_ID', '1')
+PORT = int(os.environ.get('PORT', 8001))
+
+app = Flask(__name__)
+
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    return jsonify({
+        'status': 'healthy',
+        'backend_id': BACKEND_ID
+    }), 200
+
+@app.route('/v1/chat/completions', methods=['POST'])
+def chat_completions():
+    """Simulate chat completion endpoint"""
+    data = request.get_json()
+
+    # Simulate processing time
+    processing_time = random.uniform(0.5, 2.0)
+    time.sleep(processing_time)
+
+    return jsonify({
+        'id': f'chatcmpl-{int(time.time())}',
+        'backend_id': BACKEND_ID,
+        'model': data.get('model', 'gpt-4'),
+        'choices': [{
+            'message': {
+                'role': 'assistant',
+                'content': f'Response from backend {BACKEND_ID}'
+            }
+        }],
+        'processing_time': processing_time
+    }), 200
+
+if __name__ == '__main__':
+    print(f"Starting backend {BACKEND_ID} on port {PORT}")
+    app.run(host='0.0.0.0', port=PORT)
+```
+
+**Start 3 backend servers:**
 
 ```bash
-# Make 6 requests, watch distribution
-for i in {1..6}; do
-    curl -s http://api.vexpertai.local/v1/chat/completions \
+# Terminal 1
+PORT=8001 BACKEND_ID=1 python3 backend.py
+
+# Terminal 2
+PORT=8002 BACKEND_ID=2 python3 backend.py
+
+# Terminal 3
+PORT=8003 BACKEND_ID=3 python3 backend.py
+```
+
+**Test Nginx config:**
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+**Output:**
+
+```
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+```
+
+**Test load balancing:**
+
+```bash
+# Make 9 requests, watch distribution
+for i in {1..9}; do
+    curl -s http://api-gateway.local/v1/chat/completions \
          -H "Content-Type: application/json" \
          -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "hello"}]}' | \
-    jq -r '.backend'
+    jq -r '.backend_id'
 done
 ```
 
 **Output:**
 
 ```
-server_1
-server_2
-server_3
-server_1
-server_2
-server_3
+1
+2
+3
+1
+2
+3
+1
+2
+3
 ```
 
-Each server gets 2 requests. Perfect distribution for uniform workloads.
+Perfect round-robin distribution: each backend gets exactly 3 requests.
 
-### Least Connections
+**Check access logs:**
 
-Route to the backend with fewest active connections. Better for long-running API calls (like streaming LLM responses).
+```bash
+tail -9 /var/log/nginx/api-gateway-access.log
+```
 
-**Config:**
+**Output:**
+
+```
+127.0.0.1 - - [19/Jan/2026:14:23:45 +0100] "POST /v1/chat/completions HTTP/1.1" 200 145 "-" "curl/7.81.0"
+127.0.0.1 - - [19/Jan/2026:14:23:46 +0100] "POST /v1/chat/completions HTTP/1.1" 200 145 "-" "curl/7.81.0"
+127.0.0.1 - - [19/Jan/2026:14:23:47 +0100] "POST /v1/chat/completions HTTP/1.1" 200 145 "-" "curl/7.81.0"
+...
+```
+
+### V1 Benefits
+
+1. **Single entry point**: Clients only know about the gateway, not individual backends
+2. **Load distribution**: Requests spread evenly across all backends
+3. **Simple failover**: If one backend dies, Nginx automatically routes to others
+4. **Centralized logging**: All requests logged in one place
+
+### V1 Limitations
+
+- No weighted load balancing (all backends treated equally)
+- No active health checks (only detects failures during requests)
+- No circuit breaker (keeps retrying dead backends)
+- No retry logic (single attempt per backend)
+- No SSL/TLS encryption
+- No request routing (all traffic goes to same pool)
+
+## V2: Production Health & Failover
+
+### Goal
+Add weighted load balancing, active health checks, circuit breakers, and intelligent retry logic.
+
+**Time to implement:** 45 minutes
+**Cost:** Free (development only)
+**Builds on:** V1
+
+### Weighted Load Balancing
+
+Not all backends are equal. Your infrastructure might have:
+- 1 server with 4× A100 GPUs (high capacity)
+- 2 servers with single T4 GPUs (medium capacity)
+- 1 CPU-only server (backup)
+
+Weight them to match capacity:
 
 ```nginx
 upstream llm_backends {
-    least_conn;  # Enable least-connections algorithm
+    server 127.0.0.1:8001 weight=4;  # GPU server, 4x capacity
+    server 127.0.0.1:8002 weight=2;  # Mid-tier server
+    server 127.0.0.1:8003 weight=1 backup;  # CPU-only, backup
 
-    server 10.1.1.10:8000;
-    server 10.1.1.11:8000;
-    server 10.1.1.12:8000;
+    # Passive health checks
+    server 127.0.0.1:8001 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8002 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8003 max_fails=2 fail_timeout=60s;
+}
+```
+
+**Test distribution:**
+
+```bash
+for i in {1..14}; do
+    curl -s http://api-gateway.local/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' | \
+    jq -r '.backend_id'
+done
+```
+
+**Output:**
+
+```
+1
+1
+1
+1
+2
+2
+1
+1
+1
+1
+2
+2
+1
+1
+```
+
+Backend 1: 8 requests (weight=4, ~57%)
+Backend 2: 6 requests (weight=2, ~43%)
+Backend 3: 0 requests (backup only, not used while others healthy)
+
+### Least Connections Algorithm
+
+Better for long-running requests (streaming, slow LLM responses):
+
+```nginx
+upstream llm_backends {
+    least_conn;  # Route to backend with fewest active connections
+
+    server 127.0.0.1:8001 weight=3;
+    server 127.0.0.1:8002 weight=2;
+    server 127.0.0.1:8003 weight=1;
 }
 ```
 
 **When to use:**
-- Streaming API responses (SSE, WebSocket)
-- Variable request processing time (some queries take 2s, others 30s)
-- Mixed workload (chat + embeddings + image generation)
+- Round-robin: Uniform request processing time (embeddings, quick queries)
+- Least connections: Variable processing time (chat, streaming, long-running)
 
-Think of it like CEF load balancing with flow awareness instead of per-packet.
+Like CEF with flow awareness vs per-packet distribution.
 
-### Weighted Load Balancing
+### Active Health Checks with OpenResty
 
-Give more traffic to more powerful backends.
+Nginx open-source only has passive health checks (detect failures during requests). For active probes, use OpenResty (Nginx + Lua):
 
-**Config:**
-
-```nginx
-upstream llm_backends {
-    server 10.1.1.10:8000 weight=3;  # GPU server, 3x capacity
-    server 10.1.1.11:8000 weight=2;  # Mid-tier server
-    server 10.1.1.12:8000 weight=1;  # CPU-only, backup
-}
-```
-
-With 6 requests:
-- Server 1: 3 requests (50%)
-- Server 2: 2 requests (33%)
-- Server 3: 1 request (17%)
-
-**Use case:** You have:
-- 1 server with 4x A100 GPUs
-- 2 servers with single T4 GPUs
-- 1 CPU-only backup
-
-Weight them 8:2:2:1 to match capacity.
-
-### IP Hash (Session Persistence)
-
-Route the same client to the same backend. Like sticky sessions on a load balancer.
-
-**Config:**
-
-```nginx
-upstream llm_backends {
-    ip_hash;  # Hash source IP to select backend
-
-    server 10.1.1.10:8000;
-    server 10.1.1.11:8000;
-    server 10.1.1.12:8000;
-}
-```
-
-**Why you need it:**
-- Conversation state stored in backend memory
-- Rate limiting per backend (client shouldn't hop between servers)
-- Debugging (know which logs to check)
-
-**Trade-off:** Less even distribution if you have few clients behind NAT.
-
-## Health Checks and Failover
-
-Like BFD for your APIs - detect failures fast and stop sending traffic.
-
-### Passive Health Checks (Built-in)
-
-Nginx marks a backend as down after failed requests.
-
-**Config:**
-
-```nginx
-upstream llm_backends {
-    server 10.1.1.10:8000 max_fails=3 fail_timeout=30s;
-    server 10.1.1.11:8000 max_fails=3 fail_timeout=30s;
-    server 10.1.1.12:8000 max_fails=2 fail_timeout=60s;
-}
-```
-
-**Parameters:**
-- `max_fails=3` - Mark down after 3 consecutive failures (like interface error-disable threshold)
-- `fail_timeout=30s` - Wait 30s before retry (like BGP route dampening)
-
-**Behavior:**
-
-```
-Request 1 → server_1 → 502 Bad Gateway (fail count: 1)
-Request 2 → server_1 → 502 Bad Gateway (fail count: 2)
-Request 3 → server_1 → 502 Bad Gateway (fail count: 3, MARKED DOWN)
-Request 4 → server_2 → 200 OK (traffic switched)
-...wait 30 seconds...
-Request N → server_1 → 200 OK (back in rotation)
-```
-
-### Active Health Checks (Nginx Plus / OpenResty)
-
-Send probe requests independent of client traffic. Like IP SLA monitors.
-
-**Config (Nginx Plus):**
-
-```nginx
-upstream llm_backends {
-    zone llm_zone 64k;
-
-    server 10.1.1.10:8000;
-    server 10.1.1.11:8000;
-    server 10.1.1.12:8000;
-
-    health_check interval=5s
-                 fails=2
-                 passes=2
-                 uri=/health
-                 match=health_ok;
-}
-
-match health_ok {
-    status 200;
-    header Content-Type = "application/json";
-    body ~ "\"status\":\"healthy\"";
-}
-```
-
-**Backend health endpoint:**
-
-```python
-# Flask backend
-from flask import Flask, jsonify
-import requests
-
-app = Flask(__name__)
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint - verify LLM API is reachable"""
-    try:
-        # Quick test to actual LLM API
-        response = requests.get('https://api.openai.com/v1/models',
-                               headers={'Authorization': f'Bearer {API_KEY}'},
-                               timeout=2)
-        if response.status_code == 200:
-            return jsonify({'status': 'healthy', 'backend': 'openai'}), 200
-        else:
-            return jsonify({'status': 'unhealthy', 'error': 'api_error'}), 503
-    except Exception as e:
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 503
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000)
-```
-
-**Test output:**
+**Install OpenResty:**
 
 ```bash
-curl http://10.1.1.10:8000/health
+# Ubuntu/Debian
+wget -qO - https://openresty.org/package/pubkey.gpg | sudo apt-key add -
+echo "deb http://openresty.org/package/ubuntu $(lsb_release -sc) main" | \
+    sudo tee /etc/apt/sources.list.d/openresty.list
+sudo apt update
+sudo apt install openresty
 ```
 
-```json
-{
-  "status": "healthy",
-  "backend": "openai"
+**Config with active health checks:**
+
+```nginx
+# /etc/openresty/nginx.conf
+http {
+    lua_shared_dict healthcheck 1m;
+    lua_package_path "/usr/local/openresty/lualib/?.lua;;";
+
+    init_worker_by_lua_block {
+        local hc = require "resty.healthcheck"
+
+        local ok, err = hc.spawn_checker{
+            shm = "healthcheck",
+            upstream = "llm_backends",
+            type = "http",
+
+            http_req = "GET /health HTTP/1.0\r\nHost: api-gateway.local\r\n\r\n",
+
+            interval = 5000,     -- Check every 5 seconds
+            timeout = 2000,      -- 2 second timeout
+            fall = 3,            -- Mark down after 3 failures
+            rise = 2,            -- Mark up after 2 successes
+
+            valid_statuses = {200, 201},
+            concurrency = 10,
+        }
+
+        if not ok then
+            ngx.log(ngx.ERR, "failed to spawn health checker: ", err)
+            return
+        end
+    }
+
+    upstream llm_backends {
+        server 127.0.0.1:8001 max_fails=0;
+        server 127.0.0.1:8002 max_fails=0;
+        server 127.0.0.1:8003 max_fails=0;
+
+        # Active health check handles failure detection
+        # Set max_fails=0 to disable passive checks
+    }
+
+    server {
+        listen 80;
+
+        location /v1/chat/completions {
+            proxy_pass http://llm_backends;
+        }
+    }
 }
 ```
 
-Every 5 seconds, Nginx probes `/health`. After 2 consecutive failures, backend is marked down. After 2 consecutive successes, it's back up.
+**How it works:**
 
-## Request Routing and URL Rewriting
+Every 5 seconds, OpenResty sends `GET /health` to each backend:
 
-Route based on URI, header, or query parameter. Like policy-based routing for HTTP.
+```
+Time 0s:  Check all backends → all healthy
+Time 5s:  Check all backends → backend 2 returns 503
+Time 10s: Check all backends → backend 2 still 503 (failure 2)
+Time 15s: Check all backends → backend 2 still 503 (failure 3, MARKED DOWN)
+Time 20s: Traffic only goes to backends 1 and 3
+Time 25s: Check all backends → backend 2 returns 200 (success 1)
+Time 30s: Check all backends → backend 2 returns 200 (success 2, MARKED UP)
+Time 35s: Backend 2 back in rotation
+```
+
+### Circuit Breaker Implementation
+
+Stop hitting a failing backend immediately instead of waiting for timeouts.
+
+**Circuit breaker states:**
+
+```
+[CLOSED] → failures → [OPEN] → timeout → [HALF-OPEN] → success → [CLOSED]
+                                             ↓
+                                        more failures
+                                             ↓
+                                          [OPEN]
+```
+
+- **CLOSED**: Normal operation, requests pass through
+- **OPEN**: Too many failures, reject immediately (fast fail)
+- **HALF-OPEN**: After timeout, try one request to test recovery
+
+**Implementation with Lua:**
+
+```lua
+-- /usr/local/openresty/lualib/circuit_breaker.lua
+local _M = {}
+
+local FAILURE_THRESHOLD = 5      -- Open circuit after 5 failures
+local SUCCESS_THRESHOLD = 2      -- Close circuit after 2 successes
+local TIMEOUT = 30               -- Half-open after 30 seconds
+
+function _M.is_open(backend)
+    local state = ngx.shared.circuit_breaker:get(backend .. ":state")
+    local opened_at = ngx.shared.circuit_breaker:get(backend .. ":opened_at")
+
+    if state == "open" then
+        -- Check if timeout elapsed (transition to half-open)
+        if ngx.now() - (opened_at or 0) > TIMEOUT then
+            ngx.shared.circuit_breaker:set(backend .. ":state", "half_open")
+            return false
+        end
+        return true
+    end
+
+    return false
+end
+
+function _M.record_failure(backend)
+    local failures = ngx.shared.circuit_breaker:get(backend .. ":failures") or 0
+    failures = failures + 1
+    ngx.shared.circuit_breaker:set(backend .. ":failures", failures)
+
+    if failures >= FAILURE_THRESHOLD then
+        ngx.shared.circuit_breaker:set(backend .. ":state", "open")
+        ngx.shared.circuit_breaker:set(backend .. ":opened_at", ngx.now())
+        ngx.log(ngx.WARN, "Circuit breaker OPENED for " .. backend)
+    end
+end
+
+function _M.record_success(backend)
+    local state = ngx.shared.circuit_breaker:get(backend .. ":state") or "closed"
+
+    if state == "half_open" then
+        local successes = ngx.shared.circuit_breaker:get(backend .. ":successes") or 0
+        successes = successes + 1
+        ngx.shared.circuit_breaker:set(backend .. ":successes", successes)
+
+        if successes >= SUCCESS_THRESHOLD then
+            ngx.shared.circuit_breaker:set(backend .. ":state", "closed")
+            ngx.shared.circuit_breaker:set(backend .. ":failures", 0)
+            ngx.shared.circuit_breaker:set(backend .. ":successes", 0)
+            ngx.log(ngx.INFO, "Circuit breaker CLOSED for " .. backend)
+        end
+    else
+        -- Reset failure count on success
+        ngx.shared.circuit_breaker:set(backend .. ":failures", 0)
+    end
+end
+
+return _M
+```
+
+**Nginx config using circuit breaker:**
+
+```nginx
+http {
+    lua_shared_dict circuit_breaker 10m;
+
+    server {
+        listen 80;
+
+        location /v1/chat/completions {
+            access_by_lua_block {
+                local cb = require "circuit_breaker"
+                if cb.is_open("llm_backends") then
+                    ngx.status = 503
+                    ngx.header["Retry-After"] = "30"
+                    ngx.say('{"error": "Service temporarily unavailable (circuit breaker open)", "retry_after": 30}')
+                    ngx.exit(503)
+                end
+            }
+
+            proxy_pass http://llm_backends;
+
+            log_by_lua_block {
+                local cb = require "circuit_breaker"
+                if ngx.status >= 500 then
+                    cb.record_failure("llm_backends")
+                else
+                    cb.record_success("llm_backends")
+                end
+            }
+        }
+    }
+}
+```
+
+**Test circuit breaker:**
+
+Stop all backends, then make requests:
+
+```bash
+# Stop backends
+pkill -f backend.py
+
+# Make 10 requests
+for i in {1..10}; do
+    echo "Request $i:"
+    curl -s http://api-gateway.local/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' | jq -r '.error'
+    sleep 1
+done
+```
+
+**Output:**
+
+```
+Request 1: (timeout after 30s)
+Request 2: (timeout after 30s)
+Request 3: (timeout after 30s)
+Request 4: (timeout after 30s)
+Request 5: (timeout after 30s)
+Request 6: Service temporarily unavailable (circuit breaker open) - INSTANT
+Request 7: Service temporarily unavailable (circuit breaker open) - INSTANT
+Request 8: Service temporarily unavailable (circuit breaker open) - INSTANT
+Request 9: Service temporarily unavailable (circuit breaker open) - INSTANT
+Request 10: Service temporarily unavailable (circuit breaker open) - INSTANT
+```
+
+First 5 requests: 30 seconds each (150s total wasted)
+Next 5 requests: Instant failure (circuit breaker saves 150s)
+
+### Retry Logic and Timeouts
+
+Configure intelligent retry behavior:
+
+```nginx
+upstream llm_backends {
+    server 127.0.0.1:8001 max_fails=2 fail_timeout=10s;
+    server 127.0.0.1:8002 max_fails=2 fail_timeout=10s;
+    server 127.0.0.1:8003 max_fails=2 fail_timeout=10s backup;
+
+    keepalive 32;  # Connection pool (reuse TCP connections)
+}
+
+server {
+    listen 80;
+
+    location /v1/chat/completions {
+        proxy_pass http://llm_backends;
+
+        # Timeouts
+        proxy_connect_timeout 5s;   # Connection establishment
+        proxy_send_timeout 30s;      # Sending request
+        proxy_read_timeout 30s;      # Reading response
+
+        # Retry configuration
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;      # Try up to 3 different backends
+        proxy_next_upstream_timeout 60s;  # Total retry timeout
+
+        # Connection pooling
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+}
+```
+
+**Retry behavior:**
+
+```
+Request arrives → Try backend 1 (127.0.0.1:8001)
+  ↓
+  Connection timeout after 5s
+  ↓
+Retry → Try backend 2 (127.0.0.1:8002)
+  ↓
+  502 Bad Gateway
+  ↓
+Retry → Try backend 3 (127.0.0.1:8003, backup)
+  ↓
+  200 OK (success)
+```
+
+**Don't retry on:**
+- 4xx errors (client error - won't succeed on retry)
+- POST requests that modify state (unless idempotent)
+
+**Always retry on:**
+- Network errors (connection refused, timeout)
+- 502, 503, 504 (server temporarily unavailable)
+- 429 (rate limit - with exponential backoff)
+
+### V2 Benefits
+
+1. **Capacity-aware routing**: High-capacity backends get more traffic
+2. **Proactive failure detection**: Active health checks find problems before clients do
+3. **Fast failure**: Circuit breaker stops hitting dead backends immediately
+4. **Automatic retry**: Transparent failover across backends
+5. **Connection pooling**: Reuse TCP connections for better performance
+
+### V2 Limitations
+
+- No routing based on request content (headers, URI)
+- No SSL/TLS encryption
+- No rate limiting per client
+- No advanced monitoring (metrics, tracing)
+
+## V3: Advanced Routing & Security
+
+### Goal
+Add header-based routing, SSL/TLS termination, mTLS, rate limiting, and idempotency support.
+
+**Time to implement:** 60 minutes
+**Cost:** $50-100/month (SSL certificates, production VMs)
+**Builds on:** V2
+
+### Header-Based Routing
+
+Route requests to different backend pools based on HTTP headers:
+
+**Use case:** Route to different LLM providers based on `X-Model-Provider` header
+
+```nginx
+# Map header value to backend pool
+map $http_x_model_provider $backend_pool {
+    "openai"     "openai_backends";
+    "anthropic"  "anthropic_backends";
+    "local"      "local_backends";
+    default      "openai_backends";
+}
+
+# Define backend pools
+upstream openai_backends {
+    server 10.1.1.10:8000 weight=3;
+    server 10.1.1.11:8000 weight=2;
+}
+
+upstream anthropic_backends {
+    server 10.1.2.10:8000 weight=2;
+    server 10.1.2.11:8000 weight=2;
+}
+
+upstream local_backends {
+    server 10.1.3.10:8000;
+}
+
+server {
+    listen 80;
+
+    location /v1/chat/completions {
+        # Route to pool selected by header
+        proxy_pass http://$backend_pool;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+**Client usage:**
+
+```python
+import requests
+
+# Route to Anthropic backend
+response = requests.post(
+    'http://api-gateway.local/v1/chat/completions',
+    headers={
+        'Content-Type': 'application/json',
+        'X-Model-Provider': 'anthropic'  # Routing key
+    },
+    json={
+        'model': 'claude-sonnet-4-20250514',
+        'messages': [{'role': 'user', 'content': 'Hello'}]
+    }
+)
+```
+
+Change the header, change the destination. No code changes needed.
 
 ### URI-Based Routing
 
-Send different API types to specialized backends.
-
-**Config:**
+Route different API types to specialized backends:
 
 ```nginx
-# Chat completions → OpenAI optimized backend
+# Chat completions → General pool
 upstream chat_backends {
     server 10.1.1.10:8000;
     server 10.1.1.11:8000;
@@ -369,7 +810,6 @@ upstream image_backends {
 
 server {
     listen 80;
-    server_name api.vexpertai.local;
 
     # Route based on URI path
     location /v1/chat/completions {
@@ -386,196 +826,123 @@ server {
 }
 ```
 
-This is like VRF-aware routing - same gateway, different forwarding tables per service type.
+Like VRF-aware routing - same gateway, different forwarding tables per service type.
 
-### Header-Based Routing
+### SSL/TLS Termination
 
-Route based on HTTP headers (model selection, API version, tenant ID).
+Decrypt at the gateway, backends use HTTP internally.
 
-**Config:**
-
-```nginx
-map $http_x_model_provider $backend_pool {
-    "openai"     "openai_backends";
-    "anthropic"  "anthropic_backends";
-    "local"      "local_backends";
-    default      "openai_backends";
-}
-
-upstream openai_backends {
-    server 10.1.1.10:8000;
-    server 10.1.1.11:8000;
-}
-
-upstream anthropic_backends {
-    server 10.1.2.10:8000;
-    server 10.1.2.11:8000;
-}
-
-upstream local_backends {
-    server 10.1.3.10:8000;
-}
-
-server {
-    listen 80;
-
-    location /v1/chat/completions {
-        proxy_pass http://$backend_pool;
-        proxy_set_header Host $host;
-    }
-}
-```
-
-**Client usage:**
-
-```python
-import requests
-
-# Route to Anthropic backend
-response = requests.post(
-    'http://api.vexpertai.local/v1/chat/completions',
-    headers={
-        'Content-Type': 'application/json',
-        'X-Model-Provider': 'anthropic'  # Routing key
-    },
-    json={
-        'model': 'claude-sonnet-4-20250514',
-        'messages': [{'role': 'user', 'content': 'Hello'}]
-    }
-)
-```
-
-**Output:**
-
-```
-Request routed to: 10.1.2.10:8000 (anthropic_backends pool)
-```
-
-Change the header, change the destination. No code changes in your agent.
-
-### URL Rewriting
-
-Backend expects different URI than client sends. Like NAT for URLs.
-
-**Config:**
-
-```nginx
-server {
-    listen 80;
-
-    # Client calls /api/chat
-    # Backend expects /v1/chat/completions
-    location /api/chat {
-        rewrite ^/api/chat(.*)$ /v1/chat/completions$1 break;
-        proxy_pass http://llm_backends;
-    }
-
-    # Client calls /api/embed
-    # Backend expects /v1/embeddings
-    location /api/embed {
-        rewrite ^/api/embed(.*)$ /v1/embeddings$1 break;
-        proxy_pass http://embedding_backends;
-    }
-}
-```
-
-**Test:**
+**Generate self-signed certificate (testing):**
 
 ```bash
-# Client makes simple call
-curl -X POST http://api.vexpertai.local/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "test"}]}'
-
-# Nginx rewrites to:
-# POST http://10.1.1.10:8000/v1/chat/completions
-```
-
-Your agents use clean, simple URIs. The gateway translates to whatever messy backend structure you have.
-
-## SSL/TLS Termination
-
-Decrypt at the gateway, re-encrypt to backends. Like SSL offload on F5.
-
-### Basic TLS Termination
-
-**Generate self-signed cert (testing only):**
-
-```bash
+sudo mkdir -p /etc/nginx/ssl
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/api-gateway.key \
     -out /etc/nginx/ssl/api-gateway.crt \
-    -subj "/C=DE/ST=Bavaria/L=Munich/O=vExpertAI/CN=api.vexpertai.local"
+    -subj "/C=DE/ST=Bavaria/L=Munich/O=vExpertAI/CN=api-gateway.local"
 ```
 
-**Config:**
+**Production: Use Let's Encrypt:**
+
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d api.vexpertai.com
+```
+
+**Nginx config with TLS:**
 
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name api.vexpertai.local;
+    server_name api-gateway.local;
 
     # TLS configuration
     ssl_certificate /etc/nginx/ssl/api-gateway.crt;
     ssl_certificate_key /etc/nginx/ssl/api-gateway.key;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers off;
 
-    # Enable session cache (like TCP connection reuse)
+    # Session cache (like TCP connection reuse)
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
 
     location /v1/chat/completions {
         proxy_pass http://llm_backends;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        # Forward protocol info to backend
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 
 # Redirect HTTP to HTTPS
 server {
     listen 80;
-    server_name api.vexpertai.local;
+    server_name api-gateway.local;
     return 301 https://$server_name$request_uri;
 }
 ```
 
-**Test:**
+**Test TLS:**
 
 ```bash
-curl -k https://api.vexpertai.local/v1/chat/completions \
+curl -k https://api-gateway.local/v1/chat/completions \
      -H "Content-Type: application/json" \
-     -d '{"model": "gpt-4", "messages": [{"role": "user", "content": "test"}]}'
+     -d '{"model": "gpt-4", "messages": []}'
+```
+
+**Check certificate:**
+
+```bash
+openssl s_client -connect api-gateway.local:443 -servername api-gateway.local
 ```
 
 **Output:**
 
 ```
-TLS handshake: TLSv1.3, cipher TLS_AES_256_GCM_SHA384
-Connection: Encrypted (client → gateway)
-Backend connection: Plaintext (gateway → backend, internal network)
-Response: 200 OK
+CONNECTED(00000003)
+depth=0 C = DE, ST = Bavaria, L = Munich, O = vExpertAI, CN = api-gateway.local
+verify error:num=18:self signed certificate
+verify return:1
+...
+SSL-Session:
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_256_GCM_SHA384
 ```
 
-Benefits:
+**Benefits:**
 - Single certificate to manage (not one per backend)
-- Offload crypto from backend servers (save CPU for LLM inference)
-- Centralized TLS policy (enforce TLS 1.3, disable weak ciphers)
-- Inspect traffic at gateway (logging, IDS, DLP)
+- Offload crypto from backends (save CPU for LLM inference)
+- Centralized TLS policy
+- Inspect traffic at gateway
 
 ### Mutual TLS (mTLS)
 
 Require client certificates. Like 802.1X for APIs.
 
-**Config:**
+**Generate CA and client certificates:**
+
+```bash
+# Create CA
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -days 3650 -out ca.crt \
+    -subj "/CN=vExpertAI CA"
+
+# Create client certificate
+openssl genrsa -out client.key 2048
+openssl req -new -key client.key -out client.csr \
+    -subj "/CN=client1"
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key \
+    -CAcreateserial -out client.crt -days 365
+```
+
+**Nginx config with mTLS:**
 
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name api.vexpertai.local;
+    server_name api-gateway.local;
 
     # Server cert
     ssl_certificate /etc/nginx/ssl/api-gateway.crt;
@@ -595,473 +962,144 @@ server {
 }
 ```
 
-**Client usage:**
+**Client usage with certificate:**
 
 ```python
 import requests
 
 response = requests.post(
-    'https://api.vexpertai.local/v1/chat/completions',
-    cert=('/path/to/client.crt', '/path/to/client.key'),  # Client certificate
-    verify='/path/to/ca.crt',  # CA certificate
-    json={'model': 'gpt-4', 'messages': [{'role': 'user', 'content': 'test'}]}
+    'https://api-gateway.local/v1/chat/completions',
+    cert=('/path/to/client.crt', '/path/to/client.key'),
+    verify='/path/to/ca.crt',
+    json={'model': 'gpt-4', 'messages': []}
 )
 ```
 
 **Failed auth (no client cert):**
 
-```
-Error: 400 Bad Request
-No required SSL certificate was sent
-```
-
-Use mTLS when:
-- Agent-to-gateway communication crosses untrusted networks
-- Multiple teams share the gateway (isolate with client certs)
-- Compliance requires mutual authentication (PCI-DSS, HIPAA)
-
-## Circuit Breaker Patterns
-
-Stop hitting a failing service. Like interface shutdown on error threshold.
-
-### The Problem
-
-Your backend LLM API is down. Without circuit breaking:
-
-```
-Request 1 → 502 error after 30s timeout
-Request 2 → 502 error after 30s timeout
-Request 3 → 502 error after 30s timeout
-...
-Request 100 → 502 error after 30s timeout
-
-Total time wasted: 3000 seconds (50 minutes)
-User experience: Terrible
+```bash
+curl -k https://api-gateway.local/v1/chat/completions
 ```
 
-### Circuit Breaker States
+**Output:**
 
 ```
-[CLOSED] → failures → [OPEN] → timeout → [HALF-OPEN] → success → [CLOSED]
-                                               ↓
-                                          more failures
-                                               ↓
-                                            [OPEN]
+<html>
+<head><title>400 No required SSL certificate was sent</title></head>
+<body>
+<center><h1>400 Bad Request</h1></center>
+<center>No required SSL certificate was sent</center>
+</body>
+</html>
 ```
 
-- **CLOSED**: Normal operation, requests pass through
-- **OPEN**: Too many failures, reject immediately (no backend call)
-- **HALF-OPEN**: After timeout, try one request to test recovery
+### Rate Limiting
 
-### Implementation with Nginx
-
-Nginx doesn't have native circuit breaking, but we can combine features:
-
-**Config:**
+Protect against abuse and quota exhaustion:
 
 ```nginx
-upstream llm_backends {
-    server 10.1.1.10:8000 max_fails=3 fail_timeout=30s;
-    server 10.1.1.11:8000 max_fails=3 fail_timeout=30s;
+http {
+    # Define rate limit zones
+    # $binary_remote_addr: Client IP address (compact binary format)
+    # zone=api_limit:10m: 10 MB shared memory for tracking
+    # rate=100r/s: 100 requests per second limit
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
+    limit_req_status 429;
 
-    # If all backends fail, return 503 immediately
-    keepalive 32;
-}
+    # Connection limiting
+    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
 
-server {
-    listen 80;
+    server {
+        listen 443 ssl http2;
 
-    location /v1/chat/completions {
-        proxy_pass http://llm_backends;
+        location /v1/chat/completions {
+            # Apply rate limit with burst allowance
+            # burst=50: Allow bursts up to 50 requests
+            # nodelay: Don't delay burst requests
+            limit_req zone=api_limit burst=50 nodelay;
 
-        # Fast timeout (don't wait forever)
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
+            # Limit concurrent connections per IP
+            limit_conn conn_limit 20;
 
-        # Custom error page
-        error_page 502 503 504 @backend_down;
-    }
-
-    location @backend_down {
-        # Return fast failure with retry-after header
-        add_header Retry-After 30 always;
-        return 503 '{"error": "Service temporarily unavailable", "retry_after": 30}';
-    }
-}
-```
-
-**Better approach: Use OpenResty (Nginx + Lua):**
-
-```nginx
-# /etc/nginx/conf.d/circuit-breaker.conf
-lua_shared_dict circuit_breaker 10m;
-
-server {
-    listen 80;
-
-    location /v1/chat/completions {
-        access_by_lua_block {
-            local cb = require "circuit_breaker"
-            if cb.is_open("llm_backends") then
-                ngx.status = 503
-                ngx.header["Retry-After"] = "30"
-                ngx.say('{"error": "Circuit breaker open", "retry_after": 30}')
-                ngx.exit(503)
-            end
-        }
-
-        proxy_pass http://llm_backends;
-
-        log_by_lua_block {
-            local cb = require "circuit_breaker"
-            if ngx.status >= 500 then
-                cb.record_failure("llm_backends")
-            else
-                cb.record_success("llm_backends")
-            end
+            proxy_pass http://llm_backends;
         }
     }
 }
 ```
 
-**Circuit breaker module (circuit_breaker.lua):**
-
-```lua
-local _M = {}
-
-local FAILURE_THRESHOLD = 5      -- Open circuit after 5 failures
-local SUCCESS_THRESHOLD = 2      -- Close circuit after 2 successes
-local TIMEOUT = 30               -- Half-open after 30 seconds
-
-function _M.is_open(backend)
-    local state = ngx.shared.circuit_breaker:get(backend .. ":state")
-    local opened_at = ngx.shared.circuit_breaker:get(backend .. ":opened_at")
-
-    if state == "open" then
-        -- Check if timeout elapsed (transition to half-open)
-        if ngx.now() - opened_at > TIMEOUT then
-            ngx.shared.circuit_breaker:set(backend .. ":state", "half_open")
-            return false
-        end
-        return true
-    end
-
-    return false
-end
-
-function _M.record_failure(backend)
-    local state = ngx.shared.circuit_breaker:get(backend .. ":state") or "closed"
-    local failures = ngx.shared.circuit_breaker:get(backend .. ":failures") or 0
-
-    failures = failures + 1
-    ngx.shared.circuit_breaker:set(backend .. ":failures", failures)
-
-    if failures >= FAILURE_THRESHOLD then
-        ngx.shared.circuit_breaker:set(backend .. ":state", "open")
-        ngx.shared.circuit_breaker:set(backend .. ":opened_at", ngx.now())
-        ngx.log(ngx.WARN, "Circuit breaker opened for " .. backend)
-    end
-end
-
-function _M.record_success(backend)
-    local state = ngx.shared.circuit_breaker:get(backend .. ":state") or "closed"
-
-    if state == "half_open" then
-        local successes = ngx.shared.circuit_breaker:get(backend .. ":successes") or 0
-        successes = successes + 1
-        ngx.shared.circuit_breaker:set(backend .. ":successes", successes)
-
-        if successes >= SUCCESS_THRESHOLD then
-            ngx.shared.circuit_breaker:set(backend .. ":state", "closed")
-            ngx.shared.circuit_breaker:set(backend .. ":failures", 0)
-            ngx.shared.circuit_breaker:set(backend .. ":successes", 0)
-            ngx.log(ngx.INFO, "Circuit breaker closed for " .. backend)
-        end
-    else
-        -- Reset failure count on success
-        ngx.shared.circuit_breaker:set(backend .. ":failures", 0)
-    end
-end
-
-return _M
-```
-
-**Test output:**
+**Test rate limiting:**
 
 ```bash
-# Simulate backend failures
-for i in {1..10}; do
-    curl http://api.vexpertai.local/v1/chat/completions
-    echo ""
-done
+# Send 200 requests rapidly
+for i in {1..200}; do
+    curl -k -s -o /dev/null -w "%{http_code}\n" \
+         https://api-gateway.local/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}'
+done | sort | uniq -c
 ```
 
 **Output:**
 
 ```
-Request 1: 502 Bad Gateway (failure 1)
-Request 2: 502 Bad Gateway (failure 2)
-Request 3: 502 Bad Gateway (failure 3)
-Request 4: 502 Bad Gateway (failure 4)
-Request 5: 502 Bad Gateway (failure 5, circuit OPENS)
-Request 6: 503 Circuit breaker open, retry_after: 30 (fast fail)
-Request 7: 503 Circuit breaker open, retry_after: 30 (fast fail)
-...wait 30 seconds...
-Request 8: 200 OK (half-open, test request succeeds)
-Request 9: 200 OK (success 2, circuit CLOSES)
-Request 10: 200 OK (normal operation)
+    150 200
+     50 429
 ```
 
-Notice requests 6-7 fail immediately (no 30s timeout). That's the circuit breaker saving time.
+First 150 requests (100 + 50 burst): 200 OK
+Next 50 requests: 429 Too Many Requests
 
-### Application-Level Circuit Breaker (Python)
-
-Implement in your agent code using `pybreaker` library:
-
-```python
-from pybreaker import CircuitBreaker
-import requests
-import time
-
-# Configure circuit breaker
-breaker = CircuitBreaker(
-    fail_max=5,           # Open after 5 failures
-    timeout_duration=30,  # Stay open for 30 seconds
-    name='openai_api'
-)
-
-@breaker
-def call_openai_api(prompt):
-    """Call OpenAI API with circuit breaker protection"""
-    response = requests.post(
-        'https://api.openai.com/v1/chat/completions',
-        headers={
-            'Authorization': f'Bearer {OPENAI_API_KEY}',
-            'Content-Type': 'application/json'
-        },
-        json={
-            'model': 'gpt-4',
-            'messages': [{'role': 'user', 'content': prompt}]
-        },
-        timeout=30
-    )
-    response.raise_for_status()
-    return response.json()
-
-# Test with failures
-for i in range(10):
-    try:
-        result = call_openai_api(f"Test query {i}")
-        print(f"Request {i}: Success")
-    except CircuitBreakerError:
-        print(f"Request {i}: Circuit breaker open (fast fail)")
-    except Exception as e:
-        print(f"Request {i}: Failed - {e}")
-
-    time.sleep(1)
-```
-
-**Output:**
-
-```
-Request 0: Failed - 503 Server Error
-Request 1: Failed - 503 Server Error
-Request 2: Failed - 503 Server Error
-Request 3: Failed - 503 Server Error
-Request 4: Failed - 503 Server Error
-Request 5: Circuit breaker open (fast fail)
-Request 6: Circuit breaker open (fast fail)
-Request 7: Circuit breaker open (fast fail)
-...wait for timeout...
-Request 8: Success (half-open state)
-Request 9: Success (circuit closed)
-```
-
-Requests 5-7 fail instantly (no API call). Circuit breaker in action.
-
-## Retry Logic and Backoff Strategies
-
-Retry transient failures intelligently. Like BGP soft reconfiguration.
-
-### Exponential Backoff
-
-Wait longer between each retry attempt.
-
-**Formula:**
-```
-wait_time = base_delay * (2 ^ attempt) + random_jitter
-```
-
-**Python implementation:**
-
-```python
-import requests
-import time
-import random
-
-def call_api_with_retry(url, max_retries=5, base_delay=1):
-    """
-    Call API with exponential backoff retry logic
-
-    Args:
-        url: API endpoint
-        max_retries: Maximum retry attempts
-        base_delay: Initial delay in seconds
-    """
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(url, json={'model': 'gpt-4', 'messages': []}, timeout=30)
-
-            # Success
-            if response.status_code == 200:
-                return response.json()
-
-            # Rate limited - definitely retry
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', 0))
-                wait_time = retry_after if retry_after > 0 else (base_delay * (2 ** attempt))
-                jitter = random.uniform(0, wait_time * 0.1)
-                total_wait = wait_time + jitter
-
-                print(f"Attempt {attempt + 1}: Rate limited (429)")
-                print(f"  Waiting {total_wait:.2f}s before retry")
-                time.sleep(total_wait)
-                continue
-
-            # Server error - retry
-            if response.status_code >= 500:
-                wait_time = base_delay * (2 ** attempt)
-                jitter = random.uniform(0, wait_time * 0.1)
-                total_wait = wait_time + jitter
-
-                print(f"Attempt {attempt + 1}: Server error ({response.status_code})")
-                print(f"  Waiting {total_wait:.2f}s before retry")
-                time.sleep(total_wait)
-                continue
-
-            # Client error - don't retry
-            if response.status_code >= 400:
-                print(f"Attempt {attempt + 1}: Client error ({response.status_code}) - not retrying")
-                response.raise_for_status()
-
-        except requests.exceptions.Timeout:
-            wait_time = base_delay * (2 ** attempt)
-            jitter = random.uniform(0, wait_time * 0.1)
-            total_wait = wait_time + jitter
-
-            print(f"Attempt {attempt + 1}: Timeout")
-            print(f"  Waiting {total_wait:.2f}s before retry")
-            time.sleep(total_wait)
-            continue
-
-        except requests.exceptions.ConnectionError:
-            wait_time = base_delay * (2 ** attempt)
-            jitter = random.uniform(0, wait_time * 0.1)
-            total_wait = wait_time + jitter
-
-            print(f"Attempt {attempt + 1}: Connection error")
-            print(f"  Waiting {total_wait:.2f}s before retry")
-            time.sleep(total_wait)
-            continue
-
-    # All retries exhausted
-    raise Exception(f"Failed after {max_retries} attempts")
-
-# Test
-result = call_api_with_retry('https://api.openai.com/v1/chat/completions')
-```
-
-**Output (simulated failures):**
-
-```
-Attempt 1: Server error (503)
-  Waiting 1.08s before retry
-Attempt 2: Server error (503)
-  Waiting 2.15s before retry
-Attempt 3: Rate limited (429)
-  Waiting 4.32s before retry
-Attempt 4: Timeout
-  Waiting 8.71s before retry
-Attempt 5: Success
-Response received: {...}
-
-Total retries: 4
-Total wait time: 16.26 seconds
-```
-
-Notice the wait times: 1s, 2s, 4s, 8s (exponential), with jitter added for randomness.
-
-### Nginx Retry Configuration
-
-Configure gateway-level retries:
+**Per-API-key rate limiting:**
 
 ```nginx
-upstream llm_backends {
-    server 10.1.1.10:8000 max_fails=2 fail_timeout=10s;
-    server 10.1.1.11:8000 max_fails=2 fail_timeout=10s;
-    server 10.1.1.12:8000 max_fails=2 fail_timeout=10s backup;  # Only use if others fail
+# Extract API key from Authorization header
+map $http_authorization $api_key {
+    ~^Bearer\s+(.+)$ $1;
+    default "";
 }
 
+# Rate limit by API key instead of IP
+limit_req_zone $api_key zone=apikey_limit:10m rate=1000r/m;
+
 server {
-    listen 80;
+    listen 443 ssl http2;
 
     location /v1/chat/completions {
+        limit_req zone=apikey_limit burst=20 nodelay;
         proxy_pass http://llm_backends;
-
-        # Retry configuration
-        proxy_next_upstream error timeout http_502 http_503 http_504;
-        proxy_next_upstream_tries 3;      # Try up to 3 different backends
-        proxy_next_upstream_timeout 60s;  # Total retry timeout
-
-        # Timeouts
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
     }
 }
 ```
 
-**Retry behavior:**
+Now rate limiting follows the API key, not the source IP.
 
+### Idempotency Support
+
+Ensure retries don't duplicate operations:
+
+```nginx
+server {
+    listen 443 ssl http2;
+
+    location /v1/chat/completions {
+        # Extract idempotency key from header
+        set $idempotency_key $http_idempotency_key;
+
+        # Pass to backend for deduplication
+        proxy_set_header Idempotency-Key $idempotency_key;
+        proxy_pass http://llm_backends;
+    }
+}
 ```
-Request arrives → Try backend 1 (10.1.1.10)
-  ↓
-  Connection timeout after 5s
-  ↓
-Retry → Try backend 2 (10.1.1.11)
-  ↓
-  502 Bad Gateway
-  ↓
-Retry → Try backend 3 (10.1.1.12, backup)
-  ↓
-  200 OK (success)
-```
 
-**Don't retry on:**
-- 4xx errors (client error - won't succeed on retry)
-- POST requests that modify state (unless idempotent)
-- Requests that already succeeded but response was corrupted
-
-**Always retry on:**
-- Network errors (connection refused, timeout)
-- 502, 503, 504 (server temporarily unavailable)
-- 429 (rate limit - with backoff)
-
-### Idempotency Keys
-
-Ensure retries don't duplicate operations. Like TCP sequence numbers.
-
-**Client implementation:**
+**Client usage:**
 
 ```python
 import requests
 import uuid
 
-def call_api_idempotent(url, payload, max_retries=3):
-    """Call API with idempotency key to prevent duplicate operations"""
-
-    # Generate unique idempotency key for this request
+def call_api_with_retry(url, payload, max_retries=3):
+    """Call API with idempotency key"""
     idempotency_key = str(uuid.uuid4())
 
     for attempt in range(max_retries):
@@ -1079,44 +1117,38 @@ def call_api_idempotent(url, payload, max_retries=3):
             if response.status_code == 200:
                 return response.json()
 
-            # Retry on server errors
             if response.status_code >= 500:
                 print(f"Attempt {attempt + 1} failed, retrying...")
                 continue
 
-            # Don't retry client errors
             response.raise_for_status()
 
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
                 time.sleep(2 ** attempt)  # Exponential backoff
-            continue
+                continue
+            raise
 
     raise Exception("All retries exhausted")
-
-# Backend receives same idempotency key on retry
-# Can detect duplicate and return cached response
 ```
 
-**Backend handling (Flask example):**
+**Backend deduplication (Flask example):**
 
 ```python
 from flask import Flask, request, jsonify
 import hashlib
 
 app = Flask(__name__)
-response_cache = {}  # In production, use Redis
+response_cache = {}  # In production, use Redis with TTL
 
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completion():
     idempotency_key = request.headers.get('Idempotency-Key')
 
-    # Check if we've already processed this request
+    # Check cache for duplicate request
     if idempotency_key and idempotency_key in response_cache:
         print(f"Duplicate request detected: {idempotency_key}")
-        cached_response = response_cache[idempotency_key]
-        return jsonify(cached_response), 200
+        return jsonify(response_cache[idempotency_key]), 200
 
     # Process request (expensive LLM call)
     response_data = {
@@ -1125,191 +1157,135 @@ def chat_completion():
         'choices': [{'message': {'content': 'Hello!'}}]
     }
 
-    # Cache response for future retries
+    # Cache response (TTL: 1 hour)
     if idempotency_key:
         response_cache[idempotency_key] = response_data
 
     return jsonify(response_data), 200
 ```
 
-**Test output:**
+First attempt: LLM call (10 seconds)
+Retry with same key: Cached response (instant)
 
-```
-First attempt: Processing request (10s LLM call)
-  Response: 200 OK
+### V3 Benefits
 
-Network error, retry...
+1. **Intelligent routing**: Different backends for different request types
+2. **Encrypted transport**: TLS protects data in transit
+3. **Client authentication**: mTLS ensures only authorized clients
+4. **Abuse protection**: Rate limiting prevents quota exhaustion
+5. **Retry safety**: Idempotency prevents duplicate operations
 
-Second attempt: Duplicate detected, returning cached response
-  Response: 200 OK (instant, no LLM call)
-```
+### V3 Limitations
 
-Same idempotency key = same response. No duplicate charges, no duplicate operations.
+- No metrics export for monitoring
+- No distributed tracing
+- No visual dashboards
+- No alerting on failures
 
-## Gateway Logging and Monitoring
+## V4: Complete Monitoring Stack
 
-You can't troubleshoot what you can't see. Log everything.
+### Goal
+Add Prometheus metrics, Grafana dashboards, Loki log aggregation, distributed tracing, and alerting.
 
-### Access Logging
+**Time to implement:** 90 minutes
+**Cost:** $150-300/month (monitoring infrastructure, storage, alerting)
+**Builds on:** V3
 
-**Custom log format:**
+### Custom Access Logging
+
+Track API-specific metrics:
 
 ```nginx
-# /etc/nginx/nginx.conf
 http {
-    # Define custom log format with API-specific fields
-    log_format api_gateway '$remote_addr - $remote_user [$time_local] '
-                          '"$request" $status $body_bytes_sent '
-                          '"$http_referer" "$http_user_agent" '
-                          'rt=$request_time uct="$upstream_connect_time" '
-                          'uht="$upstream_header_time" urt="$upstream_response_time" '
-                          'upstream=$upstream_addr '
-                          'cache=$upstream_cache_status';
+    # Custom log format with timing and backend info
+    log_format api_detailed '$remote_addr - $remote_user [$time_local] '
+                           '"$request" $status $body_bytes_sent '
+                           'request_id=$request_id '
+                           'rt=$request_time '
+                           'uct="$upstream_connect_time" '
+                           'uht="$upstream_header_time" '
+                           'urt="$upstream_response_time" '
+                           'upstream=$upstream_addr '
+                           'upstream_status=$upstream_status '
+                           'cache=$upstream_cache_status';
 
-    access_log /var/log/nginx/api-gateway-access.log api_gateway;
-    error_log /var/log/nginx/api-gateway-error.log warn;
+    access_log /var/log/nginx/api-gateway-access.log api_detailed;
+
+    server {
+        listen 443 ssl http2;
+
+        location /v1/chat/completions {
+            # Generate unique request ID
+            set $request_id $request_id;
+
+            # Pass to backend for correlation
+            proxy_set_header X-Request-ID $request_id;
+
+            proxy_pass http://llm_backends;
+
+            # Add to response for client tracking
+            add_header X-Request-ID $request_id always;
+        }
+    }
 }
 ```
 
 **Sample log entry:**
 
 ```
-10.0.1.50 - - [19/Jan/2026:14:23:45 +0100] "POST /v1/chat/completions HTTP/1.1" 200 1542 "-" "python-requests/2.31.0" rt=2.341 uct="0.002" uht="0.523" urt="2.339" upstream=10.1.1.10:8000 cache=-
+10.0.1.50 - - [19/Jan/2026:14:23:45 +0100] "POST /v1/chat/completions HTTP/1.1" 200 1542 request_id=a7f3c9d8 rt=2.341 uct="0.002" uht="0.523" urt="2.339" upstream=10.1.1.10:8000 upstream_status=200 cache=-
 ```
 
-**What it tells you:**
-- `rt=2.341` - Total request time: 2.34 seconds
-- `uct="0.002"` - Connect to backend: 2ms (good)
-- `uht="0.523"` - Backend processing headers: 523ms
-- `urt="2.339"` - Backend response time: 2.34s (matches total, good)
-- `upstream=10.1.1.10:8000` - Which backend served it
-
-### Performance Monitoring
-
-Parse logs to find slow requests:
+**Parse for slow requests:**
 
 ```bash
 # Find requests slower than 5 seconds
 awk '$NF ~ /rt=[0-9]+\.[0-9]+/ {
     match($0, /rt=([0-9]+\.[0-9]+)/, arr);
     if (arr[1] > 5.0) print arr[1], $7, $13
-}' /var/log/nginx/api-gateway-access.log | sort -rn | head -20
+}' /var/log/nginx/api-gateway-access.log | sort -rn | head -10
 ```
-
-**Output:**
-
-```
-12.453 /v1/chat/completions upstream=10.1.1.10:8000
-9.872 /v1/chat/completions upstream=10.1.1.11:8000
-7.234 /v1/embeddings upstream=10.1.2.10:8000
-6.891 /v1/chat/completions upstream=10.1.1.10:8000
-5.567 /v1/images/generations upstream=10.1.3.10:8000
-```
-
-Backend 10.1.1.10 appears twice in top 5 slowest. Investigate that server.
-
-### Request Tracing
-
-Add unique request ID to track through entire stack:
-
-```nginx
-server {
-    listen 80;
-
-    location /v1/chat/completions {
-        # Generate unique request ID
-        set $request_id $request_id;
-
-        # Pass to backend
-        proxy_set_header X-Request-ID $request_id;
-        proxy_pass http://llm_backends;
-
-        # Add to response header
-        add_header X-Request-ID $request_id always;
-    }
-}
-```
-
-**Backend logging (Python):**
-
-```python
-from flask import Flask, request, g
-import logging
-
-app = Flask(__name__)
-
-@app.before_request
-def before_request():
-    g.request_id = request.headers.get('X-Request-ID', 'unknown')
-    logging.info(f"[{g.request_id}] Incoming request: {request.method} {request.path}")
-
-@app.route('/v1/chat/completions', methods=['POST'])
-def chat_completion():
-    logging.info(f"[{g.request_id}] Processing chat completion")
-
-    # Call OpenAI
-    logging.info(f"[{g.request_id}] Calling OpenAI API")
-    # ... API call ...
-    logging.info(f"[{g.request_id}] OpenAI responded in 2.3s")
-
-    return jsonify({'response': 'data'}), 200
-```
-
-**Trace a request across logs:**
-
-```bash
-# Client receives: X-Request-ID: 7f3c9d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f
-
-# Gateway log:
-grep "7f3c9d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f" /var/log/nginx/api-gateway-access.log
-
-# Backend log:
-grep "7f3c9d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f" /var/log/app/backend.log
-
-# OpenAI proxy log:
-grep "7f3c9d8e-1a2b-4c5d-8e9f-0a1b2c3d4e5f" /var/log/app/openai-proxy.log
-```
-
-**Output:**
-
-```
-# Gateway
-[19/Jan/2026:14:23:45] request_id=7f3c9d8e rt=2.341 upstream=10.1.1.10:8000
-
-# Backend
-[14:23:45] [7f3c9d8e] Incoming request: POST /v1/chat/completions
-[14:23:45] [7f3c9d8e] Processing chat completion
-[14:23:45] [7f3c9d8e] Calling OpenAI API
-[14:23:47] [7f3c9d8e] OpenAI responded in 2.3s
-
-# OpenAI proxy
-[14:23:45] [7f3c9d8e] POST https://api.openai.com/v1/chat/completions
-[14:23:47] [7f3c9d8e] Response: 200 OK, tokens=145
-```
-
-Now you can trace one request through the entire stack. Like packet capture with correlation ID.
 
 ### Prometheus Metrics Export
 
-Export gateway metrics for monitoring dashboards:
+**Install nginx-prometheus-exporter:**
+
+```bash
+wget https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v0.11.0/nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+tar xzf nginx-prometheus-exporter_0.11.0_linux_amd64.tar.gz
+sudo mv nginx-prometheus-exporter /usr/local/bin/
+```
+
+**Enable Nginx stub_status:**
 
 ```nginx
-# Install nginx-prometheus-exporter
-# https://github.com/nginxinc/nginx-prometheus-exporter
-
-# Enable Nginx stub_status
 server {
     listen 9113;
+    server_name localhost;
+
     location /metrics {
         stub_status on;
         access_log off;
+        allow 127.0.0.1;
         allow 10.0.0.0/8;
         deny all;
     }
 }
 ```
 
-**Metrics output:**
+**Start exporter:**
+
+```bash
+nginx-prometheus-exporter -nginx.scrape-uri=http://localhost:9113/metrics &
+```
+
+**Check metrics:**
+
+```bash
+curl http://localhost:9114/metrics
+```
+
+**Output:**
 
 ```
 # HELP nginx_connections_active Active client connections
@@ -1328,76 +1304,233 @@ nginx_upstream_response_time_seconds_bucket{upstream="llm_backends",le="2.0"} 18
 nginx_upstream_response_time_seconds_bucket{upstream="llm_backends",le="5.0"} 19234
 ```
 
-Import into Grafana for visual dashboards.
+### Complete Monitoring Stack with Docker Compose
 
-### Complete Monitoring Stack
-
-**docker-compose.yml:**
+**File: docker-compose.yml**
 
 ```yaml
 version: '3.8'
 
 services:
+  # Nginx API Gateway
   nginx:
     image: nginx:latest
     ports:
       - "80:80"
       - "443:443"
+      - "9113:9113"  # Metrics endpoint
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./logs:/var/log/nginx
     depends_on:
       - backend1
       - backend2
+      - backend3
 
+  # Backend services
   backend1:
-    image: python:3.11
-    command: python /app/backend.py
+    image: python:3.11-slim
+    command: bash -c "pip install flask && python /app/backend.py"
     volumes:
       - ./backend.py:/app/backend.py
     environment:
       - BACKEND_ID=1
+      - PORT=8000
 
   backend2:
-    image: python:3.11
-    command: python /app/backend.py
+    image: python:3.11-slim
+    command: bash -c "pip install flask && python /app/backend.py"
     volumes:
       - ./backend.py:/app/backend.py
     environment:
       - BACKEND_ID=2
+      - PORT=8000
 
+  backend3:
+    image: python:3.11-slim
+    command: bash -c "pip install flask && python /app/backend.py"
+    volumes:
+      - ./backend.py:/app/backend.py
+    environment:
+      - BACKEND_ID=3
+      - PORT=8000
+
+  # Nginx Prometheus Exporter
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:0.11.0
+    command:
+      - '-nginx.scrape-uri=http://nginx:9113/metrics'
+    ports:
+      - "9114:9114"
+    depends_on:
+      - nginx
+
+  # Prometheus
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
 
+  # Grafana
   grafana:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana-datasources:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus
 
+  # Loki (Log aggregation)
   loki:
     image: grafana/loki:latest
     ports:
       - "3100:3100"
     volumes:
       - ./loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
 
+  # Promtail (Log shipper)
   promtail:
     image: grafana/promtail:latest
     volumes:
       - ./logs:/var/log/nginx
       - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/config.yml
     command:
-      - '-config.file=/etc/promtail/config.yml'
+      - '--config.file=/etc/alertmanager/config.yml'
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+```
+
+**File: prometheus.yml**
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Load alerting rules
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+# Scrape configurations
+scrape_configs:
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9114']
+        labels:
+          service: 'api-gateway'
+
+  # Backend metrics
+  - job_name: 'backends'
+    static_configs:
+      - targets: ['backend1:8000', 'backend2:8000', 'backend3:8000']
+        labels:
+          service: 'llm-backend'
+```
+
+**File: alerts.yml**
+
+```yaml
+groups:
+  - name: api_gateway_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(nginx_http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate on API gateway"
+          description: "Error rate is {{ $value }} req/s (>0.1 req/s threshold)"
+
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(nginx_upstream_response_time_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow API response time"
+          description: "P95 response time is {{ $value }}s (>5s threshold)"
+
+      # Backend down
+      - alert: BackendDown
+        expr: up{job="backends"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend server down"
+          description: "Backend {{ $labels.instance }} is down"
+
+      # Circuit breaker open
+      - alert: CircuitBreakerOpen
+        expr: nginx_circuit_breaker_state == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker opened"
+          description: "Circuit breaker for {{ $labels.upstream }} is open"
+```
+
+**File: alertmanager.yml**
+
+```yaml
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'slack'
+
+receivers:
+  - name: 'slack'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: 'API Gateway Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
 ```
 
 **Start monitoring stack:**
@@ -1407,687 +1540,2082 @@ docker-compose up -d
 ```
 
 **Access dashboards:**
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/admin)
-- Logs: http://localhost:3000/explore (select Loki data source)
+- **Prometheus:** http://localhost:9090
+- **Grafana:** http://localhost:3000 (admin/admin)
+- **Alertmanager:** http://localhost:9093
 
-## Complete Production Example
+**Import Grafana dashboard:**
 
-Putting it all together - a production-ready API gateway for AI workloads.
+1. Go to http://localhost:3000
+2. Login (admin/admin)
+3. Create → Import
+4. Upload dashboard JSON (Nginx dashboard ID: 12708)
 
-**File: /etc/nginx/nginx.conf**
+**View logs in Grafana:**
 
-```nginx
-user nginx;
-worker_processes auto;
-error_log /var/log/nginx/error.log warn;
-pid /var/run/nginx.pid;
+1. Go to Explore
+2. Select Loki data source
+3. Query: `{job="nginx"} |= "error"`
 
-events {
-    worker_connections 2048;
-    use epoll;
-}
+### Request Tracing Across Services
 
-http {
-    include /etc/nginx/mime.types;
-    default_type application/json;
+Track a single request through the entire stack:
 
-    # Logging
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for"';
-
-    log_format api_detailed '$remote_addr - $remote_user [$time_local] '
-                           '"$request" $status $body_bytes_sent '
-                           'request_id=$request_id '
-                           'rt=$request_time '
-                           'uct="$upstream_connect_time" '
-                           'uht="$upstream_header_time" '
-                           'urt="$upstream_response_time" '
-                           'upstream=$upstream_addr '
-                           'upstream_status=$upstream_status '
-                           'model=$http_x_model_provider';
-
-    access_log /var/log/nginx/access.log api_detailed;
-
-    # Performance
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 2048;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # Rate limiting
-    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
-    limit_req_status 429;
-
-    # Connection limiting
-    limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
-
-    # Include upstream definitions
-    include /etc/nginx/conf.d/upstreams.conf;
-
-    # Include server blocks
-    include /etc/nginx/conf.d/*.conf;
-}
-```
-
-**File: /etc/nginx/conf.d/upstreams.conf**
+**Nginx adds request ID:**
 
 ```nginx
-# OpenAI backend pool
-upstream openai_backends {
-    least_conn;
-
-    server 10.1.1.10:8000 weight=3 max_fails=2 fail_timeout=30s;
-    server 10.1.1.11:8000 weight=2 max_fails=2 fail_timeout=30s;
-    server 10.1.1.12:8000 weight=1 max_fails=2 fail_timeout=30s backup;
-
-    keepalive 64;
-    keepalive_requests 100;
-    keepalive_timeout 60s;
-}
-
-# Anthropic backend pool
-upstream anthropic_backends {
-    least_conn;
-
-    server 10.1.2.10:8000 weight=2 max_fails=2 fail_timeout=30s;
-    server 10.1.2.11:8000 weight=2 max_fails=2 fail_timeout=30s;
-
-    keepalive 64;
-}
-
-# Local model backend pool
-upstream local_backends {
-    least_conn;
-
-    server 10.1.3.10:8000 max_fails=3 fail_timeout=60s;
-
-    keepalive 32;
-}
-
-# Embedding service pool
-upstream embedding_backends {
-    least_conn;
-
-    server 10.1.4.10:8000 weight=3 max_fails=2 fail_timeout=30s;
-    server 10.1.4.11:8000 weight=2 max_fails=2 fail_timeout=30s;
-
-    keepalive 64;
-}
-```
-
-**File: /etc/nginx/conf.d/api-gateway.conf**
-
-```nginx
-# Model provider routing map
-map $http_x_model_provider $backend_pool {
-    "openai"     "openai_backends";
-    "anthropic"  "anthropic_backends";
-    "local"      "local_backends";
-    default      "openai_backends";
-}
-
-# HTTPS server
 server {
     listen 443 ssl http2;
-    server_name api.vexpertai.local;
 
-    # TLS configuration
-    ssl_certificate /etc/nginx/ssl/api-gateway.crt;
-    ssl_certificate_key /etc/nginx/ssl/api-gateway.key;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-
-    # Rate limiting
-    limit_req zone=api_limit burst=50 nodelay;
-    limit_conn conn_limit 20;
-
-    # Health check endpoint
-    location /health {
-        access_log off;
-        return 200 '{"status":"healthy","service":"api-gateway"}\n';
-        add_header Content-Type application/json;
-    }
-
-    # Metrics endpoint (restricted)
-    location /metrics {
-        access_log off;
-        stub_status on;
-        allow 10.0.0.0/8;
-        deny all;
-    }
-
-    # Chat completions endpoint
     location /v1/chat/completions {
-        # Generate request ID
-        set $request_id $request_id;
+        # Generate or use existing request ID
+        set $request_id $http_x_request_id;
         if ($request_id = "") {
-            set $request_id $pid-$msec-$remote_addr-$request_length;
+            set $request_id $request_id;
         }
 
-        # Proxy to backend pool (selected by header)
-        proxy_pass http://$backend_pool;
-
-        # Proxy headers
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        # Pass to backend
         proxy_set_header X-Request-ID $request_id;
+        proxy_pass http://llm_backends;
 
-        # Timeouts
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-
-        # Retry logic
-        proxy_next_upstream error timeout http_502 http_503 http_504;
-        proxy_next_upstream_tries 3;
-        proxy_next_upstream_timeout 90s;
-
-        # Buffering
-        proxy_buffering on;
-        proxy_buffer_size 4k;
-        proxy_buffers 8 4k;
-
-        # Response headers
+        # Return to client
         add_header X-Request-ID $request_id always;
-        add_header X-Gateway-Time $request_time always;
-        add_header X-Upstream-Addr $upstream_addr always;
-
-        # Error handling
-        error_page 502 503 504 @backend_error;
     }
-
-    # Embeddings endpoint
-    location /v1/embeddings {
-        set $request_id $request_id;
-        if ($request_id = "") {
-            set $request_id $pid-$msec-$remote_addr-$request_length;
-        }
-
-        proxy_pass http://embedding_backends;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Request-ID $request_id;
-
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-
-        proxy_next_upstream error timeout http_502 http_503 http_504;
-        proxy_next_upstream_tries 2;
-
-        add_header X-Request-ID $request_id always;
-
-        error_page 502 503 504 @backend_error;
-    }
-
-    # Error handler
-    location @backend_error {
-        internal;
-        add_header Content-Type application/json always;
-        add_header X-Request-ID $request_id always;
-        add_header Retry-After 30 always;
-        return 503 '{"error":{"code":"service_unavailable","message":"Backend temporarily unavailable. Please retry.","request_id":"$request_id"}}\n';
-    }
-}
-
-# HTTP redirect to HTTPS
-server {
-    listen 80;
-    server_name api.vexpertai.local;
-    return 301 https://$server_name$request_uri;
 }
 ```
 
-**Backend service (backend.py):**
+**Backend logs with request ID:**
 
 ```python
-#!/usr/bin/env python3
-"""
-Backend service for API gateway
-Simulates LLM API with health checks, logging, and metrics
-"""
-
-from flask import Flask, request, jsonify, g
-import time
-import os
+from flask import Flask, request, g
 import logging
-import random
-
-# Configuration
-BACKEND_ID = os.environ.get('BACKEND_ID', '1')
-PORT = int(os.environ.get('PORT', 8000))
-
-# Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format=f'[Backend-{BACKEND_ID}] %(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Metrics
-request_count = 0
-total_response_time = 0.0
-
 @app.before_request
 def before_request():
-    """Track request start time and request ID"""
-    g.start_time = time.time()
     g.request_id = request.headers.get('X-Request-ID', 'unknown')
-    logger.info(f"[{g.request_id}] Incoming: {request.method} {request.path}")
+    logging.info(f"[{g.request_id}] {request.method} {request.path}")
 
-@app.after_request
-def after_request(response):
-    """Log response metrics"""
-    duration = time.time() - g.start_time
-    logger.info(f"[{g.request_id}] Response: {response.status_code} in {duration:.3f}s")
+@app.route('/v1/chat/completions', methods=['POST'])
+def chat_completion():
+    logging.info(f"[{g.request_id}] Processing chat completion")
+    # ... process request ...
+    logging.info(f"[{g.request_id}] Completed in 2.3s")
+    return jsonify(response), 200
+```
 
-    # Update metrics
-    global request_count, total_response_time
-    request_count += 1
-    total_response_time += duration
+**Trace a request:**
 
-    # Add response headers
-    response.headers['X-Backend-ID'] = BACKEND_ID
-    response.headers['X-Request-ID'] = g.request_id
-    response.headers['X-Processing-Time'] = f"{duration:.3f}"
+```bash
+# Client makes request
+REQUEST_ID=$(curl -s https://api-gateway.local/v1/chat/completions \
+             -H "Content-Type: application/json" \
+             -d '{"model": "gpt-4", "messages": []}' \
+             -I | grep X-Request-ID | awk '{print $2}' | tr -d '\r')
 
-    return response
+echo "Request ID: $REQUEST_ID"
+
+# Find in gateway logs
+grep "$REQUEST_ID" /var/log/nginx/api-gateway-access.log
+
+# Find in backend logs
+docker-compose logs backend1 | grep "$REQUEST_ID"
+```
+
+**Output:**
+
+```
+Request ID: a7f3c9d8-1a2b-4c5d-8e9f-0a1b2c3d4e5f
+
+# Gateway log
+[19/Jan/2026:14:23:45] request_id=a7f3c9d8 rt=2.341 upstream=backend1:8000
+
+# Backend log
+[14:23:45] [a7f3c9d8] POST /v1/chat/completions
+[14:23:45] [a7f3c9d8] Processing chat completion
+[14:23:47] [a7f3c9d8] Completed in 2.3s
+```
+
+Complete visibility across the entire request path.
+
+### V4 Benefits
+
+1. **Real-time metrics**: Prometheus tracks requests, latency, errors
+2. **Visual dashboards**: Grafana shows trends and anomalies
+3. **Centralized logging**: Loki aggregates logs from all components
+4. **Distributed tracing**: Request ID correlates logs across services
+5. **Proactive alerting**: Alert on high error rates, slow responses
+6. **Historical analysis**: Query past performance for capacity planning
+
+### V4 Complete Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Client Applications                   │
+└───────────────────┬─────────────────────────────────────┘
+                    │ HTTPS (TLS 1.3)
+                    │ X-Request-ID
+                    ↓
+┌─────────────────────────────────────────────────────────┐
+│                 Nginx API Gateway                        │
+│  - Load Balancing (weighted, least_conn)               │
+│  - Health Checks (active probes every 5s)              │
+│  - Circuit Breaker (5 failures → open)                 │
+│  - SSL/TLS Termination                                 │
+│  - Rate Limiting (100 req/s per client)                │
+│  - Request Routing (header/URI based)                  │
+└───┬─────────┬─────────┬──────────────┬─────────────────┘
+    │         │         │              │
+    │         │         │              │ Logs
+    │         │         │              ↓
+    │         │         │         ┌─────────────┐
+    │         │         │         │  Promtail   │
+    │         │         │         └──────┬──────┘
+    │         │         │                ↓
+    │         │         │         ┌─────────────┐
+    │         │         │         │    Loki     │
+    │         │         │         └─────────────┘
+    │         │         │
+    │         │         │ Metrics
+    │         │         ↓
+    │         │    ┌────────────────┐
+    │         │    │  Nginx Exporter│
+    │         │    └────────┬───────┘
+    │         │             │
+    │         │             ↓
+    │         │    ┌────────────────┐
+    │         │    │  Prometheus    │
+    │         │    └────────┬───────┘
+    │         │             │
+    │         │             ↓
+    │         │    ┌────────────────┐
+    │         │    │    Grafana     │
+    │         │    └────────────────┘
+    │         │             ↓
+    │         │    ┌────────────────┐
+    │         │    │ Alertmanager   │
+    │         │    └────────────────┘
+    │         │
+    ↓         ↓         ↓
+┌─────┐  ┌─────┐  ┌─────┐
+│Back │  │Back │  │Back │
+│end 1│  │end 2│  │end 3│
+│(w=3)│  │(w=2)│  │(w=1)│
+└─────┘  └─────┘  └─────┘
+```
+
+## Hands-On Labs
+
+### Lab 1: Build Basic Nginx Gateway
+
+**Objective:** Set up Nginx with round-robin load balancing across 3 backends.
+
+**Time:** 30 minutes
+
+**Steps:**
+
+1. **Install Nginx:**
+```bash
+sudo apt update
+sudo apt install nginx
+sudo systemctl enable nginx
+sudo systemctl start nginx
+```
+
+2. **Create backend server (backend.py):**
+```python
+#!/usr/bin/env python3
+from flask import Flask, request, jsonify
+import os
+import time
+import random
+
+BACKEND_ID = os.environ.get('BACKEND_ID', '1')
+PORT = int(os.environ.get('PORT', 8001))
+
+app = Flask(__name__)
 
 @app.route('/health')
-def health_check():
-    """Health check endpoint"""
-    # Simulate occasional health check failure (5% chance)
-    if random.random() < 0.05:
-        logger.warning("Health check failed (simulated)")
-        return jsonify({
-            'status': 'unhealthy',
-            'backend_id': BACKEND_ID,
-            'reason': 'simulated_failure'
-        }), 503
-
-    return jsonify({
-        'status': 'healthy',
-        'backend_id': BACKEND_ID,
-        'requests_served': request_count,
-        'avg_response_time': total_response_time / request_count if request_count > 0 else 0
-    }), 200
+def health():
+    return jsonify({'status': 'healthy', 'backend_id': BACKEND_ID}), 200
 
 @app.route('/v1/chat/completions', methods=['POST'])
 def chat_completions():
-    """Chat completion endpoint"""
-    data = request.get_json()
-
-    # Validate request
-    if not data or 'messages' not in data:
-        return jsonify({'error': 'Invalid request: missing messages'}), 400
-
-    model = data.get('model', 'gpt-4')
-    messages = data.get('messages', [])
-
-    logger.info(f"[{g.request_id}] Processing chat completion: model={model}, messages={len(messages)}")
-
-    # Simulate processing time (0.5-3 seconds)
-    processing_time = random.uniform(0.5, 3.0)
-    time.sleep(processing_time)
-
-    # Simulate occasional failures (2% chance)
-    if random.random() < 0.02:
-        logger.error(f"[{g.request_id}] Simulated backend error")
-        return jsonify({'error': 'Internal server error'}), 500
-
-    # Generate response
-    response = {
-        'id': f'chatcmpl-{int(time.time())}',
-        'object': 'chat.completion',
-        'created': int(time.time()),
-        'model': model,
-        'choices': [{
-            'index': 0,
-            'message': {
-                'role': 'assistant',
-                'content': f'Response from backend {BACKEND_ID}'
-            },
-            'finish_reason': 'stop'
-        }],
-        'usage': {
-            'prompt_tokens': 10,
-            'completion_tokens': 20,
-            'total_tokens': 30
-        },
+    time.sleep(random.uniform(0.5, 2.0))
+    return jsonify({
         'backend_id': BACKEND_ID,
-        'processing_time': processing_time
-    }
-
-    return jsonify(response), 200
-
-@app.route('/v1/embeddings', methods=['POST'])
-def embeddings():
-    """Embeddings endpoint"""
-    data = request.get_json()
-
-    if not data or 'input' not in data:
-        return jsonify({'error': 'Invalid request: missing input'}), 400
-
-    input_text = data.get('input', '')
-    model = data.get('model', 'text-embedding-ada-002')
-
-    logger.info(f"[{g.request_id}] Processing embeddings: model={model}")
-
-    # Simulate processing (faster than chat)
-    time.sleep(random.uniform(0.1, 0.5))
-
-    # Generate fake embedding vector
-    embedding = [random.random() for _ in range(1536)]
-
-    response = {
-        'object': 'list',
-        'data': [{
-            'object': 'embedding',
-            'embedding': embedding,
-            'index': 0
-        }],
-        'model': model,
-        'usage': {
-            'prompt_tokens': 8,
-            'total_tokens': 8
-        },
-        'backend_id': BACKEND_ID
-    }
-
-    return jsonify(response), 200
-
-@app.route('/metrics')
-def metrics():
-    """Prometheus-style metrics"""
-    avg_response_time = total_response_time / request_count if request_count > 0 else 0
-
-    metrics_text = f"""# HELP backend_requests_total Total requests processed
-# TYPE backend_requests_total counter
-backend_requests_total{{backend_id="{BACKEND_ID}"}} {request_count}
-
-# HELP backend_response_time_seconds Average response time
-# TYPE backend_response_time_seconds gauge
-backend_response_time_seconds{{backend_id="{BACKEND_ID}"}} {avg_response_time:.3f}
-"""
-
-    return metrics_text, 200, {'Content-Type': 'text/plain'}
+        'model': request.json.get('model', 'gpt-4'),
+        'choices': [{'message': {'content': f'Response from backend {BACKEND_ID}'}}]
+    }), 200
 
 if __name__ == '__main__':
-    logger.info(f"Starting backend {BACKEND_ID} on port {PORT}")
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    app.run(host='0.0.0.0', port=PORT)
 ```
 
-**Test the complete setup:**
-
+3. **Install Flask and start backends:**
 ```bash
-# Start backends
-python3 backend.py &  # Backend 1 on port 8000
-PORT=8001 BACKEND_ID=2 python3 backend.py &  # Backend 2 on port 8001
-PORT=8002 BACKEND_ID=3 python3 backend.py &  # Backend 3 on port 8002
+pip install flask
 
-# Reload Nginx
-sudo nginx -t && sudo nginx -s reload
+# Terminal 1
+PORT=8001 BACKEND_ID=1 python3 backend.py &
 
-# Test health check
-curl https://api.vexpertai.local/health
+# Terminal 2
+PORT=8002 BACKEND_ID=2 python3 backend.py &
 
-# Test chat completion (will round-robin across backends)
-for i in {1..10}; do
-    curl -k https://api.vexpertai.local/v1/chat/completions \
-         -H "Content-Type: application/json" \
-         -H "X-Model-Provider: openai" \
-         -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}' | \
-    jq -r '.backend_id'
-done
-
-# Check load distribution
-tail -20 /var/log/nginx/access.log | grep chat/completions
+# Terminal 3
+PORT=8003 BACKEND_ID=3 python3 backend.py &
 ```
 
-**Output:**
-
-```
-Backend: 1
-Backend: 2
-Backend: 3
-Backend: 1
-Backend: 2
-Backend: 3
-Backend: 1
-Backend: 2
-Backend: 3
-Backend: 1
-
-Gateway metrics:
-- Total requests: 10
-- Backend 1: 4 requests (weight=3, highest capacity)
-- Backend 2: 3 requests (weight=2)
-- Backend 3: 3 requests (weight=1, but not backup, so gets traffic)
-- Average response time: 1.8s
-- Errors: 0
-- Retries: 0
-```
-
-Perfect load distribution. All backends healthy. Gateway working as expected.
-
-## Operational Considerations
-
-### Capacity Planning
-
-Calculate required gateway capacity:
-
-```
-Requests per second (RPS) = (peak concurrent users × avg requests per user per minute) / 60
-
-Example:
-- 100 concurrent users
-- Each makes 10 API calls per minute (chat, embeddings, follow-ups)
-- RPS = (100 × 10) / 60 = 16.7 RPS
-
-With 3 backends:
-- Per backend: ~6 RPS
-- With 2x headroom: need 12 RPS capacity per backend
-```
-
-**Load test with Apache Bench:**
-
-```bash
-# Test gateway capacity
-ab -n 1000 -c 10 -p request.json -T application/json \
-   https://api.vexpertai.local/v1/chat/completions
-
-# request.json:
-# {"model":"gpt-4","messages":[{"role":"user","content":"test"}]}
-```
-
-**Output:**
-
-```
-Requests per second:    45.23 [#/sec] (mean)
-Time per request:       221.1 [ms] (mean)
-Time per request:       22.1 [ms] (mean, across all concurrent requests)
-
-Percentage of requests served within a certain time (ms)
-  50%    210
-  66%    245
-  75%    280
-  80%    310
-  90%    390
-  95%    450
-  98%    520
-  99%    580
- 100%    750 (longest request)
-```
-
-Gateway can handle 45 RPS with 10 concurrent connections. More than enough for 100 users.
-
-### Security Hardening
-
-**API key validation:**
-
+4. **Configure Nginx (/etc/nginx/conf.d/api-gateway.conf):**
 ```nginx
-# /etc/nginx/conf.d/api-gateway.conf
-geo $api_key_valid {
-    default 0;
+upstream llm_backends {
+    server 127.0.0.1:8001;
+    server 127.0.0.1:8002;
+    server 127.0.0.1:8003;
 }
 
-map $http_authorization $api_key_valid {
-    "Bearer sk-vexpertai-prod-abc123" 1;
-    "Bearer sk-vexpertai-dev-xyz789" 1;
+server {
+    listen 80;
+    server_name localhost;
+
+    location /v1/chat/completions {
+        proxy_pass http://llm_backends;
+        proxy_set_header Host $host;
+    }
+
+    location /health {
+        return 200 '{"status":"healthy"}';
+        add_header Content-Type application/json;
+    }
+}
+```
+
+5. **Test configuration and reload:**
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+6. **Test load balancing:**
+```bash
+for i in {1..9}; do
+    curl -s http://localhost/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' | \
+    jq -r '.backend_id'
+done
+```
+
+**Expected Results:**
+- Each backend gets exactly 3 requests (1, 2, 3, 1, 2, 3, 1, 2, 3)
+- Perfect round-robin distribution
+- All responses return in <3 seconds
+
+### Lab 2: Add Health Checks & Circuit Breaker
+
+**Objective:** Implement passive health checks and simulate circuit breaker behavior.
+
+**Time:** 45 minutes
+
+**Prerequisites:** Lab 1 completed
+
+**Steps:**
+
+1. **Update Nginx config with health checks:**
+```nginx
+upstream llm_backends {
+    server 127.0.0.1:8001 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8002 max_fails=3 fail_timeout=30s;
+    server 127.0.0.1:8003 max_fails=3 fail_timeout=30s;
+}
+
+server {
+    listen 80;
+
+    location /v1/chat/completions {
+        proxy_pass http://llm_backends;
+
+        # Retry configuration
+        proxy_next_upstream error timeout http_502 http_503;
+        proxy_next_upstream_tries 3;
+
+        # Timeouts
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 30s;
+        proxy_read_timeout 30s;
+    }
+}
+```
+
+2. **Reload Nginx:**
+```bash
+sudo systemctl reload nginx
+```
+
+3. **Test failover - stop backend 1:**
+```bash
+# Find backend 1 process ID
+ps aux | grep "BACKEND_ID=1"
+
+# Kill backend 1
+pkill -f "BACKEND_ID=1"
+```
+
+4. **Make requests and observe failover:**
+```bash
+for i in {1..12}; do
+    echo -n "Request $i: "
+    curl -s http://localhost/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' | \
+    jq -r '.backend_id // "ERROR"'
+done
+```
+
+**Expected output:**
+```
+Request 1: ERROR (trying backend 1, connection refused, retries to 2)
+Request 2: 2
+Request 3: 3
+Request 4: ERROR (still trying 1, fails, retries to 2)
+Request 5: 2
+Request 6: 3
+Request 7: 2 (backend 1 marked down after 3 failures)
+Request 8: 3
+Request 9: 2
+Request 10: 3
+Request 11: 2
+Request 12: 3
+```
+
+After 3 failures, backend 1 is marked down. Traffic only goes to backends 2 and 3.
+
+5. **Restart backend 1 and observe recovery:**
+```bash
+PORT=8001 BACKEND_ID=1 python3 backend.py &
+
+# Wait 30 seconds (fail_timeout)
+sleep 30
+
+# Test again
+for i in {1..6}; do
+    curl -s http://localhost/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' | \
+    jq -r '.backend_id'
+done
+```
+
+**Expected output:**
+```
+1
+2
+3
+1
+2
+3
+```
+
+Backend 1 is back in rotation after fail_timeout expires.
+
+### Lab 3: Deploy Complete Monitoring Stack
+
+**Objective:** Set up Prometheus, Grafana, and Loki for comprehensive monitoring.
+
+**Time:** 60 minutes
+
+**Prerequisites:** Lab 2 completed, Docker and Docker Compose installed
+
+**Steps:**
+
+1. **Create project directory:**
+```bash
+mkdir api-gateway-monitoring
+cd api-gateway-monitoring
+```
+
+2. **Create docker-compose.yml** (see V4 section for full file)
+
+3. **Create prometheus.yml** (see V4 section)
+
+4. **Create nginx.conf:**
+```nginx
+http {
+    log_format api_detailed '$remote_addr - $remote_user [$time_local] '
+                           '"$request" $status $body_bytes_sent '
+                           'rt=$request_time urt="$upstream_response_time"';
+
+    access_log /var/log/nginx/access.log api_detailed;
+
+    upstream llm_backends {
+        server backend1:8000;
+        server backend2:8000;
+        server backend3:8000;
+    }
+
+    server {
+        listen 80;
+
+        location /v1/chat/completions {
+            proxy_pass http://llm_backends;
+        }
+
+        location /metrics {
+            stub_status on;
+            access_log off;
+        }
+    }
+}
+```
+
+5. **Start the stack:**
+```bash
+docker-compose up -d
+```
+
+6. **Verify all services are running:**
+```bash
+docker-compose ps
+```
+
+**Expected output:**
+```
+NAME                    STATUS
+nginx                   Up
+backend1                Up
+backend2                Up
+backend3                Up
+nginx-exporter          Up
+prometheus              Up
+grafana                 Up
+loki                    Up
+promtail                Up
+```
+
+7. **Access Grafana:**
+- URL: http://localhost:3000
+- Login: admin / admin
+- Add Prometheus data source: http://prometheus:9090
+- Add Loki data source: http://loki:3100
+
+8. **Import Nginx dashboard:**
+- Go to Create → Import
+- Dashboard ID: 12708
+- Select Prometheus data source
+
+9. **Generate test traffic:**
+```bash
+for i in {1..1000}; do
+    curl -s http://localhost/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' > /dev/null &
+    sleep 0.1
+done
+```
+
+10. **View metrics in Grafana:**
+- Request rate (requests/second)
+- Response time (p50, p95, p99)
+- Error rate
+- Backend distribution
+
+**Expected Results:**
+- Dashboard shows ~10 requests/second
+- P95 latency < 3 seconds
+- Equal distribution across 3 backends
+- 0% error rate
+
+## Check Your Understanding
+
+<details>
+<summary><strong>Question 1:</strong> When should you use least_conn vs round-robin load balancing?</summary>
+
+**Answer:**
+
+**Round-robin:**
+- **How it works:** Distribute requests sequentially to backends (1→2→3→1→2→3...)
+- **Best for:** Uniform request processing time
+- **Use cases:**
+  - Embeddings API (consistent ~200ms per request)
+  - Quick queries (all complete in 1-2 seconds)
+  - Stateless operations
+  - Homogeneous backends (same hardware, same capacity)
+
+**Example:** Text embedding requests all take 200ms ± 50ms. Round-robin gives perfect distribution.
+
+---
+
+**Least connections:**
+- **How it works:** Route to backend with fewest active connections
+- **Best for:** Variable request processing time
+- **Use cases:**
+  - Chat completions (some 2s, some 30s depending on prompt)
+  - Streaming responses (long-lived connections)
+  - Mixed workloads (chat + embeddings + image generation)
+  - Heterogeneous backends (different hardware specs)
+
+**Example scenario showing the difference:**
+
+```
+Time 0s: Request 1 arrives (will take 30s)
+  Round-robin → Backend 1 (now busy for 30s)
+
+Time 1s: Request 2 arrives (will take 2s)
+  Round-robin → Backend 2 (completes at 3s)
+  Least-conn → Backend 2 (completes at 3s)
+
+Time 2s: Request 3 arrives (will take 2s)
+  Round-robin → Backend 3 (completes at 4s)
+  Least-conn → Backend 3 (completes at 4s)
+
+Time 3s: Request 4 arrives (will take 2s)
+  Round-robin → Backend 1 (still busy! Queues, completes at 30s+2s=32s)
+  Least-conn → Backend 2 (connections: B1=1, B2=0, B3=0 → goes to B2, completes at 5s)
+```
+
+**Round-robin:** Request 4 waits 29 seconds because it went to busy backend
+**Least-conn:** Request 4 completes in 2 seconds because it went to idle backend
+
+**Performance difference:**
+- Round-robin: Average latency = (30+2+2+32)/4 = 16.5s
+- Least-conn: Average latency = (30+2+2+2)/4 = 9s
+
+**Least-conn is 45% faster for variable workloads.**
+
+**Networking analogy:**
+- Round-robin = per-packet load balancing (ECMP)
+- Least-conn = per-flow load balancing with flow awareness (like CEF with interface load tracking)
+
+**When NOT to use least-conn:**
+- Backend session affinity needed (use ip_hash instead)
+- Very short requests (<100ms) where connection overhead dominates
+- Backends have different capacities (use weighted round-robin instead)
+</details>
+
+<details>
+<summary><strong>Question 2:</strong> How does a circuit breaker prevent cascading failures?</summary>
+
+**Answer:**
+
+**The Cascading Failure Problem:**
+
+Without circuit breaker:
+
+```
+Backend fails → Client retries (30s timeout) → Backend still down → Client retries again → ...
+```
+
+**Scenario:** Backend dies at 14:00:00
+
+```
+14:00:00 - Request 1 → Backend → timeout after 30s (wasted)
+14:00:05 - Request 2 → Backend → timeout after 30s (wasted)
+14:00:10 - Request 3 → Backend → timeout after 30s (wasted)
+...
+14:10:00 - Request 120 → Backend → timeout after 30s (wasted)
+```
+
+**Total time wasted:** 120 requests × 30s = 3,600 seconds (60 minutes)
+
+**Worse:** If you have retries configured:
+
+```
+Each request tries 3 backends × 30s = 90s per request
+120 requests = 10,800 seconds (3 hours wasted)
+```
+
+**Cascade to other components:**
+- Thread pool exhausted (all threads waiting for timeouts)
+- Memory pressure (queued requests accumulate)
+- Database connections held (transactions waiting for API response)
+- Monitoring overwhelmed (thousands of timeout errors logged)
+- User experience destroyed (pages loading forever)
+
+**The Circuit Breaker Solution:**
+
+**States:**
+
+```
+CLOSED (normal) → OPEN (failing fast) → HALF-OPEN (testing) → CLOSED
+```
+
+**Behavior with circuit breaker:**
+
+```
+14:00:00 - Request 1 → Backend → timeout after 30s (failure 1)
+14:00:05 - Request 2 → Backend → timeout after 30s (failure 2)
+14:00:10 - Request 3 → Backend → timeout after 30s (failure 3)
+14:00:15 - Request 4 → Backend → timeout after 30s (failure 4)
+14:00:20 - Request 5 → Backend → timeout after 30s (failure 5, CIRCUIT OPENS)
+14:00:25 - Request 6 → Circuit breaker → INSTANT fail (no backend call)
+14:00:30 - Request 7 → Circuit breaker → INSTANT fail (no backend call)
+...
+14:00:50 - Request 15 → Circuit breaker → INSTANT fail
+14:00:50 - (30 seconds elapsed, circuit enters HALF-OPEN)
+14:00:55 - Request 16 → Backend (test request) → succeeds! (success 1)
+14:01:00 - Request 17 → Backend → succeeds! (success 2, CIRCUIT CLOSES)
+14:01:05 - Request 18 → Backend → normal operation
+```
+
+**Time saved:**
+- First 5 requests: 5 × 30s = 150s (unavoidable, detecting failure)
+- Next 10 requests: 10 × 0.01s = 0.1s (instant fail via circuit breaker)
+- **Without circuit breaker:** 15 × 30s = 450s
+- **With circuit breaker:** 150s + 0.1s = 150.1s
+- **Savings:** 299.9 seconds (5 minutes)
+
+**How it prevents cascade:**
+
+1. **Thread pool protection:**
+   - Without CB: 120 threads stuck waiting for timeouts
+   - With CB: Only 5 threads blocked, rest fail fast
+
+2. **Memory protection:**
+   - Without CB: 120 requests queued in memory
+   - With CB: Requests fail immediately, no queueing
+
+3. **User experience:**
+   - Without CB: Page loads hang for 30-90 seconds
+   - With CB: Fast failure, can show error message immediately
+
+4. **Monitoring sanity:**
+   - Without CB: 120 timeout errors logged
+   - With CB: 5 timeout errors + circuit breaker open event
+
+5. **Recovery speed:**
+   - Without CB: Clients keep hammering failed backend
+   - With CB: Backend gets 30s breathing room to recover
+
+**Real-world example:**
+
+AWS outage (us-east-1, 2017):
+- S3 API down
+- Services without circuit breakers: cascading failures across all regions
+- Services with circuit breakers: isolated to us-east-1, other regions unaffected
+
+**Configuration guidelines:**
+
+```lua
+FAILURE_THRESHOLD = 5      -- Open after 5 consecutive failures
+                           -- Too low: false positives from transient errors
+                           -- Too high: slow to detect real failures
+
+SUCCESS_THRESHOLD = 2      -- Close after 2 consecutive successes
+                           -- Ensures backend is stable before full traffic
+
+TIMEOUT = 30              -- Half-open after 30 seconds
+                          -- Too short: hammering failing backend
+                          -- Too long: slow recovery
+```
+
+**When to use circuit breakers:**
+- External API calls (OpenAI, Anthropic, etc.)
+- Database connections
+- Microservice calls
+- Any network operation with timeout risk
+
+**When NOT needed:**
+- Local function calls (no network)
+- Operations faster than circuit breaker overhead (<10ms)
+- Single-replica services (no failover alternative)
+</details>
+
+<details>
+<summary><strong>Question 3:</strong> What's the difference between passive and active health checks?</summary>
+
+**Answer:**
+
+**Passive Health Checks (Built into Nginx open-source):**
+
+**How they work:**
+- Monitor requests that clients actually make
+- Mark backend down after N consecutive failures
+- No separate monitoring traffic
+
+**Configuration:**
+
+```nginx
+upstream backends {
+    server 10.1.1.10:8000 max_fails=3 fail_timeout=30s;
+}
+```
+
+- `max_fails=3`: Mark down after 3 consecutive failures
+- `fail_timeout=30s`: Wait 30s before retrying
+
+**Behavior:**
+
+```
+Client request 1 → Backend → 502 error (fail count: 1)
+Client request 2 → Backend → 502 error (fail count: 2)
+Client request 3 → Backend → 502 error (fail count: 3, MARKED DOWN)
+Client request 4 → Routes to different backend
+...wait 30 seconds...
+Client request N → Backend → tries again (test request)
+```
+
+**Pros:**
+- Free (built into Nginx)
+- No extra traffic (uses real client requests)
+- Simple configuration
+- Works for any protocol Nginx supports
+
+**Cons:**
+- **Reactive, not proactive:** Only detects failures when clients make requests
+- **Client impact:** First 3 clients get errors before backend is marked down
+- **Slow detection:** If traffic is sparse (1 request/min), takes 3 minutes to detect failure
+- **No pre-failure detection:** Can't detect degraded performance (high latency but not failing)
+
+---
+
+**Active Health Checks (Nginx Plus or OpenResty):**
+
+**How they work:**
+- Send probes to backends independently of client traffic
+- Check at regular intervals (e.g., every 5 seconds)
+- Can validate response content, not just status code
+
+**Configuration (OpenResty):**
+
+```nginx
+http {
+    lua_shared_dict healthcheck 1m;
+
+    init_worker_by_lua_block {
+        local hc = require "resty.healthcheck"
+
+        hc.spawn_checker{
+            upstream = "backends",
+            type = "http",
+            http_req = "GET /health HTTP/1.0\r\nHost: api\r\n\r\n",
+
+            interval = 5000,     -- Check every 5 seconds
+            timeout = 2000,      -- 2 second timeout
+            fall = 3,            -- Mark down after 3 failures
+            rise = 2,            -- Mark up after 2 successes
+
+            valid_statuses = {200, 201},
+        }
+    }
+}
+```
+
+**Behavior:**
+
+```
+00:00 - Probe: GET /health → 200 OK (healthy)
+00:05 - Probe: GET /health → 200 OK (healthy)
+00:10 - Backend crashes
+00:15 - Probe: GET /health → timeout (failure 1)
+00:20 - Probe: GET /health → timeout (failure 2)
+00:25 - Probe: GET /health → timeout (failure 3, MARKED DOWN)
+00:30 - Client request → Routes to healthy backend (no client impact!)
+```
+
+**Pros:**
+- **Proactive detection:** Finds failures before clients hit them
+- **Fast detection:** 15 seconds in example above (3 probes × 5s interval)
+- **No client impact:** Backend marked down before any client gets error
+- **Consistent:** Detection time doesn't depend on traffic volume
+- **Content validation:** Can check response body, not just status code
+- **Performance monitoring:** Can measure latency trends
+
+**Cons:**
+- Requires Nginx Plus (commercial) or OpenResty (more complex)
+- Generates monitoring traffic (bandwidth cost)
+- Backend must implement health endpoint
+- More complex configuration
+
+---
+
+**Comparison Example:**
+
+**Scenario:** Backend fails at 14:00:00. Traffic: 1 request every 10 seconds.
+
+**Passive health checks (max_fails=3):**
+```
+14:00:00 - Backend fails
+14:00:10 - Client request 1 → 502 error (client sees error!)
+14:00:20 - Client request 2 → 502 error (client sees error!)
+14:00:30 - Client request 3 → 502 error (client sees error!)
+14:00:40 - Backend marked down, traffic routes elsewhere
+```
+- **Detection time:** 40 seconds
+- **Client impact:** 3 clients got errors
+
+**Active health checks (interval=5s, fall=3):**
+```
+14:00:00 - Backend fails
+14:00:05 - Probe 1 → timeout (failure 1)
+14:00:10 - Probe 2 → timeout (failure 2)
+14:00:15 - Probe 3 → timeout (failure 3, MARKED DOWN)
+14:00:20 - Client request → routes to healthy backend (no error!)
+```
+- **Detection time:** 15 seconds
+- **Client impact:** 0 clients got errors
+
+---
+
+**Best Practices:**
+
+**Use passive when:**
+- Budget constrained (Nginx open-source only)
+- High traffic volume (failures detected quickly anyway)
+- Backend doesn't support health endpoints
+- Simple setup needed
+
+**Use active when:**
+- Budget allows (Nginx Plus or comfortable with OpenResty)
+- Low traffic volume (passive would be slow)
+- Zero client error tolerance
+- Need proactive monitoring
+
+**Hybrid approach (best of both):**
+```nginx
+upstream backends {
+    # Passive: fail_timeout very short to recover fast
+    server 10.1.1.10:8000 max_fails=1 fail_timeout=5s;
+
+    # Active health checks also running
+    # (OpenResty config from above)
+}
+```
+
+- Active checks: Proactive detection, mark down before clients hit
+- Passive checks: Safety net if active checks miss something
+- Short fail_timeout: Fast recovery if active check marks up prematurely
+
+**Networking analogy:**
+- Passive health checks = Interface error-disable (react to errors)
+- Active health checks = BFD (proactive failure detection)
+</details>
+
+<details>
+<summary><strong>Question 4:</strong> Why use idempotency keys for retry logic?</summary>
+
+**Answer:**
+
+**The Problem: Duplicate Operations**
+
+Without idempotency keys:
+
+```
+Client sends: "Generate image: sunset over mountains"
+↓
+Request → Gateway → Backend → OpenAI API → Starts processing (charges $0.50)
+↓
+Network glitch (client doesn't receive response)
+↓
+Client retries: "Generate image: sunset over mountains"
+↓
+Request → Gateway → Backend → OpenAI API → Starts ANOTHER image (charges $0.50 again)
+↓
+Client gets TWO images, charged $1.00 instead of $0.50
+```
+
+**Worse scenarios:**
+
+**1. Financial operations:**
+```
+Request: "Charge customer $100 for API credits"
+Network error → Retry
+Result: Customer charged $200
+```
+
+**2. Configuration changes:**
+```
+Request: "Add firewall rule: permit 10.0.0.0/8"
+Timeout → Retry
+Result: Duplicate firewall rules, config errors
+```
+
+**3. Expensive LLM calls:**
+```
+Request: "Fine-tune model on 10GB dataset" ($1,000 cost)
+Timeout after 2 hours → Retry
+Result: Two fine-tuning jobs, $2,000 cost
+```
+
+---
+
+**The Solution: Idempotency Keys**
+
+**Concept:** Same key = same operation = same result
+
+```
+Client sends: "Generate image" + Idempotency-Key: abc123
+↓
+Request → Backend → Processes image → Returns result → CACHES result with key abc123
+↓
+Network glitch
+↓
+Client retries: "Generate image" + Idempotency-Key: abc123 (SAME KEY)
+↓
+Request → Backend → Sees key abc123 in cache → Returns CACHED result (no new API call!)
+```
+
+**Implementation:**
+
+**Client side:**
+
+```python
+import requests
+import uuid
+
+def call_api_with_retry(url, payload, max_retries=3):
+    # Generate unique key for THIS operation
+    idempotency_key = str(uuid.uuid4())
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(
+                url,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': idempotency_key  # SAME key for all retries
+                },
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            # Retry on server errors
+            if response.status_code >= 500:
+                print(f"Attempt {attempt + 1} failed, retrying...")
+                time.sleep(2 ** attempt)  # Exponential backoff
+                continue
+
+        except requests.exceptions.RequestException:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)
+                continue
+
+    raise Exception("All retries exhausted")
+```
+
+**Backend side (Flask):**
+
+```python
+from flask import Flask, request, jsonify
+import hashlib
+import redis
+
+app = Flask(__name__)
+cache = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+@app.route('/v1/images/generations', methods=['POST'])
+def generate_image():
+    idempotency_key = request.headers.get('Idempotency-Key')
+
+    if not idempotency_key:
+        return jsonify({'error': 'Idempotency-Key required'}), 400
+
+    # Check cache for duplicate request
+    cached_response = cache.get(f"idem:{idempotency_key}")
+    if cached_response:
+        print(f"Duplicate request detected: {idempotency_key}")
+        return jsonify(json.loads(cached_response)), 200
+
+    # Process request (expensive operation)
+    print(f"Processing new request: {idempotency_key}")
+    result = {
+        'id': 'img-123',
+        'url': 'https://cdn.example.com/sunset.png',
+        'cost': 0.50
+    }
+
+    # Cache result for 24 hours
+    cache.setex(f"idem:{idempotency_key}", 86400, json.dumps(result))
+
+    return jsonify(result), 200
+```
+
+**Test output:**
+
+```bash
+# First attempt
+curl -X POST https://api.example.com/v1/images/generations \
+     -H "Idempotency-Key: abc123" \
+     -H "Content-Type: application/json" \
+     -d '{"prompt": "sunset"}'
+
+# Backend log: Processing new request: abc123
+# Response: {"id": "img-123", "url": "...", "cost": 0.50}
+# Time: 10 seconds
+# Charge: $0.50
+
+# Retry (network error, client didn't receive)
+curl -X POST https://api.example.com/v1/images/generations \
+     -H "Idempotency-Key: abc123" \  # SAME KEY
+     -H "Content-Type: application/json" \
+     -d '{"prompt": "sunset"}'
+
+# Backend log: Duplicate request detected: abc123
+# Response: {"id": "img-123", "url": "...", "cost": 0.50}  # SAME response
+# Time: 0.01 seconds (cached)
+# Charge: $0.00 (no duplicate call)
+```
+
+---
+
+**Key Guidelines:**
+
+**1. Generate key on client:**
+```python
+# CORRECT: Client generates UUID
+idempotency_key = str(uuid.uuid4())
+
+# WRONG: Using request hash (different for retries)
+idempotency_key = hashlib.md5(json.dumps(payload)).hexdigest()
+```
+
+**2. Use same key for all retries of SAME operation:**
+```python
+# One idempotency key per logical operation
+key = uuid.uuid4()
+
+# All retries use same key
+for retry in range(3):
+    response = call_api(key=key)
+```
+
+**3. Cache TTL should be reasonable:**
+```python
+# Too short: Retry after TTL expires = duplicate operation
+cache.setex(key, 60, result)  # Only 1 minute
+
+# Better: Long enough for all retries
+cache.setex(key, 86400, result)  # 24 hours
+
+# Production: Match payment/refund window
+cache.setex(key, 2592000, result)  # 30 days
+```
+
+**4. Handle cache misses gracefully:**
+```python
+# Cache expired or evicted
+cached = cache.get(key)
+if cached:
+    return cached
+else:
+    # Process again (client may have to pay again)
+    # Log for investigation
+    logger.warn(f"Idempotency key expired: {key}")
+```
+
+---
+
+**When Idempotency Keys Are Critical:**
+
+1. **Payment/billing APIs:** Prevent duplicate charges
+2. **State-changing operations:** Database writes, config changes
+3. **Expensive operations:** LLM fine-tuning, large batch processing
+4. **Distributed systems:** Network partitions cause retries
+5. **Mobile clients:** Unreliable networks, frequent retries
+
+**When NOT Needed:**
+
+1. **Read-only operations:** GET requests (already idempotent)
+2. **Cheap operations:** <$0.01 cost, <100ms duration
+3. **Single-attempt requests:** No retry logic
+
+---
+
+**Real-world benefit:**
+
+Stripe (payment API):
+- Uses idempotency keys for all POST requests
+- Prevents duplicate charges from network retries
+- Caches results for 24 hours
+- Saved millions in duplicate transaction reversals
+
+**Bottom line:** Idempotency keys are like TCP sequence numbers for application-layer operations. They ensure "exactly-once" semantics even with "at-least-once" delivery.
+</details>
+
+## Lab Time Budget
+
+| Phase | Time | Cost | Notes |
+|-------|------|------|-------|
+| **Environment Setup** | 15 min | Free | Install Nginx, Python, Docker |
+| **Lab 1: Basic Gateway** | 30 min | Free | Round-robin load balancing |
+| **Lab 2: Health & Failover** | 45 min | Free | Circuit breakers, retry logic |
+| **Lab 3: Monitoring Stack** | 60 min | Free | Prometheus + Grafana (local) |
+| **SSL Certificate Setup** | 15 min | Free | Let's Encrypt (production) |
+| **Production Testing** | 30 min | $10-20 | Load testing, failover drills |
+| **TOTAL** | **3.25 hours** | **$10-20** | One-time learning investment |
+
+**Monthly Production Costs:**
+
+| Component | Cost | Scaling Notes |
+|-----------|------|---------------|
+| API Gateway VM (2 vCPU, 4GB RAM) | $40-60 | AWS t3.medium, GCP e2-medium |
+| SSL Certificate | Free | Let's Encrypt auto-renewal |
+| Backend VMs (3× 2 vCPU, 4GB RAM) | $120-180 | Can use spot instances |
+| Monitoring (Prometheus + Grafana) | Free-$50 | Self-hosted free, managed ~$50/mo |
+| Load testing tools | Free | Apache Bench, Locust |
+| Logs storage (100 GB/month) | $10-20 | S3, GCS with lifecycle policies |
+| **TOTAL** | **$170-310/month** | For production 3-backend setup |
+
+**ROI Calculation:**
+
+**Scenario 1: Prevent API outage costs**
+
+**Without gateway:**
+- Direct API calls to single provider
+- Provider outage = complete service down
+- Average outage: 2 hours/month
+- Revenue loss: $10,000/hour
+- **Monthly loss:** $20,000
+
+**With gateway:**
+- Multi-provider failover (OpenAI + Anthropic + local)
+- Provider outage = automatic failover (30s disruption)
+- Revenue loss: $10,000 × (30s / 3600s) = $83
+- Gateway cost: $300/month
+- **Monthly loss:** $383
+
+**Savings:** $20,000 - $383 = $19,617/month
+**Annual savings:** $235,404
+**ROI:** 65,135% annually
+**Break-even:** 0.4 days
+
+---
+
+**Scenario 2: Reduce API costs through intelligent routing**
+
+**Without gateway:**
+- All traffic to expensive provider (Claude Opus: $15/$75 per 1M tokens)
+- 100M tokens/month input, 20M tokens/month output
+- Cost: (100M × $15) + (20M × $75) = $1,500 + $1,500 = $3,000/month
+
+**With gateway (header-based routing):**
+- Simple queries → Claude Haiku ($0.25/$1.25 per 1M tokens): 60M input, 10M output
+- Complex queries → Claude Opus: 40M input, 10M output
+- Cost:
+  - Haiku: (60M × $0.25) + (10M × $1.25) = $15 + $12.50 = $27.50
+  - Opus: (40M × $15) + (10M × $75) = $600 + $750 = $1,350
+  - Gateway: $300
+- **Total:** $1,677.50/month
+
+**Savings:** $3,000 - $1,677.50 = $1,322.50/month
+**Annual savings:** $15,870
+**ROI:** 446% annually
+**Break-even:** 6.8 months
+
+---
+
+**Scenario 3: Reduce engineering time for multi-provider support**
+
+**Without gateway (manual failover):**
+- Detect outage: 15 minutes
+- Update code to switch providers: 30 minutes
+- Deploy: 15 minutes
+- Test: 15 minutes
+- **Total:** 75 minutes per outage
+- Outages: 3/month average
+- Engineer cost: $150/hour
+- **Monthly cost:** 3 × 1.25 hours × $150 = $562.50
+
+**With gateway (automatic failover):**
+- Detection: Automatic (5 seconds)
+- Failover: Automatic (30 seconds)
+- Engineer intervention: 0 minutes
+- **Monthly cost:** $0 (just gateway cost)
+
+**Savings:** $562.50/month
+**Annual savings:** $6,750
+**Gateway cost:** $300/month ($3,600/year)
+**Net savings:** $3,150/year
+**ROI:** 88% annually
+**Break-even:** 6.4 months
+
+## Production Deployment Guide
+
+### Week 1-2: Development Environment (V1 + V2)
+
+**Goal:** Build and test basic gateway with load balancing and health checks
+
+**Tasks:**
+- Install Nginx on development VM (Ubuntu 22.04 LTS)
+- Implement V1: Round-robin load balancing across 3 test backends
+- Implement V2: Weighted balancing, passive health checks, retry logic
+- Test failover scenarios (kill backends, observe recovery)
+- Document configuration and test results
+
+**Deliverables:**
+- Working Nginx gateway with 3 backends
+- Test report showing load distribution
+- Failover test results (time to detect, time to recover)
+- Initial configuration documentation
+
+**Team:** 1 network engineer, 15 hours
+
+---
+
+### Week 3-4: Staging Environment (V3 - Part 1)
+
+**Goal:** Add routing and SSL/TLS termination
+
+**Tasks:**
+- Obtain SSL certificate (Let's Encrypt for staging domain)
+- Implement header-based routing (X-Model-Provider)
+- Implement URI-based routing (/v1/chat vs /v1/embeddings)
+- Configure rate limiting (100 req/s per client IP)
+- Set up staging environment with real backends (OpenAI, Anthropic)
+- Performance testing with realistic traffic patterns
+
+**Deliverables:**
+- HTTPS-enabled gateway with valid certificate
+- Routing rules for 3 backend pools
+- Rate limiting configuration
+- Performance test results (latency, throughput)
+
+**Team:** 1 network engineer + 1 security engineer, 20 hours
+
+---
+
+### Week 5-6: Production Preparation (V3 - Part 2 + V4)
+
+**Goal:** Add monitoring and finalize production configuration
+
+**Tasks:**
+- Deploy monitoring stack (Prometheus + Grafana + Loki)
+- Configure alerting rules (high error rate, slow responses, backend down)
+- Implement request tracing (X-Request-ID correlation)
+- Set up mTLS for internal service authentication
+- Create runbook for common failure scenarios
+- Load testing (1000 req/s sustained)
+- Security audit (TLS configuration, rate limiting effectiveness)
+
+**Deliverables:**
+- Production monitoring dashboards
+- Alert rules configured in Alertmanager
+- Security audit report
+- Load test results (passed 1000 req/s)
+- Operational runbook
+
+**Team:** 1 network engineer + 1 SRE + 1 security engineer, 30 hours
+
+---
+
+### Week 7-8: Production Rollout
+
+**Goal:** Deploy to production with gradual traffic migration
+
+**Phase 1 (Week 7, Days 1-3): Canary deployment**
+- Deploy gateway in production
+- Route 10% of traffic through gateway (90% direct to backends)
+- Monitor: error rate, latency, backend distribution
+- Success criteria: <0.1% error rate increase, <10% latency increase
+
+**Phase 2 (Week 7, Days 4-7): Partial rollout**
+- Increase to 50% traffic through gateway
+- Monitor circuit breaker activations, retry rates
+- Success criteria: No production incidents, circuit breaker working correctly
+
+**Phase 3 (Week 8, Days 1-4): Full rollout**
+- Route 100% traffic through gateway
+- Remove direct backend access (enforce gateway)
+- Monitor: request tracing, alert accuracy
+- Success criteria: 99.9% uptime, all alerts actionable
+
+**Phase 4 (Week 8, Days 5-7): Multi-region expansion**
+- Deploy gateway in EU region
+- Configure geo-routing (Route 53 latency-based)
+- Test cross-region failover
+- Success criteria: <200ms latency increase for EU users
+
+**Deliverables:**
+- Production gateway handling 100% traffic
+- Multi-region deployment
+- Incident reports (if any)
+- Lessons learned document
+
+**Team:** 1 SRE (on-call), 20 hours
+
+---
+
+### Week 9+: Operations and Optimization
+
+**Ongoing tasks:**
+- Monitor dashboard daily (10 min/day)
+- Review alerts and tune thresholds (2 hours/week)
+- Optimize backend weights based on actual performance (1 hour/week)
+- Update SSL certificates (automated, verify quarterly)
+- Capacity planning review (monthly)
+- Disaster recovery drills (quarterly)
+
+**Team:** 1 SRE (10% allocation, ~4 hours/week)
+
+---
+
+### Rollback Plan
+
+**Triggers for rollback:**
+- Error rate >1% for 5 minutes
+- P95 latency >5s for 5 minutes
+- >2 backends down simultaneously
+- Circuit breaker stuck open (not recovering)
+- Security incident (compromised gateway)
+
+**Rollback procedure:**
+
+```bash
+# Step 1: Route traffic directly to backends (bypass gateway)
+# Update DNS or load balancer upstream
+
+# Step 2: Stop Nginx to prevent partial traffic
+sudo systemctl stop nginx
+
+# Step 3: Debug in isolated environment
+# Review logs, metrics, configuration
+
+# Step 4: Fix and redeploy
+sudo systemctl start nginx
+# Test with 10% traffic again
+```
+
+**Estimated rollback time:** <10 minutes (DNS TTL + configuration change)
+
+## Common Problems and Solutions
+
+### Problem 1: Connection Pool Exhaustion
+
+**Symptom:**
+
+```bash
+curl http://api-gateway.local/v1/chat/completions
+# Hangs for 60 seconds, then:
+```
+
+```
+upstream sent too big header while reading response header from upstream
+```
+
+**Nginx error log:**
+
+```
+2026/01/19 14:23:45 [error] 12345#12345: *67890 upstream sent too big header while reading response header from upstream, client: 10.0.1.50, server: api-gateway.local, request: "POST /v1/chat/completions HTTP/1.1", upstream: "http://10.1.1.10:8000/v1/chat/completions"
+```
+
+**Cause:**
+
+Nginx isn't reusing connections to backends. Each request creates new TCP connection:
+
+```
+Request 1 → New connection → Response → Close connection
+Request 2 → New connection → Response → Close connection
+...
+After 1000 requests: 1000 TCP connections created/destroyed
+Backend: TIME_WAIT sockets exhausted
+```
+
+**Solution:**
+
+Enable connection pooling with keepalive:
+
+```nginx
+upstream llm_backends {
+    server 10.1.1.10:8000;
+    server 10.1.1.11:8000;
+    server 10.1.1.12:8000;
+
+    # Connection pool
+    keepalive 32;                 # Maintain 32 idle connections per worker
+    keepalive_requests 100;       # Reuse connection for 100 requests
+    keepalive_timeout 60s;        # Keep idle connection open for 60s
+}
+
+server {
+    listen 80;
+
+    location /v1/chat/completions {
+        proxy_pass http://llm_backends;
+
+        # Required for keepalive to work
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";  # Clear "Connection: close" header
+    }
+}
+```
+
+**Verification:**
+
+```bash
+# Check backend connection count
+netstat -an | grep :8000 | grep ESTABLISHED | wc -l
+
+# Before fix: Spikes to 100+, drops to 0, repeats
+# After fix: Stable at 32 (keepalive pool size)
+```
+
+**Prevention:**
+- Always enable keepalive for backend connections
+- Set keepalive size = (expected concurrent requests / number of backends)
+- Monitor backend TIME_WAIT socket count
+
+---
+
+### Problem 2: SSL Handshake Failures
+
+**Symptom:**
+
+```bash
+curl -v https://api-gateway.local/v1/chat/completions
+```
+
+```
+* TLSv1.2 (OUT), TLS handshake, Client hello (1):
+* TLSv1.2 (IN), TLS alert, handshake failure (552):
+* error:14094410:SSL routines:ssl3_read_bytes:sslv3 alert handshake failure
+```
+
+**Nginx error log:**
+
+```
+2026/01/19 14:23:45 [crit] 12345#12345: *67890 SSL_do_handshake() failed (SSL: error:14209102:SSL routines:tls_early_post_process_client_hello:unsupported protocol) while SSL handshaking
+```
+
+**Cause:**
+
+Client doesn't support server's TLS configuration:
+
+1. **Outdated TLS version:** Client only supports TLS 1.0/1.1 (deprecated)
+2. **Cipher mismatch:** No common cipher suites
+3. **Certificate issue:** Expired, self-signed, hostname mismatch
+
+**Solution:**
+
+**1. Check client TLS version:**
+
+```bash
+openssl s_client -connect api-gateway.local:443 -tls1_2
+```
+
+If this fails, client doesn't support TLS 1.2.
+
+**2. Update Nginx TLS config for broader compatibility:**
+
+```nginx
+server {
+    listen 443 ssl http2;
+
+    ssl_certificate /etc/nginx/ssl/api-gateway.crt;
+    ssl_certificate_key /etc/nginx/ssl/api-gateway.key;
+
+    # Support TLS 1.2 and 1.3
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Modern cipher suite (strong security)
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+
+    # For older clients (less secure but more compatible):
+    # ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-GCM-SHA384';
+
+    ssl_prefer_server_ciphers off;  # Let client choose (better performance)
+
+    # Enable session resumption
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_session_tickets off;  # Disable for better security
+}
+```
+
+**3. Verify certificate:**
+
+```bash
+# Check certificate validity
+openssl x509 -in /etc/nginx/ssl/api-gateway.crt -noout -dates
+
+# Check hostname
+openssl x509 -in /etc/nginx/ssl/api-gateway.crt -noout -subject
+
+# Test with browser or curl
+curl -vI https://api-gateway.local
+```
+
+**Prevention:**
+- Use Let's Encrypt for auto-renewal
+- Monitor certificate expiration (alert 30 days before)
+- Test TLS config with SSL Labs (https://www.ssllabs.com/ssltest/)
+- Use Mozilla SSL Configuration Generator (https://ssl-config.mozilla.org/)
+
+---
+
+### Problem 3: Backend Timeout Causing Cascading Failures
+
+**Symptom:**
+
+All backends appear down, but they're actually healthy:
+
+```bash
+curl http://api-gateway.local/v1/chat/completions
+```
+
+```
+<html>
+<head><title>502 Bad Gateway</title></head>
+</html>
+```
+
+**Nginx error log:**
+
+```
+2026/01/19 14:23:45 [error] upstream timed out (110: Connection timed out) while reading response header from upstream
+```
+
+**Backend logs:**
+
+```
+[14:23:15] Processing request (started)
+[14:23:45] Processing request (still working...)
+[14:23:46] Request completed successfully (total: 31 seconds)
+```
+
+**Cause:**
+
+Nginx timeout (30s) shorter than backend processing time (31s):
+
+```
+Client → Gateway (30s timeout) → Backend (31s processing)
+                ↓
+        Timeout! 502 error
+                               ↓
+                        Backend completes (wasted work)
+```
+
+After multiple timeouts, all backends marked down (passive health check).
+
+**Solution:**
+
+**1. Tune timeouts to match expected processing time:**
+
+```nginx
+upstream llm_backends {
+    server 10.1.1.10:8000;
+}
+
+server {
+    listen 80;
+
+    location /v1/chat/completions {
+        proxy_pass http://llm_backends;
+
+        # Increase timeouts for long-running LLM requests
+        proxy_connect_timeout 10s;   # Connection establishment (keep short)
+        proxy_send_timeout 60s;       # Sending request body (usually fast)
+        proxy_read_timeout 90s;       # Reading response (LLM can be slow!)
+
+        # Prevent marking backend down on timeout
+        proxy_next_upstream error http_502 http_503 http_504;
+        # Note: "timeout" removed from proxy_next_upstream
+        # Timeout = likely slow request, not backend failure
+    }
+}
+```
+
+**2. Implement request timeout at application layer:**
+
+```python
+# Backend: Return 202 Accepted for long-running tasks
+@app.route('/v1/chat/completions', methods=['POST'])
+def chat_completion():
+    # Estimate processing time
+    estimated_time = estimate_completion_time(request.json)
+
+    if estimated_time > 30:
+        # Too long for synchronous response
+        task_id = queue_task(request.json)
+        return jsonify({
+            'status': 'processing',
+            'task_id': task_id,
+            'estimated_seconds': estimated_time,
+            'poll_url': f'/v1/tasks/{task_id}'
+        }), 202  # Accepted
+
+    # Quick request, process synchronously
+    result = process_completion(request.json)
+    return jsonify(result), 200
+```
+
+**3. Use streaming for long responses:**
+
+```nginx
+location /v1/chat/completions {
+    proxy_pass http://llm_backends;
+
+    # Enable streaming
+    proxy_buffering off;
+    proxy_cache off;
+
+    # HTTP/1.1 for streaming
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
+    # Longer timeout for streaming (minutes)
+    proxy_read_timeout 300s;
+}
+```
+
+**Prevention:**
+- Monitor P95/P99 response times, set timeouts > P99
+- Implement async processing for requests >30s
+- Use streaming for long-running LLM calls
+- Circuit breaker prevents cascading timeout failures
+
+---
+
+### Problem 4: Circuit Breaker False Positives
+
+**Symptom:**
+
+Circuit breaker opens during normal operation:
+
+```
+2026-01-19 14:23:45 [WARN] Circuit breaker OPENED for llm_backends
+2026-01-19 14:23:45 [ERROR] All backends unavailable
+```
+
+But backends are healthy:
+
+```bash
+curl http://10.1.1.10:8000/health
+# {"status": "healthy"}
+```
+
+**Cause:**
+
+Circuit breaker threshold too sensitive:
+
+```lua
+FAILURE_THRESHOLD = 3  -- Opens after only 3 failures
+TIMEOUT = 60           -- Stays open for 60 seconds
+```
+
+Normal traffic pattern:
+- 1000 requests/minute
+- 0.5% error rate (5 errors/minute from transient issues)
+- 3 errors in 10 seconds → circuit opens
+- False positive
+
+**Solution:**
+
+**1. Tune failure threshold for traffic volume:**
+
+```lua
+-- For high-traffic endpoints
+FAILURE_THRESHOLD = 10     -- More tolerance for transient errors
+SUCCESS_THRESHOLD = 3      -- Require more successes to close
+TIMEOUT = 30               -- Shorter timeout (test recovery faster)
+
+-- For low-traffic endpoints
+FAILURE_THRESHOLD = 3
+SUCCESS_THRESHOLD = 2
+TIMEOUT = 60
+```
+
+**2. Use error rate instead of absolute count:**
+
+```lua
+function _M.should_open(backend)
+    local failures = ngx.shared.circuit_breaker:get(backend .. ":failures") or 0
+    local total = ngx.shared.circuit_breaker:get(backend .. ":total") or 1
+
+    local error_rate = failures / total
+
+    -- Open if error rate > 50% over last 100 requests
+    if total >= 100 and error_rate > 0.5 then
+        return true
+    end
+
+    return false
+end
+```
+
+**3. Implement sliding window:**
+
+```lua
+function _M.record_request(backend, success)
+    local window = 60  -- 60 second sliding window
+    local now = ngx.now()
+
+    -- Add request to time-series
+    local key = backend .. ":requests:" .. math.floor(now)
+    if success then
+        ngx.shared.circuit_breaker:incr(key .. ":success", 1, 0)
+    else
+        ngx.shared.circuit_breaker:incr(key .. ":failure", 1, 0)
+    end
+
+    -- Expire old entries
+    ngx.shared.circuit_breaker:expire(key .. ":success", window)
+    ngx.shared.circuit_breaker:expire(key .. ":failure", window)
+
+    -- Calculate error rate over window
+    local success_count = 0
+    local failure_count = 0
+
+    for i = 0, window do
+        local ts = math.floor(now - i)
+        success_count = success_count + (ngx.shared.circuit_breaker:get(backend .. ":requests:" .. ts .. ":success") or 0)
+        failure_count = failure_count + (ngx.shared.circuit_breaker:get(backend .. ":requests:" .. ts .. ":failure") or 0)
+    end
+
+    local total = success_count + failure_count
+    if total > 0 and failure_count / total > 0.5 then
+        _M.open_circuit(backend)
+    end
+end
+```
+
+**Prevention:**
+- Monitor circuit breaker open/close frequency
+- Alert if circuit breaker opens >5 times/hour (indicates tuning needed)
+- Log circuit breaker state changes with context (error rate, request count)
+- Test circuit breaker with fault injection (Chaos Engineering)
+
+---
+
+### Problem 5: Log Volume Overwhelming Disk
+
+**Symptom:**
+
+```bash
+df -h /var/log
+```
+
+```
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        50G   48G   2G  96% /var/log
+```
+
+**Nginx access log:**
+
+```bash
+ls -lh /var/log/nginx/
+```
+
+```
+-rw-r--r-- 1 nginx nginx  15G Jan 19 14:23 api-gateway-access.log
+-rw-r--r-- 1 nginx nginx 3.2G Jan 19 14:23 api-gateway-error.log
+```
+
+**Cause:**
+
+High-traffic API (1000 req/s) generates massive logs:
+
+```
+1000 req/s × 86400 seconds/day × 500 bytes/log line = 43 GB/day
+```
+
+Without log rotation, disk fills in 1-2 days.
+
+**Solution:**
+
+**1. Configure log rotation:**
+
+```bash
+# /etc/logrotate.d/nginx
+/var/log/nginx/*.log {
+    daily                    # Rotate daily
+    rotate 7                 # Keep 7 days of logs
+    compress                 # Compress old logs
+    delaycompress            # Don't compress yesterday's log (might still be written to)
+    missingok                # Don't error if log file missing
+    notifempty               # Don't rotate empty logs
+    create 0640 nginx nginx  # Create new log with these permissions
+    sharedscripts            # Run postrotate once for all logs
+    postrotate
+        # Reopen log files
+        [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
+    endscript
+}
+```
+
+**Test rotation:**
+
+```bash
+# Force rotation
+sudo logrotate -f /etc/logrotate.d/nginx
+
+# Verify
+ls -lh /var/log/nginx/
+```
+
+**Output:**
+
+```
+-rw-r--r-- 1 nginx nginx  15M Jan 19 14:30 api-gateway-access.log
+-rw-r--r-- 1 nginx nginx 3.2G Jan 18 23:59 api-gateway-access.log.1.gz
+-rw-r--r-- 1 nginx nginx 3.1G Jan 17 23:59 api-gateway-access.log.2.gz
+```
+
+**2. Ship logs to remote storage:**
+
+```yaml
+# promtail-config.yml
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          __path__: /var/log/nginx/*log
+```
+
+**Start Promtail:**
+
+```bash
+docker run -d \
+  --name promtail \
+  -v /var/log/nginx:/var/log/nginx \
+  -v $(pwd)/promtail-config.yml:/etc/promtail/config.yml \
+  grafana/promtail:latest \
+  -config.file=/etc/promtail/config.yml
+```
+
+**3. Reduce log verbosity:**
+
+```nginx
+http {
+    # Log only errors and warnings, not every request
+    access_log /var/log/nginx/api-gateway-access.log;
+    error_log /var/log/nginx/api-gateway-error.log warn;
+
+    # Conditional logging (only errors)
+    map $status $loggable {
+        ~^[23]  0;  # Don't log 2xx and 3xx
+        default 1;  # Log 4xx and 5xx
+    }
+
+    server {
+        listen 80;
+
+        location /v1/chat/completions {
+            access_log /var/log/nginx/errors-only.log combined if=$loggable;
+            proxy_pass http://llm_backends;
+        }
+    }
+}
+```
+
+**4. Sample logs (log only 1% of requests):**
+
+```nginx
+# Log 1 out of every 100 requests
+map $request_id $sampling {
+    ~9$ 1;      # Request ID ends in 9 (10% of requests)
     default 0;
 }
 
 server {
-    listen 443 ssl http2;
+    listen 80;
 
     location /v1/chat/completions {
-        # Validate API key
-        if ($api_key_valid = 0) {
-            return 401 '{"error":"Invalid API key"}';
-        }
-
-        proxy_pass http://$backend_pool;
+        access_log /var/log/nginx/sampled.log combined if=$sampling;
+        proxy_pass http://llm_backends;
     }
 }
 ```
 
-Better approach: Use external auth service (OAuth, JWT validation).
+**Prevention:**
+- Monitor disk space, alert at 80% full
+- Set up log rotation from day one
+- Ship logs to centralized storage (Loki, S3, CloudWatch)
+- Use log sampling for high-volume endpoints
+- Retention policy: 7 days local, 30 days remote, 1 year cold storage
 
-### Disaster Recovery
+---
 
-**Backup gateway configuration:**
+### Problem 6: Rate Limiting Not Working Across Replicas
+
+**Symptom:**
+
+Rate limit configured: 100 req/minute per client
+
+```nginx
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/m;
+```
+
+But client can make 300 req/minute without getting rate limited.
+
+**Cause:**
+
+Load balancer distributes traffic across 3 Nginx replicas:
+
+```
+Client → Load Balancer → Nginx Replica 1 (allows 100 req/m)
+                      → Nginx Replica 2 (allows 100 req/m)
+                      → Nginx Replica 3 (allows 100 req/m)
+
+Total allowed: 300 req/m (3 × 100)
+```
+
+Each replica has its own in-memory rate limit counter (not shared).
+
+**Solution:**
+
+**1. Use Redis for shared rate limiting:**
+
+```nginx
+http {
+    # Load Redis module (requires OpenResty or nginx-module-lua)
+    lua_package_path "/usr/local/openresty/lualib/?.lua;;";
+
+    server {
+        listen 80;
+
+        location /v1/chat/completions {
+            access_by_lua_block {
+                local redis = require "resty.redis"
+                local red = redis:new()
+
+                red:set_timeouts(1000, 1000, 1000)  # connect, send, read timeouts
+
+                local ok, err = red:connect("redis", 6379)
+                if not ok then
+                    ngx.log(ngx.ERR, "Failed to connect to Redis: ", err)
+                    return ngx.exit(500)
+                end
+
+                local client_ip = ngx.var.binary_remote_addr
+                local rate_limit_key = "ratelimit:" .. client_ip .. ":" .. os.time() // 60  # Current minute
+
+                # Increment request count
+                local count, err = red:incr(rate_limit_key)
+                if not count then
+                    ngx.log(ngx.ERR, "Failed to increment: ", err)
+                    return ngx.exit(500)
+                end
+
+                # Set expiry on first request of minute
+                if count == 1 then
+                    red:expire(rate_limit_key, 60)
+                end
+
+                # Check limit
+                if count > 100 then
+                    ngx.status = 429
+                    ngx.header["Retry-After"] = 60 - (os.time() % 60)  # Seconds until next minute
+                    ngx.say('{"error": "Rate limit exceeded", "limit": 100, "retry_after": ' .. ngx.header["Retry-After"] .. '}')
+                    return ngx.exit(429)
+                end
+
+                red:set_keepalive(10000, 100)  # Keep connection alive
+            }
+
+            proxy_pass http://llm_backends;
+        }
+    }
+}
+```
+
+**2. Deploy Redis:**
 
 ```bash
-# Backup script
-#!/bin/bash
-BACKUP_DIR="/backup/nginx"
-DATE=$(date +%Y%m%d-%H%M%S)
-
-mkdir -p $BACKUP_DIR
-
-# Backup configs
-tar -czf $BACKUP_DIR/nginx-config-$DATE.tar.gz /etc/nginx/
-
-# Backup SSL certs
-tar -czf $BACKUP_DIR/nginx-ssl-$DATE.tar.gz /etc/nginx/ssl/
-
-# Keep only last 30 days
-find $BACKUP_DIR -type f -mtime +30 -delete
-
-echo "Backup completed: $BACKUP_DIR"
+docker run -d \
+  --name redis \
+  -p 6379:6379 \
+  redis:7-alpine
 ```
 
-**Restore process:**
+**3. Test rate limiting:**
 
 ```bash
-# Stop Nginx
-sudo systemctl stop nginx
-
-# Restore config
-sudo tar -xzf /backup/nginx/nginx-config-20260119-143000.tar.gz -C /
-
-# Restore SSL
-sudo tar -xzf /backup/nginx/nginx-ssl-20260119-143000.tar.gz -C /
-
-# Test config
-sudo nginx -t
-
-# Start Nginx
-sudo systemctl start nginx
+# Make 150 requests in one minute
+for i in {1..150}; do
+    curl -s -w "%{http_code}\n" \
+         http://api-gateway.local/v1/chat/completions \
+         -H "Content-Type: application/json" \
+         -d '{"model": "gpt-4", "messages": []}' \
+         -o /dev/null
+    sleep 0.4  # 150 requests over 60 seconds
+done | sort | uniq -c
 ```
 
-### Multi-Region Deployment
-
-Deploy gateways in multiple regions for HA:
+**Output:**
 
 ```
-         [Global Load Balancer]
-                   |
-      +------------+------------+
-      |                         |
-[US Gateway]              [EU Gateway]
-      |                         |
-[US Backends]            [EU Backends]
+    100 200
+     50 429
 ```
 
-**Global LB config (AWS Route 53, Cloudflare):**
+Perfect: First 100 requests succeed, next 50 rate limited (even across 3 replicas).
 
-```
-Record: api.vexpertai.com
-Type: A
-Policy: Latency-based routing
-
-US-East-1: 54.123.45.67 (Nginx gateway)
-EU-Central-1: 18.234.56.78 (Nginx gateway)
-
-Health check: HTTPS GET /health every 30s
-Failover: Automatic if health check fails
-```
-
-Users automatically routed to nearest healthy gateway.
+**Prevention:**
+- Always use Redis/Memcached for shared state across replicas
+- Monitor Redis connection pool health
+- Set up Redis persistence (AOF or RDB)
+- Use Redis Sentinel or Redis Cluster for high availability
 
 ## Summary
 
-You've built a production-grade API gateway using Nginx. This gives you:
+You built a production API gateway across four versions:
 
-1. **Load balancing** - Distribute across multiple LLM providers and models
-2. **High availability** - Automatic failover when backends fail
-3. **Performance** - Connection pooling, caching, SSL offload
-4. **Security** - Single point for authentication, rate limiting, TLS
-5. **Visibility** - Detailed logging, metrics, request tracing
-6. **Reliability** - Circuit breakers, retry logic, health checks
-7. **Flexibility** - Route based on headers, URI, client properties
+**V1: Basic Gateway (30 min, Free)**
+- Round-robin load balancing
+- Passive health checks
+- Basic access logging
 
-This is the same architecture used by companies like Netflix, Uber, and AWS. You're applying Layer 4-7 networking skills to API infrastructure.
+**V2: Production Health & Failover (45 min, Free)**
+- Weighted load balancing (capacity-aware)
+- Circuit breaker (fail fast pattern)
+- Retry logic with exponential backoff
+- Connection pooling (keepalive)
 
-Your AI agents are more resilient, your costs are controlled (rate limiting prevents runaway API bills), and you can debug production issues with proper logging and tracing.
+**V3: Advanced Routing & Security (60 min, $50-100/month)**
+- Header-based routing (model provider selection)
+- URI-based routing (endpoint type separation)
+- SSL/TLS termination (single certificate)
+- mTLS (client authentication)
+- Rate limiting (100 req/s per client)
+- Idempotency key support
 
-The gateway becomes your control plane for all AI/ML API traffic. Add a new model provider? Update gateway config, no code changes. Rate limit a rogue service? One Nginx rule. Audit who called what? Parse gateway logs.
+**V4: Complete Monitoring Stack (90 min, $150-300/month)**
+- Prometheus metrics export
+- Grafana dashboards (request rate, latency, errors)
+- Loki log aggregation
+- Distributed tracing (X-Request-ID)
+- Alertmanager (Slack notifications)
+- Multi-region deployment
 
-You've essentially built a miniature version of what Cloudflare, Akamai, and AWS API Gateway do at scale. Now you understand how those services work under the hood - and you can run your own for $50/month instead of $500/month.
+**Key architectural decisions:**
 
-Next chapter: Kubernetes orchestration for your AI workloads (because manually managing 20 backend containers gets old fast).
+1. **Nginx as gateway:** Layer 7 load balancing with health checks and SSL termination
+2. **Circuit breaker pattern:** Prevent cascading failures by failing fast
+3. **Connection pooling:** Reuse TCP connections for 10× better performance
+4. **Shared rate limiting:** Redis for cross-replica enforcement
+5. **Distributed tracing:** Request ID correlation across all services
+6. **Monitoring first:** Prometheus + Grafana from day one
 
-## Further Reading
+**Production readiness:**
+- ✅ High availability (multi-backend failover)
+- ✅ Security (TLS 1.3, mTLS, rate limiting)
+- ✅ Observability (metrics, logs, traces)
+- ✅ Performance (connection pooling, weighted balancing)
+- ✅ Reliability (circuit breakers, health checks, retry logic)
 
-**Nginx documentation:**
-- Official docs: https://nginx.org/en/docs/
-- Load balancing: https://nginx.org/en/docs/http/load_balancing.html
-- TLS configuration: https://nginx.org/en/docs/http/configuring_https_servers.html
+This is the same architecture used by Netflix, Uber, and AWS API Gateway. You're running production-grade infrastructure for $300/month instead of $3,000/month on a managed service.
 
-**OpenResty (Nginx + Lua):**
-- https://openresty.org/
-- Scripting guide: https://github.com/openresty/lua-nginx-module
+Your AI agents now have:
+- **Zero single points of failure** (multi-provider failover)
+- **Intelligent routing** (cheap models for simple queries, expensive for complex)
+- **Cost control** (rate limiting prevents runaway bills)
+- **Full visibility** (trace every request, alert on anomalies)
 
-**Circuit breaker libraries:**
-- pybreaker (Python): https://github.com/danielfm/pybreaker
-- resilience4j (Java): https://resilience4j.readme.io/
-- Polly (.NET): https://github.com/App-vNext/Polly
+The gateway is your control plane for all AI API traffic. Need to add a new model provider? Update Nginx config, no code changes. Rate limit a rogue service? One line in Nginx. Debug production issues? Query logs by request ID across the entire stack.
 
-**API gateway patterns:**
-- "Building Microservices" by Sam Newman (O'Reilly)
-- "Release It!" by Michael Nygard (Pragmatic Bookshelf)
-- AWS API Gateway docs: https://docs.aws.amazon.com/apigateway/
-
-**Monitoring:**
-- Prometheus: https://prometheus.io/docs/
-- Grafana: https://grafana.com/docs/
-- Loki (log aggregation): https://grafana.com/docs/loki/
-
-You now have the tools to build production-grade API infrastructure. Stop hitting APIs directly from your agents - put a gateway in front of everything. Your future self (debugging a production outage at 2am) will thank you.
+**Next chapter:** Caching strategies for AI systems (save 80% of API costs by caching frequent queries).
