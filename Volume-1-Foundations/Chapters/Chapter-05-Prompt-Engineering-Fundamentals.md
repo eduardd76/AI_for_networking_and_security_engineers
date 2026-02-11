@@ -127,12 +127,12 @@ This is explicit routing policy: "IF condition matches, THEN apply these actions
 Consider how this vague prompt is like a route-map with only `permit any`:
 
 ```
-❌ Vague prompt (permit any):
+BAD - Vague prompt (permit any):
 "Generate a network configuration"
 
 ↓ Model considers ALL possible outputs equally
 
-✅ Specific prompt (detailed route-map):
+GOOD - Specific prompt (detailed route-map):
 "Generate a Cisco IOS-XE configuration for a branch router.
 Include: OSPF area 0, NTP server 10.1.1.1, SNMPv3 user 'monitoring'.
 Output format: CLI commands only, no explanations.
@@ -218,7 +218,24 @@ Return findings in JSON format with severity levels."
 
 ---
 
-## Prompting Techniques
+## Prompting Techniques: Decision Guide
+
+Before diving into each technique, here's when to use what:
+
+| Task | Best Technique | Why |
+|------|----------------|-----|
+| "Explain this command" | Zero-shot | Simple, well-known concept |
+| "Parse logs into our format" | Few-shot | Need custom format/terminology |
+| "Why won't BGP establish?" | Chain-of-Thought | Complex multi-step reasoning |
+| Build config review chatbot | System prompt | Persistent expertise needed |
+| "Convert Cisco to Junos" | Few-shot + System | Custom format + expertise |
+| Compliance checking | Zero-shot + JSON | Simple task + structured output |
+
+**Rule of thumb**: Start with zero-shot. If output quality or format isn't right, add examples (few-shot). If reasoning quality is poor, add chain-of-thought. If building a persistent assistant, add a system prompt.
+
+Now let's learn each technique in detail.
+
+---
 
 ### 1. Zero-Shot Prompting
 
@@ -496,7 +513,7 @@ Always structure your output as:
 """
 
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4.5",
     max_tokens=2000,
     temperature=0,
     system=system_prompt,  # Inject expertise
@@ -582,7 +599,7 @@ def compare_temperatures(prompt: str):
 
     for temp in [0.0, 0.5, 1.0]:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4.5",
             max_tokens=200,
             temperature=temp,
             messages=[{"role": "user", "content": prompt}]
@@ -633,7 +650,7 @@ compare_temperatures(prompt)
 **Example**:
 ```python
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4.5",
     max_tokens=200,
     top_p=0.9,  # Consider top 90% of probability
     messages=[{"role": "user", "content": prompt}]
@@ -856,7 +873,7 @@ if __name__ == "__main__":
     prompt = prompts.log_classification(log)
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4.5",
         max_tokens=50,
         temperature=0,
         messages=[{"role": "user", "content": prompt}]
@@ -881,7 +898,7 @@ Prompt Testing Framework
 Evaluate prompt effectiveness on test cases.
 """
 
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 from dataclasses import dataclass
 from anthropic import Anthropic
 import os
@@ -908,7 +925,7 @@ class PromptTester:
         self,
         prompt_template: Callable[[str], str],
         test_cases: List[TestCase],
-        model: str = "claude-sonnet-4-20250514",
+        model: str = "claude-sonnet-4.5",
         temperature: float = 0.0
     ) -> Dict[str, Any]:
         """
@@ -954,9 +971,9 @@ class PromptTester:
 
                 if success:
                     passed += 1
-                    status = "✓ PASS"
+                    status = "PASS"
                 else:
-                    status = "✗ FAIL"
+                    status = "FAIL"
 
                 print(f"  {status}")
                 print(f"  Expected: {test.expected_output}")
@@ -1061,22 +1078,22 @@ PROMPT TEST SUITE (4 tests)
 ================================================================================
 
 Test 1/4: OSPF neighbor down
-  ✓ PASS
+  PASS
   Expected: CRITICAL
   Got: CRITICAL
 
 Test 2/4: Interface up (normal)
-  ✓ PASS
+  PASS
   Expected: INFO
   Got: INFO
 
 Test 3/4: Memory allocation failure
-  ✓ PASS
+  PASS
   Expected: CRITICAL
   Got: CRITICAL
 
 Test 4/4: Config change (audit)
-  ✓ PASS
+  PASS
   Expected: INFO
   Got: INFO
 
@@ -1133,7 +1150,7 @@ Do not guess or invent information.
 **Fix**: Set temperature=0 for determinism
 ```python
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4.5",
     max_tokens=1000,
     temperature=0,  # Deterministic
     messages=[{"role": "user", "content": prompt}]
@@ -1166,24 +1183,24 @@ def process_large_config(config: str, chunk_size: int = 50000):
 
 ## Best Practices
 
-### ✅ DO:
+### DO:
 
 1. **Be specific**
    ```
-   ❌ "Analyze this config"
-   ✅ "Analyze this Cisco IOS config for security issues: SNMP, telnet, ACLs"
+   BAD: "Analyze this config"
+   GOOD: "Analyze this Cisco IOS config for security issues: SNMP, telnet, ACLs"
    ```
 
 2. **Provide context**
    ```
-   ❌ "Generate ACL"
-   ✅ "Generate Cisco IOS extended ACL to block HTTP/HTTPS from guest VLAN 100 to internal servers"
+   BAD: "Generate ACL"
+   GOOD: "Generate Cisco IOS extended ACL to block HTTP/HTTPS from guest VLAN 100 to internal servers"
    ```
 
 3. **Specify format**
    ```
-   ❌ "List the interfaces"
-   ✅ "List interfaces in JSON: [{'name': '...', 'ip': '...', 'status': '...'}]"
+   BAD: "List the interfaces"
+   GOOD: "List interfaces in JSON: [{'name': '...', 'ip': '...', 'status': '...'}]"
    ```
 
 4. **Use examples (few-shot)**
@@ -1194,24 +1211,24 @@ def process_large_config(config: str, chunk_size: int = 50000):
    - Consistency matters more than creativity
    - Deterministic outputs are testable
 
-### ❌ DON'T:
+### DON'T:
 
 1. **Don't assume knowledge**
    ```
-   ❌ "Fix it"
-   ✅ "Fix the MTU mismatch between R1 (MTU 1500) and R2 (MTU 9000)"
+   BAD: "Fix it"
+   GOOD: "Fix the MTU mismatch between R1 (MTU 1500) and R2 (MTU 9000)"
    ```
 
 2. **Don't be vague**
    ```
-   ❌ "What's wrong?"
-   ✅ "BGP neighbor not establishing. Check AS numbers, reachability, authentication"
+   BAD: "What's wrong?"
+   GOOD: "BGP neighbor not establishing. Check AS numbers, reachability, authentication"
    ```
 
 3. **Don't mix multiple tasks**
    ```
-   ❌ "Analyze security, generate docs, and create a diagram"
-   ✅ Break into 3 separate prompts
+   BAD: "Analyze security, generate docs, and create a diagram"
+   GOOD: Break into 3 separate prompts
    ```
 
 4. **Don't ignore failures**
