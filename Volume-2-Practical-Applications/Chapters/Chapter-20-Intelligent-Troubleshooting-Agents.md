@@ -1,307 +1,112 @@
 # Chapter 20: Intelligent Troubleshooting Agents
 
-## Why This Chapter Matters
+## The Problem
 
-Picture this: It's 2 AM. Your phone buzzes with a critical alert—"Internet is down at headquarters." You groan, grab your laptop, and begin the familiar routine:
+Network troubleshooting at 2 AM: phone buzzes, internet is down, you run 15 show commands, check BGP, OSPF, interfaces, routing tables. 30 minutes later you find a shutdown interface. Users angry, executives stressed, you're awake until morning.
 
-**Traditional troubleshooting workflow:**
-1. SSH to the edge router (find the IP, remember the password)
-2. Run `show ip interface brief` to check interface status
-3. Run `show ip route` to verify routing table
-4. Run `show ip bgp summary` to check BGP neighbors
-5. Run `show interface` on suspicious ports
-6. Analyze logs, check for errors
-7. Finally identify the root cause... **30 minutes later**
+AI agents change this: describe the problem in English, agent runs diagnostic commands autonomously, identifies root cause in 2 minutes, suggests the exact fix.
 
-By the time you've found the problem, users are angry, executives are stressed, and you're wide awake for the rest of the night.
+This chapter builds troubleshooting agents that investigate network issues systematically, follow OSI model methodology, and operate safely in production.
 
-**AI Agent approach:**
-1. Tell the agent: "Users at HQ can't access internet"
-2. Agent automatically runs the right diagnostic commands
-3. Agent identifies root cause in **2 minutes**
-4. Agent suggests the exact fix with configuration commands
+## What You'll Build
 
-This isn't science fiction—it's what you'll build in this chapter.
+Four progressive versions:
 
-### What You'll Learn
+**Version 1 (V1) - Basic Tool-Calling Agent**
+- Natural language problem descriptions
+- Autonomous command execution
+- Root cause identification
+- ~150 lines, 45 min build time
 
-This chapter teaches you to build **autonomous troubleshooting agents** that:
+**Version 2 (V2) - Multi-Stage Planning**
+- Structured OSI-based investigation
+- Hypothesis-driven testing
+- Complete audit trail
+- +280 lines, 60 min build time
 
-- **Understand natural language problem descriptions** ("VLAN 20 is down" → knows which commands to run)
-- **Decide which diagnostic commands to run** (interface checks → routing checks → BGP checks)
-- **Execute commands safely** (read-only by default, with human approval for changes)
-- **Analyze command outputs** (parse complex CLI output and extract meaning)
-- **Identify root causes** (not just symptoms, but the actual problem)
-- **Suggest precise fixes** (exact configuration commands to resolve the issue)
+**Version 3 (V3) - Conversation Memory**
+- Context-aware follow-ups
+- Natural conversational flow
+- Investigation continuity
+- +95 lines, 60 min build time
 
-**This is where AI transforms from "interesting" to "indispensable."**
+**Version 4 (V4) - Production Safety**
+- Command validation (whitelist/blacklist)
+- Human approval for changes
+- Complete audit logging
+- Read-only by default
+- +220 lines, 90 min build time
+
+Total: ~745 lines production-ready code, 4-5 hours build time.
+
+## Prerequisites
+
+```bash
+# Install dependencies
+pip install anthropic langchain langchain-anthropic netmiko
+
+# Environment setup
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+**Required knowledge:**
+- Chapter 19 (Agent Architecture) - ReAct patterns, tool calling
+- Network troubleshooting fundamentals
+- OSI model (Layer 1-7)
+- Cisco CLI commands
+
+**Test network requirements:**
+- Cisco router or switch (physical or GNS3/EVE-NG)
+- SSH access configured
+- Or use simulated outputs (provided in code)
 
 ---
 
-## Section 1: Understanding AI Agents
+## Version 1: Basic Tool-Calling Agent
 
-Before we build anything, let's understand what makes something an "agent" versus a simple chatbot.
+**Goal:** Build an agent that troubleshoots network issues autonomously.
 
-### What IS an AI Agent?
+**Capabilities:**
+- Understand natural language problem descriptions
+- Execute diagnostic commands (show, ping, traceroute)
+- Analyze command outputs
+- Identify root causes
 
-**❌ Not an agent:** A chatbot that answers questions
-- You: "How do I configure OSPF?"
-- Chatbot: "Here's the config syntax..."
-- (Chatbot just retrieves information)
-
-**✅ Is an agent:** A system that takes actions to achieve a goal
-- You: "Users can't reach 10.5.5.0/24"
-- Agent: *Thinks* → "I should check routing"
-- Agent: *Acts* → Runs `show ip route 10.5.5.0`
-- Agent: *Observes* → No route found
-- Agent: *Thinks* → "Need to check BGP"
-- Agent: *Acts* → Runs `show ip bgp`
-- Agent: *Concludes* → "BGP neighbor is down, here's the fix"
-
-The key difference: **Agents take actions in pursuit of a goal.** They don't just answer—they investigate, decide, execute, and iterate until the problem is solved.
-
-### Agent Architecture: The Five Essential Components
-
-Every effective AI agent needs these five components working together:
-
-#### 1. **LLM Brain** (Reasoning and Decision-Making)
-The large language model (like GPT-4 or Claude) serves as the "brain" that:
-- Understands the problem description
-- Decides which actions to take next
-- Analyzes command outputs
-- Draws conclusions
-
-Think of it as the experienced network engineer's intuition—the part that says "if the interface is up/down, that's a Layer 2 issue."
-
-#### 2. **Tools** (Actions the Agent Can Take)
-Tools are functions the agent can call to interact with the world:
-- `show_command()` - Run Cisco show commands
-- `ping()` - Test connectivity
-- `traceroute()` - Trace network path
-- `get_logs()` - Retrieve syslog entries
-
-Without tools, the LLM is just thinking. Tools let it **act**.
-
-#### 3. **Memory** (Track Conversation and Actions)
-The agent needs to remember:
-- What problem you described
-- Which commands it already ran
-- What it found in previous outputs
-- The conversation context
-
-This prevents the agent from running the same command twice or losing track of its investigation.
-
-#### 4. **Planning** (Break Complex Problems into Steps)
-A good agent doesn't just randomly try commands. It:
-- Breaks the problem into stages ("First check Layer 1, then Layer 2, then Layer 3")
-- Forms hypotheses ("I think BGP is down")
-- Tests hypotheses systematically
-- Adjusts the plan based on findings
-
-#### 5. **Safety** (Prevent Dangerous Commands)
-The agent must have guardrails:
-- Only allow read-only commands by default (`show`, `ping`, etc.)
-- Block dangerous commands (`reload`, `write erase`, `no shutdown`)
-- Require human approval for configuration changes
-- Validate all commands before execution
-
-**Safety is not optional.** An agent with `configure terminal` access and no guardrails is a disaster waiting to happen.
-
-### The Agent Loop: How It All Works Together
-
-Here's how these components work together in a real troubleshooting scenario:
+**Architecture:**
 
 ```
-User reports: "Troubleshoot connectivity issue to 10.2.2.0/24"
+User: "VLAN 20 is down"
     ↓
-1. THINK (LLM Brain):
-   "Users can't reach a specific network. I should first check if the 
-    interface for that subnet is up."
+LLM Brain (Claude)
     ↓
-2. PLAN:
-   "Run 'show ip interface brief' to see all interface states"
+Decides: "Check interface status"
     ↓
-3. ACT (Tool):
-   Execute: show_command("show ip interface brief")
+Calls Tool: show_command("show ip interface brief")
     ↓
-4. OBSERVE (Tool returns output):
-   GigabitEthernet0/1   10.2.2.1   YES manual up   down
+Tool executes via Netmiko
     ↓
-5. ANALYZE (LLM Brain):
-   "Interface is administratively up but line protocol is down.
-    This is a Layer 2 issue—likely cable problem or switch port down."
+Returns: "Gi0/1 is up/down"
     ↓
-6. THINK:
-   "I should check interface details to see why line protocol is down"
+LLM analyzes: "Line protocol down = Layer 2 issue"
     ↓
-7. ACT (Tool):
-   Execute: show_command("show interface gigabitethernet0/1")
-    ↓
-8. OBSERVE:
-   "Last input never, output 00:00:01"
-    ↓
-9. ANALYZE (LLM Brain):
-   "No input traffic ever received. This confirms Layer 2 failure."
-    ↓
-10. CONCLUDE:
-    "Root Cause: GigabitEthernet0/1 line protocol is down.
-     Likely causes: Cable unplugged, remote switchport disabled, or duplex mismatch.
-     Recommended fix: Check physical cable, verify remote switch config."
+Suggests fix: "Check cable, switchport config"
 ```
-
-This loop continues until the agent either:
-- Finds the root cause and suggests a fix
-- Reaches maximum iterations (safety limit)
-- Determines it needs human help
-
-### Agent Types: Choosing the Right Architecture
-
-There are three main types of AI agents, each suited for different use cases:
-
-#### **ReAct Agent** (Reason + Act)
-**Pattern:** Think → Act → Observe → Think → Act → Observe → ...
-
-**How it works:**
-- Agent reasons about what to do next
-- Performs an action
-- Observes the result
-- Reasons again based on new information
-- Continues until goal is achieved
-
-**Best for:**
-- **Troubleshooting** (where each step depends on the last)
-- **Dynamic investigations** (path is not predetermined)
-- **Exploratory tasks** (don't know the full scope upfront)
-
-**Example:**
-```
-THINK: "Interface is down, I should check why"
-ACT:   show interface gi0/1
-OBSERVE: "Line protocol is down"
-THINK: "No input traffic. Could be cable or switch issue"
-ACT:   show cdp neighbors gi0/1
-OBSERVE: "No CDP neighbor detected"
-THINK: "Definitely a Layer 1/2 issue—cable likely unplugged"
-```
-
-#### **Plan-and-Execute Agent**
-**Pattern:** Plan all steps → Execute step 1 → Execute step 2 → ... → Done
-
-**How it works:**
-- Creates a complete plan upfront
-- Executes each step in sequence
-- Does not adapt the plan based on intermediate results
-
-**Best for:**
-- **Structured processes** (same steps every time)
-- **Change procedures** (predefined runbook)
-- **Audits and compliance checks** (fixed checklist)
-
-**Example:**
-```
-PLAN:
-  Step 1: Check interface status
-  Step 2: Check routing table
-  Step 3: Check BGP peers
-  Step 4: Generate report
-
-EXECUTE:
-  ✓ Step 1: show ip interface brief
-  ✓ Step 2: show ip route
-  ✓ Step 3: show ip bgp summary
-  ✓ Step 4: Create summary
-```
-
-**Limitation:** If step 1 reveals the interface is down, a Plan-and-Execute agent will still run steps 2 and 3 (wasting time). A ReAct agent would adapt.
-
-#### **Tool-Calling Agent** (Function-Calling)
-**Pattern:** LLM directly calls functions as needed
-
-**How it works:**
-- Modern LLMs (GPT-4, Claude) support native "function calling"
-- LLM decides which functions to call and with what parameters
-- More reliable than parsing text output
-- Industry best practice for production systems
-
-**Best for:**
-- **Production deployments** (most reliable)
-- **Safety-critical systems** (explicit function calls are easier to validate)
-- **Integration with existing tools** (clean API integration)
-
-**Example:**
-```
-LLM decides: "I need to check interface status"
-LLM calls: show_command(command="show ip interface brief")
-Tool returns: [interface data]
-LLM analyzes and decides next action
-```
-
-**Why it's better:**
-- No parsing ambiguity (function parameters are structured)
-- Built-in safety (function schema validates inputs)
-- Easier to log and audit
-- **This is what we'll use in this chapter**
-
-### Comparing Agent Types
-
-| Feature | ReAct | Plan-and-Execute | Tool-Calling |
-|---------|-------|------------------|--------------|
-| **Adaptability** | High (adjusts based on results) | Low (fixed plan) | High |
-| **Efficiency** | Medium (may take detours) | High (if path is known) | High |
-| **Best for troubleshooting?** | Yes ✓ | No | Yes ✓ |
-| **Production readiness** | Good | Good | **Excellent** |
-| **Setup complexity** | Medium | Low | Low |
-
-### Key Insight: Why Agents Matter for Network Troubleshooting
-
-Traditional scripts and automation follow **predefined logic**:
-```python
-if ping_fails:
-    check_interface()
-    if interface_down:
-        send_alert()
-```
-
-AI agents use **reasoning and adaptation**:
-```
-Problem: Ping fails
-Agent thinks: "Could be interface, routing, or firewall"
-Agent investigates dynamically
-Agent adapts based on what it finds
-Agent concludes with root cause
-```
-
-**Scripts execute instructions. Agents pursue goals.**
-
-That's why agents excel at troubleshooting—each network issue is unique, and the investigation path depends on what you discover along the way.
-
----
-
-## Section 2: Building Your First Troubleshooting Agent
-
-Now that you understand the theory, let's build a real troubleshooting agent. We'll start simple and add complexity in later sections.
 
 ### Step 1: Define Tools
 
-Tools are the **actions** your agent can take. We'll create three essential troubleshooting tools:
+Tools give the agent capabilities. We need three essential diagnostic tools:
 
-1. `show_command` - Run Cisco show commands
-2. `ping` - Test connectivity
-3. `traceroute` - Trace network path
-
-Here's the complete implementation:
+**File: `troubleshooting_tools.py`**
 
 ```python
-# troubleshooting_tools.py
 from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
 from typing import Optional, Type
 import subprocess
 
 # ============================================
-# PART 1: Define Input Schemas
+# Tool Input Schemas
 # ============================================
-# These schemas tell the LLM what parameters each tool needs
 
 class ShowCommandInput(BaseModel):
     """Input schema for show command tool."""
@@ -319,63 +124,48 @@ class TraceRouteInput(BaseModel):
     """Input schema for traceroute tool."""
     destination: str = Field(description="Destination IP or hostname")
 
-
 # ============================================
-# PART 2: Implement Tool Classes
+# Tool Implementations
 # ============================================
 
 class ShowCommandTool(BaseTool):
     """Execute show commands on network devices."""
-    
+
     name: str = "show_command"
     description: str = """
     Execute read-only show commands on network devices.
-    Use this to gather diagnostic information about interfaces, routing, protocols, etc.
-    
+    Use this to gather diagnostic information about interfaces, routing, protocols.
+
     Examples:
-    - 'show ip interface brief' - List all interfaces and their status
+    - 'show ip interface brief' - List all interfaces and status
     - 'show ip route' - Display routing table
     - 'show ip bgp summary' - Show BGP neighbor status
     - 'show interface gigabitethernet0/1' - Detailed interface stats
     """
     args_schema: Type[BaseModel] = ShowCommandInput
 
-    device_connection = None  # In production: Netmiko SSH connection object
-
     def _run(self, command: str) -> str:
-        """
-        Execute a show command and return output.
-        
-        In production, this would use Netmiko to SSH to devices:
-            output = self.device_connection.send_command(command)
-            return output
-        
-        For this demo, we return simulated outputs.
-        """
-        
+        """Execute show command and return output."""
+
         # SAFETY CHECK: Only allow show commands
         if not command.strip().lower().startswith("show"):
             return "ERROR: Only 'show' commands are allowed for safety"
 
-        # ==========================================
-        # PRODUCTION CODE (commented out for demo):
-        # ==========================================
+        # PRODUCTION: Use Netmiko to SSH to real devices
         # from netmiko import ConnectHandler
-        # 
+        #
         # device = {
         #     'device_type': 'cisco_ios',
         #     'host': '192.168.1.1',
         #     'username': 'admin',
         #     'password': 'password'
         # }
-        # 
+        #
         # with ConnectHandler(**device) as net_connect:
         #     output = net_connect.send_command(command)
         #     return output
 
-        # ==========================================
-        # SIMULATED OUTPUTS FOR DEMO:
-        # ==========================================
+        # DEMO: Simulated outputs
         simulated_outputs = {
             "show ip interface brief": """
 Interface              IP-Address      OK? Method Status                Protocol
@@ -384,7 +174,7 @@ GigabitEthernet0/1     10.2.2.1        YES manual up                    down
 GigabitEthernet0/2     192.168.1.1     YES manual up                    up
 Loopback0              1.1.1.1         YES manual up                    up
             """,
-            
+
             "show ip route": """
 Gateway of last resort is 192.168.1.254 to network 0.0.0.0
 
@@ -395,7 +185,7 @@ C        10.2.2.0/24 is directly connected, GigabitEthernet0/1
 C        192.168.1.0/24 is directly connected, GigabitEthernet0/2
 S*    0.0.0.0/0 [1/0] via 192.168.1.254
             """,
-            
+
             "show ip bgp summary": """
 BGP router identifier 1.1.1.1, local AS number 65001
 BGP table version is 45, main routing table version 45
@@ -404,7 +194,7 @@ Neighbor        V    AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
 192.168.1.2     4 65002    1234    1235       45    0    0 00:15:23        150
 203.0.113.1     4 65003       0       0        0    0    0 never    Idle
             """,
-            
+
             "show interface gigabitethernet0/1": """
 GigabitEthernet0/1 is up, line protocol is down
   Hardware is iGbE, address is 0000.0c07.ac01 (bia 0000.0c07.ac01)
@@ -412,41 +202,27 @@ GigabitEthernet0/1 is up, line protocol is down
   MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
      reliability 255/255, txload 1/255, rxload 1/255
   Encapsulation ARPA, loopback not set
-  Keepalive set (10 sec)
   Full-duplex, 1000Mb/s, media type is RJ45
-  output flow-control is unsupported, input flow-control is unsupported
-  ARP type: ARPA, ARP Timeout 04:00:00
   Last input never, output 00:00:01, output hang never
-  Last clearing of "show interface" counters never
   Input queue: 0/75/0/0 (size/max/drops/flushes); Total output drops: 0
-  Queueing strategy: fifo
-  Output queue: 0/40 (size/max)
   5 minute input rate 0 bits/sec, 0 packets/sec
   5 minute output rate 0 bits/sec, 0 packets/sec
      0 packets input, 0 bytes, 0 no buffer
-     Received 0 broadcasts (0 IP multicasts)
-     0 runts, 0 giants, 0 throttles
-     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
-     0 watchdog, 0 multicast, 0 pause input
      13 packets output, 1234 bytes, 0 underruns
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
      0 output errors, 0 collisions, 1 interface resets
-     0 unknown protocol drops
-     0 babbles, 0 late collision, 0 deferred
-     0 lost carrier, 0 no carrier, 0 pause output
-     0 output buffer failures, 0 output buffers swapped out
             """,
         }
 
-        # Return simulated output if available, otherwise generic message
         return simulated_outputs.get(
             command.lower(),
-            f"[Simulated output for: {command}]\nNo specific output configured for this command."
+            f"[Simulated output for: {command}]"
         )
 
 
 class PingTool(BaseTool):
     """Ping a host to test network connectivity."""
-    
+
     name: str = "ping"
     description: str = """
     Ping a host to test network connectivity.
@@ -458,7 +234,6 @@ class PingTool(BaseTool):
     def _run(self, host: str, count: int = 4) -> str:
         """Execute ping command."""
         try:
-            # Run actual ping command on the system
             result = subprocess.run(
                 ["ping", "-c", str(count), host],
                 capture_output=True,
@@ -474,11 +249,11 @@ class PingTool(BaseTool):
 
 class TraceRouteTool(BaseTool):
     """Trace the network path to a destination."""
-    
+
     name: str = "traceroute"
     description: str = """
     Trace the network path to a destination.
-    Use this to identify where in the path packets are being dropped or delayed.
+    Use this to identify where packets are being dropped or delayed.
     Shows each hop along the route with latency measurements.
     """
     args_schema: Type[BaseModel] = TraceRouteInput
@@ -486,7 +261,6 @@ class TraceRouteTool(BaseTool):
     def _run(self, destination: str) -> str:
         """Execute traceroute command."""
         try:
-            # Run actual traceroute (max 15 hops)
             result = subprocess.run(
                 ["traceroute", "-m", "15", destination],
                 capture_output=True,
@@ -500,15 +274,8 @@ class TraceRouteTool(BaseTool):
             return f"Traceroute failed: {str(e)}"
 
 
-# ============================================
-# PART 3: Helper Function to Get All Tools
-# ============================================
-
 def get_troubleshooting_tools():
-    """
-    Returns a list of all troubleshooting tools.
-    Use this when creating the agent.
-    """
+    """Returns all troubleshooting tools."""
     return [
         ShowCommandTool(),
         PingTool(),
@@ -516,20 +283,20 @@ def get_troubleshooting_tools():
     ]
 ```
 
-**Key points about this code:**
+**Key design decisions:**
 
-1. **Input Schemas** - Tell the LLM exactly what parameters each tool needs
-2. **Safety First** - The show command tool ONLY allows commands starting with "show"
-3. **Simulated Outputs** - For demo purposes; in production, use Netmiko to SSH to real devices
-4. **Real Ping/Traceroute** - These tools actually run on your system
-5. **Error Handling** - Timeouts and exceptions are caught and returned as strings
+1. **Safety first** - Only allow commands starting with "show"
+2. **Simulated outputs** - Demo mode for learning, comment shows Netmiko production code
+3. **Real ping/traceroute** - Actually run on your system
+4. **Structured schemas** - Pydantic models validate LLM function calls
 
 ### Step 2: Create the Agent
 
-Now we'll wire up these tools with an LLM to create a functioning agent:
+Wire tools to Claude for autonomous troubleshooting:
+
+**File: `troubleshooting_agent_v1.py`**
 
 ```python
-# troubleshooting_agent.py
 from langchain_anthropic import ChatAnthropic
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -537,36 +304,22 @@ from troubleshooting_tools import get_troubleshooting_tools
 
 
 class TroubleshootingAgent:
-    """
-    AI-powered network troubleshooting agent.
-    
-    This agent can:
-    - Understand natural language problem descriptions
-    - Run diagnostic commands autonomously
-    - Analyze command outputs
-    - Identify root causes
-    - Suggest fixes
-    """
+    """AI-powered network troubleshooting agent."""
 
     def __init__(self, api_key: str):
-        """
-        Initialize the troubleshooting agent.
-        
-        Args:
-            api_key: Anthropic API key for Claude
-        """
-        
-        # Initialize the LLM (the "brain")
+        """Initialize the troubleshooting agent."""
+
+        # Initialize LLM (the "brain")
         self.llm = ChatAnthropic(
             model="claude-sonnet-4-20250514",
             api_key=api_key,
             temperature=0.0  # Deterministic for troubleshooting
         )
 
-        # Get the tools (the "hands")
+        # Get tools (the "hands")
         self.tools = get_troubleshooting_tools()
 
-        # Define the agent's instructions and behavior
+        # Define agent behavior
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert network troubleshooting assistant.
 
@@ -575,53 +328,45 @@ Your goal: Diagnose network issues by running diagnostic commands and analyzing 
 Available tools:
 - show_command: Run Cisco show commands to gather information
 - ping: Test connectivity to hosts
-- traceroute: Trace network path to identify where failures occur
+- traceroute: Trace network path to identify failures
 
-Your troubleshooting process:
-1. **Understand the symptom** - What exactly is the user reporting?
-2. **Form a hypothesis** - What could cause this symptom?
-3. **Run diagnostic commands** - Use tools to test your hypothesis
-4. **Analyze results** - What do the outputs tell you?
-5. **Identify root cause** - What is actually wrong (not just the symptom)?
-6. **Suggest fix** - Provide specific configuration commands to resolve the issue
+Troubleshooting process:
+1. Understand the symptom - What is the user reporting?
+2. Form a hypothesis - What could cause this?
+3. Run diagnostic commands - Test your hypothesis
+4. Analyze results - What do outputs tell you?
+5. Identify root cause - What is actually wrong?
+6. Suggest fix - Provide specific configuration commands
 
 Safety rules:
-- Only use show commands (read-only operations)
+- Only use show commands (read-only)
 - NEVER run configuration commands
-- Explain your reasoning at each step so the engineer understands your logic
+- Explain your reasoning at each step
 
-Be systematic, thorough, and always explain your thought process."""),
-            
-            ("human", "{input}"),  # The problem description from the user
-            MessagesPlaceholder("agent_scratchpad")  # Space for tool outputs and agent thoughts
+Be systematic and thorough."""),
+
+            ("human", "{input}"),
+            MessagesPlaceholder("agent_scratchpad")
         ])
 
-        # Create the agent (combines LLM + tools + prompt)
+        # Create agent
         agent = create_tool_calling_agent(
             llm=self.llm,
             tools=self.tools,
             prompt=self.prompt
         )
 
-        # Create the executor (runs the agent loop)
+        # Create executor
         self.agent_executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            verbose=True,  # Print agent's thought process
-            max_iterations=10,  # Safety limit: max 10 actions
-            handle_parsing_errors=True  # Gracefully handle LLM errors
+            verbose=True,
+            max_iterations=10,
+            handle_parsing_errors=True
         )
 
     def troubleshoot(self, problem_description: str) -> dict:
-        """
-        Troubleshoot a network problem.
-        
-        Args:
-            problem_description: Natural language description of the problem
-            
-        Returns:
-            Dictionary with problem, analysis, and steps taken
-        """
+        """Troubleshoot a network problem."""
         result = self.agent_executor.invoke({
             "input": problem_description
         })
@@ -633,20 +378,17 @@ Be systematic, thorough, and always explain your thought process."""),
         }
 
 
-# ============================================
-# Example Usage
-# ============================================
-
 if __name__ == "__main__":
-    # Create the agent
-    agent = TroubleshootingAgent(api_key="your-anthropic-api-key-here")
+    import os
 
-    # Scenario: Users on VLAN 20 can't access the network
+    # Create agent
+    agent = TroubleshootingAgent(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+    # Test case: VLAN 20 connectivity issue
     result = agent.troubleshoot(
         "Users on VLAN 20 (10.2.2.0/24) cannot access the network"
     )
 
-    # Print results
     print(f"\n{'='*60}")
     print(f"Problem: {result['problem']}")
     print(f"{'='*60}")
@@ -654,265 +396,210 @@ if __name__ == "__main__":
     print(f"\nDiagnostic steps taken: {result['steps_taken']}")
 ```
 
-### Step 3: Understanding What Happens When You Run It
+### Step 3: Run and Verify
 
-Let's trace through exactly what happens when you run this agent:
+```bash
+# Test the agent
+python troubleshooting_agent_v1.py
+```
+
+**Expected output:**
 
 ```
-User: "Users on VLAN 20 (10.2.2.0/24) cannot access the network"
-```
+> Entering new AgentExecutor chain...
 
-**Agent's internal reasoning** (what you'll see with `verbose=True`):
+I need to check the interface status for VLAN 20 (10.2.2.0/24).
 
-```
-====================================
-STEP 1: Initial Analysis
-====================================
-Agent thinks:
-"Users on VLAN 20 can't access the network. VLAN 20 uses subnet 10.2.2.0/24.
-I should first check if the interface serving that VLAN is up."
+Action: show_command
+Action Input: {"command": "show ip interface brief"}
 
-Agent decides to act:
-TOOL: show_command
-ARGS: {"command": "show ip interface brief"}
-
-====================================
-STEP 2: Analyze Interface Status
-====================================
-Tool returns:
+Observation:
 Interface              IP-Address      OK? Method Status                Protocol
 GigabitEthernet0/0     10.1.1.1        YES manual up                    up
-GigabitEthernet0/1     10.2.2.1        YES manual up                    down  ← PROBLEM!
+GigabitEthernet0/1     10.2.2.1        YES manual up                    down
 GigabitEthernet0/2     192.168.1.1     YES manual up                    up
-Loopback0              1.1.1.1         YES manual up                    up
 
-Agent analyzes:
-"GigabitEthernet0/1 has IP 10.2.2.1 (the VLAN 20 gateway).
-Status is 'up' but Protocol is 'down'.
-This means:
-  - Interface is administratively enabled (up)
-  - But line protocol is down (no Layer 2 connectivity)
-  
-This is a Layer 2 problem. I need more details."
+Thought: GigabitEthernet0/1 (10.2.2.1) is the gateway for VLAN 20. Status is up
+but Protocol is down - this is a Layer 2 issue. Let me get details.
 
-====================================
-STEP 3: Get Detailed Interface Info
-====================================
-Agent decides to act:
-TOOL: show_command
-ARGS: {"command": "show interface gigabitethernet0/1"}
+Action: show_command
+Action Input: {"command": "show interface gigabitethernet0/1"}
 
-Tool returns:
+Observation:
 GigabitEthernet0/1 is up, line protocol is down
-  ...
-  Last input never, output 00:00:01, output hang never  ← KEY INFO
-  ...
-  0 packets input, 0 bytes  ← NO INPUT TRAFFIC
+  Last input never, output 00:00:01
+  0 packets input, 0 bytes
   13 packets output, 1234 bytes
 
-Agent analyzes:
-"Key findings:
-1. Last input: NEVER - no packets have EVER been received
-2. 0 packets input - confirms no inbound traffic
-3. 13 packets output - outbound traffic IS being sent
+Thought: "Last input never" and "0 packets input" means the interface has never
+received any traffic. This is a complete Layer 1/2 failure.
 
-This definitively proves a Layer 1/2 issue:
-  - Cable could be unplugged
-  - Remote switch port could be disabled
-  - Duplex mismatch (though less likely with 'never' seeing traffic)
-  - Wrong VLAN on switch port"
+Final Answer:
 
-====================================
-STEP 4: Final Conclusion
-====================================
-Agent provides analysis:
+ROOT CAUSE: GigabitEthernet0/1 line protocol is down. Interface has never
+received input traffic.
 
-ROOT CAUSE IDENTIFIED:
-GigabitEthernet0/1 line protocol is down despite being administratively up.
-The interface has NEVER received any input traffic.
+EVIDENCE:
+- Gi0/1 has IP 10.2.2.1 (VLAN 20 gateway)
+- Status: up (administratively enabled)
+- Protocol: down (no Layer 2 connectivity)
+- "Last input never" - no packets ever received
+- 0 input packets vs 13 output packets
 
-This indicates a Layer 1 or Layer 2 connectivity failure.
+LIKELY CAUSES:
+1. Physical cable unplugged or faulty
+2. Remote switchport administratively down
+3. Remote switchport in wrong VLAN
 
-Most likely causes (in order of probability):
-1. Physical cable is unplugged or faulty
-2. Remote switchport is administratively down
-3. Remote switchport is in wrong VLAN
-4. Duplex/speed mismatch (less likely given 'never' seen traffic)
+RECOMMENDED FIX:
+1. Check physical cable on both ends
+2. Verify remote switch config:
+   show cdp neighbors gigabitethernet0/1
+   show interface status (on remote switch)
+3. If cable is good, enable remote port:
+   interface [port]
+    no shutdown
+    switchport access vlan 20
 
-RECOMMENDED ACTIONS:
-1. Physically check cable connection on both ends
-2. Check remote switch configuration:
-   - show cdp neighbors detail (to identify connected switch)
-   - Verify switchport is enabled: show interface status
-   - Verify switchport VLAN: show interface trunk/switchport
-3. Check for physical errors:
-   - show interface gigabitethernet0/1 | include error
-4. If duplex mismatch suspected:
-   interface gigabitethernet0/1
-    duplex auto
-    speed auto
+VERIFICATION:
+show ip interface brief | include Gi0/1
+(Should show: up/up, not up/down)
 
-IMPACT:
-All users on VLAN 20 (10.2.2.0/24) have no network access because
-their default gateway (10.2.2.1) is unreachable.
+> Finished chain.
 
-Steps taken: 2 diagnostic commands
+Diagnostic steps taken: 2
 ```
 
-### What Makes This Powerful?
+**What happened:**
 
-1. **Natural language input** - You describe the problem in plain English
-2. **Autonomous investigation** - Agent decides which commands to run
-3. **Systematic analysis** - Follows OSI model (Layer 2 before Layer 3)
-4. **Actionable output** - Specific commands to fix the issue
-5. **Fast** - 2 commands, 30 seconds vs. 30 minutes of manual work
+1. Agent understood "VLAN 20 can't access network"
+2. Checked interface status autonomously
+3. Identified Gi0/1 serves 10.2.2.0/24
+4. Noticed line protocol down
+5. Dug deeper with detailed interface stats
+6. Found "Last input never" = no traffic ever received
+7. Concluded Layer 1/2 issue
+8. Provided specific fix steps
 
-### Key Limitations of This Basic Agent
+**Time:** 30 seconds vs. 15-30 minutes manual
 
-While impressive, this basic agent has limitations we'll address in the next sections:
+### V1 Cost Analysis
 
-1. **No structured methodology** - Investigation is somewhat ad-hoc
-2. **No conversation** - Can't ask follow-up questions
-3. **Limited safety** - Basic command validation only
-4. **No planning** - Reacts to each result without long-term strategy
+**Per troubleshooting session:**
+- Input: ~500 tokens (prompt + tool schemas)
+- Output: ~600 tokens (analysis + tool calls)
+- Tool outputs: ~800 tokens
+- Total: ~1,900 tokens per session
 
-Let's fix these issues in the next sections.
+**Claude Sonnet 4 pricing:**
+- Input: $3/million tokens
+- Output: $15/million tokens
+- Cost per session: $0.015 (1.5 cents)
+
+**Monthly cost (500 incidents):**
+- 500 incidents × $0.015 = $7.50/month
+
+**ROI calculation:**
+- Time saved: 25 min/incident (30 min manual - 5 min with agent)
+- 500 incidents × 25 min = 208 hours saved/month
+- At $75/hour engineer rate: $15,600 saved
+- Agent cost: $7.50
+- Net savings: $15,592/month ($187,104/year)
+
+**V1 is production-ready for read-only troubleshooting.**
 
 ---
 
-## Section 3: Multi-Stage Troubleshooting with Structured Planning
+## Version 2: Multi-Stage Planning
 
-The basic agent we built works, but it's reactive—it responds to each command output without a long-term plan. Real network troubleshooting follows a **structured methodology** based on the OSI model.
+**Problem with V1:** Investigation is reactive. Agent responds to each output without long-term strategy.
 
-Let's build a **multi-stage troubleshooting system** that works like an experienced network engineer:
+**V2 adds:** Structured OSI-based methodology with explicit planning stages.
 
-1. **Plan** the investigation strategy
-2. **Execute** diagnostic commands for that stage
-3. **Analyze** the results
-4. **Decide** the next stage based on findings
-5. **Repeat** until root cause found
+**Architecture:**
 
-### Why Multi-Stage Matters
-
-**Problem with reactive agents:**
 ```
-Agent: "Let me check interfaces"
-[runs show ip interface brief]
-Agent: "Hmm, BGP might be involved"
-[runs show ip bgp]
-Agent: "Actually, let me check routing"
-[runs show ip route]
+User: "Intermittent connectivity"
+    ↓
+PLAN Stage 1: Identify OSI layer
+  Hypothesis: "Could be L1/2/3"
+  Commands: [show ip int brief, show ip route]
+    ↓
+EXECUTE Stage 1
+    ↓
+ANALYZE: "Routing looks good, check BGP"
+    ↓
+PLAN Stage 2: Check routing protocols
+  Hypothesis: "BGP flapping causes intermittent issues"
+  Commands: [show ip bgp summary]
+    ↓
+EXECUTE Stage 2
+    ↓
+ANALYZE: "BGP neighbor in Idle state"
+    ↓
+PLAN Stage 3: Root cause found
+    ↓
+FINAL ANALYSIS: Comprehensive report
 ```
-→ Inefficient, jumps around without clear strategy
 
-**Multi-stage approach:**
-```
-STAGE 1 - Identify OSI Layer:
-  Hypothesis: "Problem could be L1, L2, or L3"
-  Commands: show ip interface brief
-  Finding: "Interface up/down → L2 issue"
+**Benefits:**
+- Systematic investigation (not ad-hoc)
+- Clear hypothesis at each stage
+- Complete audit trail
+- Follows OSI model best practices
 
-STAGE 2 - Investigate Layer 2:
-  Hypothesis: "Physical connectivity problem"
-  Commands: show interface gi0/1, show cdp neighbors
-  Finding: "No CDP neighbor, no input traffic → cable issue"
+### Implementation
 
-STAGE 3 - Root Cause Found:
-  Conclusion: "Cable unplugged or faulty"
-```
-→ Systematic, follows proven methodology
-
-### The Multi-Stage Architecture
-
-We'll build a system with:
-
-1. **DiagnosticStage Enum** - Defines possible investigation stages
-2. **DiagnosticPlan Model** - Structured plan for each stage
-3. **MultiStageTroubleshooter** - Orchestrates the investigation
-
-Here's the complete implementation:
+**File: `multi_stage_agent_v2.py`**
 
 ```python
-# multi_stage_agent.py
 from langchain_anthropic import ChatAnthropic
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from typing import List, Dict
 from enum import Enum
+from troubleshooting_tools import ShowCommandTool
 
-
-# ============================================
-# PART 1: Define Investigation Stages
-# ============================================
 
 class DiagnosticStage(str, Enum):
-    """
-    Possible stages in network troubleshooting.
-    Based on OSI model bottom-up approach.
-    """
-    IDENTIFY_LAYER = "identify_layer"      # Which OSI layer is affected?
-    CHECK_PHYSICAL = "check_physical"      # Layer 1: Cables, hardware
-    CHECK_DATA_LINK = "check_data_link"    # Layer 2: Switching, VLANs, MAC
-    CHECK_NETWORK = "check_network"        # Layer 3: IP, routing
-    CHECK_TRANSPORT = "check_transport"    # Layer 4: TCP/UDP, ports
-    CHECK_ROUTING = "check_routing"        # Routing protocols (BGP, OSPF)
-    CHECK_SERVICES = "check_services"      # Application layer services
-    ROOT_CAUSE_FOUND = "root_cause_found"  # Investigation complete
+    """Possible stages in network troubleshooting (OSI-based)."""
+    IDENTIFY_LAYER = "identify_layer"
+    CHECK_PHYSICAL = "check_physical"
+    CHECK_DATA_LINK = "check_data_link"
+    CHECK_NETWORK = "check_network"
+    CHECK_TRANSPORT = "check_transport"
+    CHECK_ROUTING = "check_routing"
+    CHECK_SERVICES = "check_services"
+    ROOT_CAUSE_FOUND = "root_cause_found"
 
-
-# ============================================
-# PART 2: Define Diagnostic Plan Structure
-# ============================================
 
 class DiagnosticPlan(BaseModel):
-    """
-    Structured plan for a single diagnostic stage.
-    
-    The LLM generates this plan, which tells us:
-    - What stage we're in
-    - What we think the problem is
-    - Which commands to run
-    - Why we're running them
-    """
+    """Structured plan for a diagnostic stage."""
     stage: DiagnosticStage = Field(
-        description="Current diagnostic stage in the investigation"
+        description="Current diagnostic stage"
     )
     hypothesis: str = Field(
-        description="What we think the problem is at this stage"
+        description="What we think the problem is"
     )
     commands_to_run: List[str] = Field(
-        description="List of diagnostic commands to execute"
+        description="Diagnostic commands to execute"
     )
     reasoning: str = Field(
-        description="Why these commands will help test the hypothesis"
+        description="Why these commands test the hypothesis"
     )
 
 
-# ============================================
-# PART 3: Multi-Stage Troubleshooter
-# ============================================
-
 class MultiStageTroubleshooter:
-    """
-    Structured multi-stage network troubleshooting system.
-    
-    This agent follows a disciplined approach:
-    1. Plan each stage based on OSI model
-    2. Execute diagnostic commands
-    3. Analyze results
-    4. Plan next stage based on findings
-    """
+    """Structured multi-stage troubleshooting system."""
 
     def __init__(self, api_key: str):
-        """Initialize the multi-stage troubleshooter."""
+        """Initialize multi-stage troubleshooter."""
         self.llm = ChatAnthropic(
             model="claude-sonnet-4-20250514",
             api_key=api_key,
-            temperature=0.0  # Deterministic for troubleshooting
+            temperature=0.0
         )
-
-        # JSON parser for structured outputs
         self.parser = JsonOutputParser(pydantic_object=DiagnosticPlan)
 
     def plan_next_stage(
@@ -920,66 +607,45 @@ class MultiStageTroubleshooter:
         symptom: str,
         previous_findings: List[Dict] = None
     ) -> DiagnosticPlan:
-        """
-        Plan the next diagnostic stage based on symptom and previous findings.
-        
-        Args:
-            symptom: Original problem description
-            previous_findings: Results from previous stages
-            
-        Returns:
-            DiagnosticPlan with stage, hypothesis, commands, and reasoning
-        """
-        
-        # Format previous findings for context
+        """Plan next diagnostic stage based on symptom and findings."""
+
+        # Format previous findings
         if previous_findings:
             findings_text = "\n\n".join([
                 f"Stage {i+1}: {f['stage']}\n"
                 f"Hypothesis: {f['hypothesis']}\n"
-                f"Commands run: {', '.join(f['commands'])}\n"
-                f"Key findings: {f['results'][:300]}..."
+                f"Commands: {', '.join(f['commands'])}\n"
+                f"Results: {f['results'][:300]}..."
                 for i, f in enumerate(previous_findings)
             ])
         else:
-            findings_text = "None yet - this is the first stage"
+            findings_text = "None - this is the first stage"
 
-        # Create prompt for the LLM
         prompt = ChatPromptTemplate.from_template("""
-You are planning the next stage of a systematic network troubleshooting investigation.
+You are planning a network troubleshooting investigation.
 
-ORIGINAL SYMPTOM:
-{symptom}
+SYMPTOM: {symptom}
 
 PREVIOUS FINDINGS:
 {findings}
 
-Your task: Plan the next diagnostic stage using OSI model methodology.
+Plan the next diagnostic stage using OSI model methodology.
 
-INSTRUCTIONS:
-1. Analyze what we know so far
-2. Determine which OSI layer to investigate next (or if root cause is found)
-3. Form a hypothesis about what might be wrong
-4. Choose specific diagnostic commands to test that hypothesis
-5. Explain why those commands will help
-
-Available diagnostic stages:
+STAGES:
 - identify_layer: Determine which OSI layer is affected
-- check_physical: Layer 1 - cables, hardware, link status
-- check_data_link: Layer 2 - switching, VLANs, MAC addresses, STP
-- check_network: Layer 3 - IP addressing, subnetting, ARP
-- check_routing: Routing protocols - BGP, OSPF, static routes
-- check_transport: Layer 4 - TCP/UDP, port connectivity
-- check_services: Application layer - DNS, DHCP, services
-- root_cause_found: Root cause identified, ready for fix
+- check_physical: Layer 1 (cables, hardware, link status)
+- check_data_link: Layer 2 (switching, VLANs, MAC, STP)
+- check_network: Layer 3 (IP addressing, subnetting, ARP)
+- check_routing: Routing protocols (BGP, OSPF, static routes)
+- check_transport: Layer 4 (TCP/UDP, ports)
+- check_services: Application layer (DNS, DHCP, services)
+- root_cause_found: Investigation complete
 
-Return your plan as JSON matching this schema:
+Return JSON:
 {format_instructions}
 
-Think step-by-step, be systematic, and follow the OSI model.
+Be systematic and follow OSI model bottom-up.""")
 
-JSON plan:""")
-
-        # Get LLM's plan
         response = self.llm.invoke(
             prompt.format(
                 symptom=symptom,
@@ -988,7 +654,6 @@ JSON plan:""")
             )
         )
 
-        # Parse JSON response into DiagnosticPlan object
         import json
         plan_data = json.loads(response.content)
         return DiagnosticPlan(**plan_data)
@@ -998,20 +663,11 @@ JSON plan:""")
         plan: DiagnosticPlan,
         show_command_tool
     ) -> Dict:
-        """
-        Execute all commands in a diagnostic stage.
-        
-        Args:
-            plan: The diagnostic plan to execute
-            show_command_tool: Tool for running show commands
-            
-        Returns:
-            Dictionary with stage results
-        """
+        """Execute all commands in diagnostic stage."""
         results = []
 
         print(f"\n🔍 Executing {len(plan.commands_to_run)} commands...")
-        
+
         for command in plan.commands_to_run:
             print(f"  → {command}")
             output = show_command_tool._run(command)
@@ -1020,7 +676,6 @@ JSON plan:""")
                 "output": output
             })
 
-        # Combine all command outputs
         combined_results = "\n\n".join([
             f"$ {r['command']}\n{r['output']}"
             for r in results
@@ -1038,18 +693,8 @@ JSON plan:""")
         symptom: str,
         stage_results: List[Dict]
     ) -> str:
-        """
-        Analyze all stage results and provide comprehensive root cause analysis.
-        
-        Args:
-            symptom: Original problem description
-            stage_results: All stage results from the investigation
-            
-        Returns:
-            Detailed root cause analysis with fix recommendations
-        """
-        
-        # Format all results
+        """Analyze all stages and provide root cause analysis."""
+
         results_text = "\n\n".join([
             f"{'='*60}\n"
             f"STAGE: {r['stage']}\n"
@@ -1059,48 +704,32 @@ JSON plan:""")
             for r in stage_results
         ])
 
-        # Create analysis prompt
         prompt = ChatPromptTemplate.from_template("""
-You are providing final root cause analysis after completing a network troubleshooting investigation.
+Provide final root cause analysis after troubleshooting investigation.
 
-ORIGINAL SYMPTOM:
-{symptom}
+SYMPTOM: {symptom}
 
-COMPLETE INVESTIGATION RESULTS:
+INVESTIGATION RESULTS:
 {results}
 
-Provide a comprehensive root cause analysis with:
+Provide comprehensive analysis:
 
-1. **ROOT CAUSE**
-   What is actually wrong? Be specific and definitive.
+1. ROOT CAUSE - What is actually wrong? Be specific.
 
-2. **EVIDENCE**
-   Which command outputs prove this root cause? Quote specific lines.
+2. EVIDENCE - Which command outputs prove this? Quote specific lines.
 
-3. **IMPACT**
-   Why are users experiencing the reported symptom?
-   How does the root cause lead to the symptom?
+3. IMPACT - Why are users experiencing the symptom?
 
-4. **FIX**
-   Exact configuration commands to resolve the issue.
-   Include full command syntax.
+4. FIX - Exact configuration commands to resolve.
 
-5. **PREVENTION**
-   How can this be prevented in the future?
-   Monitoring, automation, or best practices?
+5. PREVENTION - How to prevent in future? Monitoring, automation, best practices.
 
-6. **VERIFICATION**
-   After applying the fix, which commands should be run to verify it worked?
+6. VERIFICATION - Commands to verify fix worked.
 
-Format your analysis clearly and actionably. Network engineers will use this to
-fix the problem, so be precise and thorough.""")
+Be precise and actionable.""")
 
-        # Get comprehensive analysis from LLM
         response = self.llm.invoke(
-            prompt.format(
-                symptom=symptom,
-                results=results_text
-            )
+            prompt.format(symptom=symptom, results=results_text)
         )
 
         return response.content
@@ -1110,57 +739,44 @@ fix the problem, so be precise and thorough.""")
         symptom: str,
         max_stages: int = 5
     ) -> Dict:
-        """
-        Perform complete multi-stage troubleshooting investigation.
-        
-        Args:
-            symptom: Natural language problem description
-            max_stages: Maximum number of stages (safety limit)
-            
-        Returns:
-            Complete investigation results with analysis
-        """
-        from troubleshooting_tools import ShowCommandTool
-
-        # Initialize show command tool
+        """Perform complete multi-stage investigation."""
         tool = ShowCommandTool()
         previous_findings = []
 
         print(f"\n{'='*70}")
-        print(f"MULTI-STAGE TROUBLESHOOTING INVESTIGATION")
+        print(f"MULTI-STAGE TROUBLESHOOTING")
         print(f"{'='*70}")
         print(f"\nSymptom: {symptom}\n")
 
-        # Execute stages until root cause found or max stages reached
         for stage_num in range(max_stages):
             print(f"\n{'#'*70}")
             print(f"# STAGE {stage_num + 1}")
             print(f"{'#'*70}")
 
-            # PLAN: Determine next stage
-            print(f"\n📋 Planning next stage...")
+            # PLAN
+            print(f"\n📋 Planning...")
             plan = self.plan_next_stage(symptom, previous_findings)
 
             print(f"\n✓ Stage planned:")
-            print(f"  Stage type: {plan.stage}")
+            print(f"  Type: {plan.stage}")
             print(f"  Hypothesis: {plan.hypothesis}")
-            print(f"  Commands to run: {len(plan.commands_to_run)}")
+            print(f"  Commands: {len(plan.commands_to_run)}")
             print(f"  Reasoning: {plan.reasoning}")
 
-            # Check if we've found the root cause
+            # Check if done
             if plan.stage == DiagnosticStage.ROOT_CAUSE_FOUND:
                 print(f"\n🎯 ROOT CAUSE IDENTIFIED!")
                 break
 
-            # EXECUTE: Run diagnostic commands
+            # EXECUTE
             results = self.execute_stage(plan, tool)
             previous_findings.append(results)
 
             print(f"\n✓ Stage {stage_num + 1} complete")
 
-        # ANALYZE: Provide final root cause analysis
+        # ANALYZE
         print(f"\n{'='*70}")
-        print(f"FINAL ROOT CAUSE ANALYSIS")
+        print(f"FINAL ANALYSIS")
         print(f"{'='*70}\n")
 
         analysis = self.analyze_results(symptom, previous_findings)
@@ -1174,32 +790,24 @@ fix the problem, so be precise and thorough.""")
         }
 
 
-# ============================================
-# Example Usage
-# ============================================
-
 if __name__ == "__main__":
-    # Create multi-stage troubleshooter
-    troubleshooter = MultiStageTroubleshooter(api_key="your-anthropic-api-key")
+    import os
 
-    # Scenario: Intermittent connectivity issues
-    result = troubleshooter.troubleshoot_full(
-        symptom="Users at branch office report intermittent internet connectivity. "
-                "Sometimes it works, sometimes it doesn't.",
-        max_stages=4
+    troubleshooter = MultiStageTroubleshooter(
+        api_key=os.getenv("ANTHROPIC_API_KEY")
     )
 
-    # Results are printed during execution
-    # The result dict contains all findings for logging/review
+    result = troubleshooter.troubleshoot_full(
+        symptom="Users at branch office report intermittent internet connectivity",
+        max_stages=4
+    )
 ```
 
-### Example Output: Multi-Stage Investigation
-
-Here's what the output looks like for a real troubleshooting scenario:
+**Example output:**
 
 ```
 ======================================================================
-MULTI-STAGE TROUBLESHOOTING INVESTIGATION
+MULTI-STAGE TROUBLESHOOTING
 ======================================================================
 
 Symptom: Users at branch office report intermittent internet connectivity
@@ -1208,13 +816,13 @@ Symptom: Users at branch office report intermittent internet connectivity
 # STAGE 1
 ######################################################################
 
-📋 Planning next stage...
+📋 Planning...
 
 ✓ Stage planned:
-  Stage type: identify_layer
-  Hypothesis: Need to determine if this is a Layer 1/2 (local) or Layer 3 (routing/WAN) issue
-  Commands to run: 2
-  Reasoning: Check local interface status and WAN link status to narrow down the problem domain
+  Type: identify_layer
+  Hypothesis: Need to determine if L1/2 (local) or L3 (routing/WAN) issue
+  Commands: 2
+  Reasoning: Check local interfaces and WAN link to narrow problem domain
 
 🔍 Executing 2 commands...
   → show ip interface brief
@@ -1226,17 +834,16 @@ Symptom: Users at branch office report intermittent internet connectivity
 # STAGE 2
 ######################################################################
 
-📋 Planning next stage...
+📋 Planning...
 
 ✓ Stage planned:
-  Stage type: check_routing
-  Hypothesis: Intermittent connectivity suggests routing instability, possibly flapping BGP session
-  Commands to run: 2
-  Reasoning: BGP flapping would cause routes to appear/disappear, matching the symptom
+  Type: check_routing
+  Hypothesis: Intermittent connectivity suggests routing instability (flapping BGP)
+  Commands: 1
+  Reasoning: BGP flapping causes routes to appear/disappear
 
-🔍 Executing 2 commands...
+🔍 Executing 1 commands...
   → show ip bgp summary
-  → show ip bgp neighbors 203.0.113.1
 
 ✓ Stage 2 complete
 
@@ -1244,185 +851,116 @@ Symptom: Users at branch office report intermittent internet connectivity
 # STAGE 3
 ######################################################################
 
-📋 Planning next stage...
+📋 Planning...
 
 🎯 ROOT CAUSE IDENTIFIED!
 
 ======================================================================
-FINAL ROOT CAUSE ANALYSIS
+FINAL ANALYSIS
 ======================================================================
 
 1. ROOT CAUSE
-BGP neighbor 203.0.113.1 (AS 65003) is in "Idle" state and has never established
-a session. This is NOT intermittent flapping—it has never worked.
+BGP neighbor 203.0.113.1 (AS 65003) is in "Idle" state and has never established.
 
-The "intermittent" connectivity is likely caused by:
-- Primary path (BGP) is down
-- Backup static route occasionally takes over
-- When backup route is congested/unavailable, connectivity fails
+Intermittent connectivity is caused by:
+- Primary BGP path down
+- Backup static route occasionally working
+- When backup route congested, connectivity fails
 
 2. EVIDENCE
 From "show ip bgp summary":
   203.0.113.1     4 65003       0       0        0    0    0 never    Idle
                                                             ^^^^^^    ^^^^
-                                                         Never up   Idle state
-
-This neighbor has:
-- 0 messages received
-- 0 messages sent
+- 0 messages sent/received
 - Never been up
-- Currently in Idle state (not even trying to connect)
+- Idle state (not trying to connect)
 
 3. IMPACT
-Users experience intermittent connectivity because:
-- Primary BGP path (intended route) is down
-- Traffic fails over to backup static route
-- When backup route is congested or the path is suboptimal, connectivity degrades
-- This creates the "intermittent" behavior
+Users experience intermittent connectivity because traffic fails over to backup
+static route. When backup is congested, connectivity degrades.
 
 4. FIX
-Step 1: Diagnose why BGP won't establish
-!
+Diagnose why BGP won't establish:
+
 router bgp 65001
- neighbor 203.0.113.1 description ISP_PRIMARY
  neighbor 203.0.113.1 remote-as 65003
  neighbor 203.0.113.1 update-source GigabitEthernet0/2
- neighbor 203.0.113.1 password bgp_secret_key
-!
 
-Possible issues to check:
-a) IP connectivity to neighbor:
-   ping 203.0.113.1 source GigabitEthernet0/2
-
-b) Access-list blocking TCP 179:
-   show access-lists
-   (Ensure outbound ACL permits TCP 179 to 203.0.113.1)
-
-c) Firewall blocking BGP:
-   Check any firewalls between router and ISP
-
-d) Wrong BGP password:
-   Verify password with ISP
-
-e) ISP side not configured:
-   Contact ISP to verify their BGP config
-
-Step 2: Once BGP is up, verify routes are received:
-show ip bgp summary
-show ip bgp
-show ip route bgp
+Check:
+a) IP connectivity: ping 203.0.113.1 source GigabitEthernet0/2
+b) Firewall blocking TCP 179
+c) BGP password mismatch
+d) ISP configuration
 
 5. PREVENTION
-- Monitor BGP neighbor states (send alert if neighbor goes down)
-- Implement BFD (Bidirectional Forwarding Detection) for fast failover
-- Configure syslog for BGP state changes
-- Document ISP contact procedures for BGP issues
+- Monitor BGP neighbor states (alert if down)
+- Implement BFD for fast failover
+- Syslog for BGP state changes
 
 6. VERIFICATION
-After fix is applied:
-# Verify BGP session is established
-show ip bgp summary
-# Should show state "Established" with PfxRcd > 0
-
-# Verify routes are being received
-show ip bgp
-# Should show routes learned from 203.0.113.1
-
-# Verify routes are in routing table
+show ip bgp summary (should show "Established" with PfxRcd > 0)
 show ip route bgp
-# Should show BGP routes installed
-
-# Test connectivity
 ping 8.8.8.8
-# Should work reliably now
 
 Stages completed: 2
 ```
 
-### Why This Approach Is Better
+**V2 improvements over V1:**
 
-**Compared to the basic agent:**
+| Feature | V1 | V2 |
+|---------|----|----|
+| Methodology | Reactive | Structured (OSI) |
+| Planning | None | Explicit per stage |
+| Hypothesis | Implicit | Explicit |
+| Audit trail | Basic | Complete |
+| Analysis | Simple | 6-section comprehensive |
 
-| Feature | Basic Agent | Multi-Stage Agent |
-|---------|-------------|-------------------|
-| **Methodology** | Reactive | Structured (OSI model) |
-| **Planning** | None | Plans each stage |
-| **Explanation** | Limited | Hypothesis + reasoning |
-| **Analysis** | Basic | Comprehensive (6 sections) |
-| **Audit trail** | Minimal | Complete stage history |
-| **Efficiency** | Medium | High (systematic) |
+### V2 Cost Analysis
 
-**Real-world benefits:**
+**Per troubleshooting session:**
+- Input: ~1,200 tokens (planning + stage prompts)
+- Output: ~1,800 tokens (plans + analysis)
+- Total: ~3,000 tokens per session
 
-1. **Systematic investigation** - Follows proven troubleshooting methodology
-2. **Clear logic** - Each stage has explicit hypothesis and reasoning
-3. **Complete documentation** - Full audit trail of investigation
-4. **Comprehensive fix** - Not just "what" but "how" and "why"
-5. **Prevention guidance** - Learn from the incident
+**Cost per session:** $0.031 (3.1 cents)
 
-### When to Use Multi-Stage vs Basic Agent
+**Monthly cost (500 incidents):** $15.50
 
-**Use Basic Agent when:**
-- Quick, simple issues ("Is this interface up?")
-- Interactive troubleshooting with human
-- Learning/experimentation
-
-**Use Multi-Stage Agent when:**
-- Complex, multi-layer issues
-- Need documented investigation process
-- Production incident response
-- Training junior engineers (they can follow the logic)
+**Still trivial compared to engineer time savings ($15,600/month).**
 
 ---
 
-## Section 4: Conversational Troubleshooting Agent with Memory
+## Version 3: Conversation Memory
 
-The multi-stage agent is great for structured investigations, but real troubleshooting is often **conversational**. You might:
+**Problem with V1/V2:** No memory between interactions. Can't handle:
 
-- Ask a follow-up question: "What caused that interface to go down?"
-- Request more detail: "Can you check if BGP is working?"
-- Pivot mid-investigation: "Actually, let's check the firewall instead"
+```
+User: "Check VLAN 20"
+Agent: "Gi0/1 is down"
 
-To support this, we need an agent with **memory**—it remembers the conversation and previous findings.
-
-### The Problem: Stateless Agents
-
-Our basic agent has no memory:
-
-```python
-agent.troubleshoot("Users can't reach 10.2.2.0/24")
-# Agent investigates: "Gi0/1 is down"
-
-agent.troubleshoot("Why is that interface down?")
-# Agent has NO IDEA what "that interface" refers to!
-# It starts over from scratch
+User: "Why is it down?"
+Agent: "What interface? I have no context."  ❌
 ```
 
-### The Solution: Conversation Memory
+**V3 adds:** Conversation memory for natural follow-up questions.
 
-```python
-agent = ConversationalTroubleshootingAgent(api_key="...")
+**Architecture:**
 
-# First message
-agent.chat("Users can't reach 10.2.2.0/24")
-→ Agent: "Let me check... Gi0/1 is down (line protocol down)"
-
-# Follow-up (agent remembers!)
-agent.chat("Why is the line protocol down?")
-→ Agent: "Based on my earlier check of Gi0/1, I saw 'Last input never' 
-          which indicates no traffic received. Let me get more details..."
-
-# Another follow-up
-agent.chat("How do I fix it?")
-→ Agent: "Given that Gi0/1 has never received input, the fix is..."
+```
+ConversationBufferMemory
+    ↓
+Stores: [User msg, Agent response, Tool calls, Tool outputs]
+    ↓
+Next user message includes full history
+    ↓
+Agent understands context and references
 ```
 
-The agent maintains **context** across messages, just like chatting with a human engineer.
+### Implementation
 
-### Implementation: Conversational Agent with Memory
+**File: `conversational_agent_v3.py`**
 
 ```python
-# conversational_agent.py
 from langchain_anthropic import ChatAnthropic
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -1431,432 +969,286 @@ from troubleshooting_tools import get_troubleshooting_tools
 
 
 class ConversationalTroubleshootingAgent:
-    """
-    Network troubleshooting agent with conversation memory.
-    
-    This agent:
-    - Remembers all previous messages and findings
-    - Understands follow-up questions and context
-    - Maintains investigation state across multiple interactions
-    - Provides natural conversational experience
-    """
+    """Network troubleshooting agent with conversation memory."""
 
     def __init__(self, api_key: str):
-        """Initialize conversational agent with memory."""
-        
-        # Initialize LLM
+        """Initialize conversational agent."""
+
         self.llm = ChatAnthropic(
             model="claude-sonnet-4-20250514",
             api_key=api_key,
-            temperature=0.2  # Slightly higher for more natural conversation
+            temperature=0.2  # Slightly higher for natural conversation
         )
 
-        # ==========================================
-        # KEY ADDITION: Conversation Memory
-        # ==========================================
-        # This stores all messages and agent actions
+        # KEY ADDITION: Conversation memory
         self.memory = ConversationBufferMemory(
             memory_key="chat_history",
-            return_messages=True,  # Return as message objects (not strings)
-            output_key="output"    # Which key in the result to remember
+            return_messages=True,
+            output_key="output"
         )
 
-        # Get troubleshooting tools
         self.tools = get_troubleshooting_tools()
 
-        # ==========================================
-        # Prompt with Memory Placeholder
-        # ==========================================
+        # Prompt with memory placeholder
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a network troubleshooting assistant having a conversation with a network engineer.
+            ("system", """You are a network troubleshooting assistant having a
+conversation with a network engineer.
 
-IMPORTANT: Remember the context of previous messages. If they ask a follow-up question, 
-reference earlier findings and diagnostic work.
+IMPORTANT: Remember context from previous messages. Reference earlier findings
+when relevant.
 
 Available tools:
 - show_command: Run Cisco show commands
 - ping: Test connectivity
 - traceroute: Trace network path
 
-Your conversational guidelines:
-1. **Remember context**: Reference earlier findings when relevant
-2. **Answer naturally**: Have a conversation, not just dump data
-3. **Ask clarifying questions** if the request is ambiguous
-4. **Provide value**: Don't just run commands—analyze and explain
-5. **Be concise**: The engineer is busy; get to the point
+Conversational guidelines:
+1. Remember context - Reference earlier findings
+2. Answer naturally - Have a conversation, not just dump data
+3. Ask clarifying questions if request is ambiguous
+4. Provide value - Analyze and explain, don't just run commands
+5. Be concise - Engineer is busy
 
-Use tools when you need diagnostic information. Otherwise, answer based on your knowledge
-and the conversation history."""),
-            
-            # This is where the conversation history gets injected
-            MessagesPlaceholder("chat_history"),
-            
-            # Current user message
+Use tools when you need diagnostic information. Otherwise answer based on
+knowledge and conversation history."""),
+
+            MessagesPlaceholder("chat_history"),  # History injected here
             ("human", "{input}"),
-            
-            # Space for agent's tool calls and thoughts
             MessagesPlaceholder("agent_scratchpad")
         ])
 
-        # Create agent with memory
         agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
 
-        # Agent executor with memory integration
         self.agent_executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            memory=self.memory,  # <-- Memory integrated here
+            memory=self.memory,  # Memory integrated
             verbose=True,
             max_iterations=10,
             handle_parsing_errors=True
         )
 
     def chat(self, message: str) -> str:
-        """
-        Chat with the agent (remembers conversation).
-        
-        Args:
-            message: User message or question
-            
-        Returns:
-            Agent's response
-        """
+        """Chat with agent (remembers conversation)."""
         result = self.agent_executor.invoke({"input": message})
         return result['output']
 
     def clear_memory(self):
-        """Clear conversation history (start fresh)."""
+        """Clear conversation history."""
         self.memory.clear()
 
     def get_conversation_history(self) -> list:
-        """Get all messages in the conversation."""
+        """Get all messages."""
         return self.memory.buffer_as_messages
 
 
-# ============================================
-# Example: Natural Troubleshooting Conversation
-# ============================================
-
 if __name__ == "__main__":
-    agent = ConversationalTroubleshootingAgent(api_key="your-api-key")
+    import os
+
+    agent = ConversationalTroubleshootingAgent(
+        api_key=os.getenv("ANTHROPIC_API_KEY")
+    )
 
     print("="*60)
     print("Conversational Troubleshooting Agent")
     print("="*60)
-    print("Type 'quit' to exit, 'clear' to reset conversation\n")
+    print("Type 'quit' to exit, 'clear' to reset\n")
 
     while True:
-        # Get user input
         user_message = input("\nYou: ")
-        
+
         if user_message.lower() == 'quit':
             break
-        
+
         if user_message.lower() == 'clear':
             agent.clear_memory()
-            print("✓ Conversation history cleared\n")
+            print("✓ Conversation cleared\n")
             continue
 
-        # Get agent response
         response = agent.chat(user_message)
         print(f"\nAgent: {response}")
 ```
 
-### Example Conversation Flow
-
-Here's what a real conversation with this agent looks like:
+**Example conversation:**
 
 ```
-================================================================
-Conversational Troubleshooting Agent
-================================================================
-
 You: Users on VLAN 20 can't access the internet
 
-Agent: Let me check the interface status for VLAN 20...
+Agent: Let me check the interface for VLAN 20...
+[runs: show_command("show ip interface brief")]
 
-[Running: show_command("show ip interface brief")]
-
-I can see that GigabitEthernet0/1 (which has IP 10.2.2.1 - likely your VLAN 20 gateway) 
-has a problem: the interface is administratively up, but the line protocol is down.
+I can see GigabitEthernet0/1 (IP 10.2.2.1 - likely your VLAN 20 gateway) has
+a problem: interface is up but line protocol is down.
 
 This means:
-- The interface is enabled in configuration
-- But there's no Layer 2 connectivity
+- Interface is enabled in config
+- But no Layer 2 connectivity
 
-This is preventing VLAN 20 users from reaching their gateway.
+This prevents VLAN 20 users from reaching their gateway.
 
-Would you like me to investigate why the line protocol is down?
+Would you like me to investigate why line protocol is down?
 
 ----------------------------------------------------------------
 
 You: Yes, why is it down?
 
-Agent: Let me get detailed information about that interface...
+Agent: Let me get detailed information...
+[runs: show_command("show interface gigabitethernet0/1")]
 
-[Running: show_command("show interface gigabitethernet0/1")]
-
-The key finding here is: "Last input never" - this interface has NEVER received any 
-traffic since the counters were last cleared.
+Key finding: "Last input never" - this interface has NEVER received any traffic.
 
 Combined with:
 - 0 packets input
 - 13 packets output
-- No input errors or CRC errors
+- No errors
 
-This tells us the interface is sending traffic but receiving absolutely nothing. 
-This is a clear Layer 1 or Layer 2 issue, most likely:
+The interface sends traffic but receives nothing. This is a Layer 1/2 issue:
+1. Physical cable unplugged or damaged
+2. Remote switchport down
+3. Remote switchport in wrong VLAN
 
-1. Physical cable is unplugged or damaged
-2. Remote switchport is administratively down
-3. Remote switchport is in the wrong VLAN
-
-The lack of ANY received traffic (including keepalives) points to a complete break 
-in physical or data-link layer connectivity.
+The complete lack of received traffic points to a break in physical connectivity.
 
 ----------------------------------------------------------------
 
 You: How do I fix it?
 
-Agent: Based on what we found (Gi0/1 never receiving traffic), here's how to fix it:
+Agent: Based on what we found (Gi0/1 never receiving traffic), here's the fix:
 
-**Immediate Steps:**
+IMMEDIATE STEPS:
 
-1. **Physical verification**
-   - Check both ends of the cable connected to Gi0/1
-   - Verify the cable is properly seated
-   - Look for physical damage to the cable
+1. Physical verification
+   - Check both ends of cable on Gi0/1
+   - Verify cable properly seated
+   - Check for physical damage
 
-2. **Check remote switch**
-   First, identify the remote switch:
-   ```
+2. Check remote switch
    show cdp neighbors gigabitethernet0/1
-   ```
-   
-   Then on the remote switch, verify:
-   - Is the port enabled? (not in shutdown state)
-   - Is it in the correct VLAN?
-   - Any port security violations?
 
-3. **Check for interface errors**
-   ```
-   show interface gigabitethernet0/1 | include error|CRC|collision
-   ```
+   Then on remote switch:
+   - Is port enabled?
+   - Correct VLAN?
+   - Port security violations?
 
-**If it's a cable issue:**
-- Replace the cable
-- Test with a known-good cable
+3. If cable issue: Replace cable
 
-**If it's a switchport config issue:**
-```
-! On the remote switch
-interface [port]
- no shutdown
- switchport mode access
- switchport access vlan 20
-```
+4. If switchport config issue:
+   interface [port]
+    no shutdown
+    switchport access vlan 20
 
-**Verification after fix:**
-```
-show ip interface brief | include GigabitEthernet0/1
-```
-Should show: up/up (not up/down)
+VERIFICATION:
+show ip interface brief | include Gi0/1
+(Should show: up/up)
 
-```
 show interface gigabitethernet0/1 | include packets input
-```
-Should show increasing input packet count
+(Should show increasing input packets)
 
-**Test user connectivity:**
-```
-ping 10.2.2.10  ! (ping a user device on VLAN 20)
-```
+ping 10.2.2.10  (test user device)
 
-Would you like me to help with any of these steps?
-
-----------------------------------------------------------------
-
-You: What if changing the cable doesn't work?
-
-Agent: Good question. If you've verified the cable is good and still have the 
-line protocol down, here's the next level of troubleshooting:
-
-**1. Check for speed/duplex mismatch**
-Even though we didn't see errors, mismatches can sometimes cause "Last input never".
-
-On your router:
-```
-interface gigabitethernet0/1
- duplex auto
- speed auto
+Want help with any specific step?
 ```
 
-Check the remote switch's settings match (both should be auto-negotiate).
+**Key features:**
 
-**2. Verify the remote port is actually connected**
-If CDP is enabled but you see no CDP neighbor on Gi0/1, that's a red flag:
-```
-show cdp neighbors gigabitethernet0/1
-```
+1. **Context awareness** - "why is it down?" → Agent knows "it" = Gi0/1
+2. **Natural flow** - Doesn't repeat information
+3. **Progressive detail** - High-level first, then technical
+4. **Guidance** - Step-by-step procedures
 
-If no CDP neighbor appears, either:
-- The cable isn't connected on the other end
-- The remote port is shutdown
-- CDP is disabled on one side
+### V3 Cost Analysis
 
-**3. Check if port security is blocking**
-On the remote switch:
-```
-show port-security interface [interface]
-```
+**Per conversation (5 messages):**
+- Input: ~2,500 tokens (includes growing history)
+- Output: ~2,000 tokens
+- Total: ~4,500 tokens
 
-If you see "Security Violation Count" > 0, the port may be in err-disabled:
-```
-show interface status | include err-disabled
-```
+**Cost per conversation:** $0.038 (3.8 cents)
 
-To recover:
-```
-interface [interface]
- shutdown
- no shutdown
-```
+**For 500 conversations/month:** $19.00
 
-**4. Try a different port**
-If possible, connect to a different port on the remote switch to isolate whether 
-it's the port itself that's faulty.
+**Context window management:**
 
-**5. Check STP (Spanning Tree)**
-Sometimes STP can block a port. On the remote switch:
-```
-show spanning-tree interface [interface]
+Use `ConversationBufferWindowMemory` for long conversations:
+
+```python
+from langchain.memory import ConversationBufferWindowMemory
+
+memory = ConversationBufferWindowMemory(
+    k=10,  # Keep last 10 messages only
+    memory_key="chat_history",
+    return_messages=True
+)
 ```
 
-Should show "FWD" (forwarding), not "BLK" (blocking).
-
-Since Gi0/1 is showing ZERO received packets (not even spanning-tree BPDUs), I'd 
-focus on #1 and #2 first—this really looks like a physical connectivity or remote 
-port shutdown issue.
-
-Want me to walk you through any of these checks specifically?
-```
-
-### Key Features of Conversational Agent
-
-**1. Context Awareness**
-- "why is it down?" → Agent knows "it" refers to Gi0/1
-- "How do I fix it?" → Agent remembers the root cause found earlier
-
-**2. Natural Flow**
-- Doesn't repeat information already discussed
-- References earlier findings naturally
-- Asks clarifying questions
-
-**3. Progressive Detail**
-- First response: High-level summary
-- Follow-up: More technical detail
-- Further questions: Advanced troubleshooting
-
-**4. Guidance**
-- Not just data dumps
-- Explains what to do with the information
-- Provides step-by-step procedures
-
-### When to Use Conversational Agent
-
-**Best for:**
-- ✅ Interactive troubleshooting sessions
-- ✅ Training junior engineers (they can ask questions)
-- ✅ Exploratory investigations (don't know exactly what's wrong)
-- ✅ Learning mode (explain as you go)
-
-**Not ideal for:**
-- ❌ Automated incident response (no human in loop)
-- ❌ Batch diagnostics (checking 100 devices)
-- ❌ Strict runbook following (multi-stage is better)
+This prevents context overflow and keeps costs predictable.
 
 ---
 
-## Section 5: Production Safety Features
+## Version 4: Production Safety
 
-We've built powerful agents, but with power comes risk. Before deploying to production, you MUST implement safety features.
+**The problem:** V1-V3 are powerful but dangerous in production without safety guardrails.
 
-**What could go wrong without safety?**
+**What could go wrong:**
+
 ```
-Agent receives: "Fix the BGP issue"
 Agent thinks: "I should restart BGP"
 Agent executes: clear ip bgp *
 → ALL BGP sessions reset
 → Network outage
-→ You're looking for a new job
+→ Resume polishing required
 ```
 
-Let's implement layers of safety to prevent disasters.
+**V4 adds:**
+1. Command validation (whitelist/blacklist)
+2. Human approval for changes
+3. Audit logging
+4. Read-only default mode
 
 ### Safety Layer 1: Command Validation
 
-**Whitelist only safe commands** and block anything dangerous:
+**File: `safe_command_validator.py`**
 
 ```python
-# safe_agent.py
-from langchain.tools import BaseTool
-from typing import List, Tuple
 import re
+from typing import Tuple
 
 
 class SafeCommandValidator:
-    """
-    Validate commands before execution.
-    
-    This is your first line of defense against dangerous operations.
-    Only allow read-only commands by default.
-    """
+    """Validate commands before execution."""
 
-    # Whitelist: Only these command prefixes are allowed
+    # Whitelist: Only these prefixes allowed
     SAFE_COMMANDS = [
-        "show",           # Cisco show commands
-        "ping",           # Connectivity tests
-        "traceroute",     # Path tracing
-        "display",        # Huawei show equivalent
-        "get",            # Fortinet show equivalent
-        "describe",       # Some vendors
+        "show",
+        "ping",
+        "traceroute",
+        "display",  # Huawei
+        "get",      # Fortinet
     ]
 
-    # Blacklist: Dangerous patterns that should NEVER be allowed
+    # Blacklist: Dangerous patterns
     DANGEROUS_PATTERNS = [
-        r'\bno\b',                      # Removes config: "no ip address"
+        r'\bno\b',                      # Removes config
         r'\bshutdown\b',                # Disables interfaces
         r'\breload\b',                  # Reboots device
         r'\bwrite\s+erase\b',           # Erases config
-        r'\bformat\b',                  # Formats flash/disk
+        r'\bformat\b',                  # Formats flash
         r'\bdelete\b',                  # Deletes files
-        r'\bclear\s+(line|ip\s+bgp)\b', # Clears sessions/connections
-        r'\bconfigure\b',               # Enters config mode
-        r'\bconf\s+t\b',                # Config mode shortcut
-        r'\bexit\b',                    # Might exit critical mode
-        r'\bend\b',                     # Might end session
-        r'\bwrite\s+(memory|network)\b',# Saves config (could persist bad state)
+        r'\bclear\s+(line|ip\s+bgp)\b', # Clears sessions
+        r'\bconfigure\b',               # Config mode
+        r'\bconf\s+t\b',                # Config mode
+        r'\bwrite\s+memory\b',          # Saves config
     ]
 
     @classmethod
     def is_safe(cls, command: str) -> Tuple[bool, str]:
-        """
-        Validate if a command is safe to execute.
-        
-        Args:
-            command: The command to validate
-            
-        Returns:
-            (is_safe: bool, reason: str)
-            If unsafe, reason explains why it was blocked
-        """
+        """Validate if command is safe."""
         command_lower = command.lower().strip()
 
-        # Empty command
         if not command_lower:
             return False, "Empty command"
 
-        # Check if starts with safe command prefix
+        # Check safe prefix
         is_safe_prefix = any(
             command_lower.startswith(safe_cmd)
             for safe_cmd in cls.SAFE_COMMANDS
@@ -1864,236 +1256,138 @@ class SafeCommandValidator:
 
         if not is_safe_prefix:
             return False, (
-                f"Command must start with one of: {', '.join(cls.SAFE_COMMANDS)}\n"
+                f"Command must start with: {', '.join(cls.SAFE_COMMANDS)}\n"
                 f"Got: {command[:50]}"
             )
 
-        # Check for dangerous patterns
+        # Check dangerous patterns
         for pattern in cls.DANGEROUS_PATTERNS:
             if re.search(pattern, command_lower, re.IGNORECASE):
-                return False, f"Command contains dangerous pattern: {pattern}"
+                return False, f"Contains dangerous pattern: {pattern}"
 
-        # Passed all checks
         return True, "Command is safe"
 
 
-class SafeShowCommandTool(BaseTool):
-    """
-    Show command tool with safety validation.
-    
-    This wraps your normal ShowCommandTool with validation.
-    """
-    name: str = "show_command"
-    description: str = "Execute safe read-only show commands (validated for safety)"
-
-    def _run(self, command: str) -> str:
-        """Run command only if it passes safety checks."""
-        
-        # VALIDATE FIRST
-        is_safe, reason = SafeCommandValidator.is_safe(command)
-
-        if not is_safe:
-            # Log the blocked attempt
-            import logging
-            logging.warning(f"BLOCKED COMMAND: {command} | Reason: {reason}")
-            
-            # Return error to the agent
-            return f"ERROR: Command blocked for safety.\nReason: {reason}"
-
-        # Command is safe - execute it
-        # (Here you'd use your actual Netmiko connection)
-        return self._execute_on_device(command)
-
-    def _execute_on_device(self, command: str) -> str:
-        """Execute validated command on device."""
-        # Your Netmiko code here
-        pass
-
-
-# ============================================
-# Example: What Gets Blocked?
-# ============================================
-
+# Test validation
 if __name__ == "__main__":
     test_commands = [
-        # Safe commands (should pass)
+        # Safe
         "show ip interface brief",
         "show running-config",
-        "show ip bgp summary",
         "ping 8.8.8.8",
-        "traceroute google.com",
-        
-        # Dangerous commands (should block)
+
+        # Dangerous
         "configure terminal",
         "no shutdown",
         "reload in 5",
         "write erase",
         "clear ip bgp *",
-        "show run | include no",  # Contains "no"
-        "delete flash:config.txt",
     ]
 
-    print("Command Safety Validation Tests\n")
-    print("="*70)
-    
+    print("Command Validation Tests\n" + "="*70)
+
     for cmd in test_commands:
         is_safe, reason = SafeCommandValidator.is_safe(cmd)
         status = "✓ SAFE" if is_safe else "✗ BLOCKED"
         print(f"\n{status}: {cmd}")
         if not is_safe:
             print(f"  Reason: {reason}")
-
-"""
-Output:
-======================================================================
-Command Safety Validation Tests
-
-✓ SAFE: show ip interface brief
-
-✓ SAFE: show running-config
-
-✓ SAFE: show ip bgp summary
-
-✓ SAFE: ping 8.8.8.8
-
-✓ SAFE: traceroute google.com
-
-✗ BLOCKED: configure terminal
-  Reason: Command must start with one of: show, ping, traceroute, display, get
-
-✗ BLOCKED: no shutdown
-  Reason: Command must start with one of: show, ping, traceroute, display, get
-
-✗ BLOCKED: reload in 5
-  Reason: Command contains dangerous pattern: \breload\b
-
-✗ BLOCKED: write erase
-  Reason: Command contains dangerous pattern: \bwrite\s+erase\b
-
-✗ BLOCKED: clear ip bgp *
-  Reason: Command contains dangerous pattern: \bclear\s+(line|ip\s+bgp)\b
-
-✗ BLOCKED: show run | include no
-  Reason: Command contains dangerous pattern: \bno\b
-
-✗ BLOCKED: delete flash:config.txt
-  Reason: Command contains dangerous pattern: \bdelete\b
-"""
 ```
 
-### Safety Layer 2: Human-in-the-Loop Approval
+**Output:**
 
-For operations that change state (even if "safe"), require human approval:
+```
+✓ SAFE: show ip interface brief
+✓ SAFE: show running-config
+✓ SAFE: ping 8.8.8.8
+
+✗ BLOCKED: configure terminal
+  Reason: Command must start with: show, ping, traceroute, display, get
+
+✗ BLOCKED: no shutdown
+  Reason: Command must start with: show, ping, traceroute, display, get
+
+✗ BLOCKED: reload in 5
+  Reason: Contains dangerous pattern: \breload\b
+
+✗ BLOCKED: write erase
+  Reason: Contains dangerous pattern: \bwrite\s+erase\b
+
+✗ BLOCKED: clear ip bgp *
+  Reason: Contains dangerous pattern: \bclear\s+(line|ip\s+bgp)\b
+```
+
+### Safety Layer 2: Human Approval
+
+**File: `approval_tool.py`**
 
 ```python
-# approval_agent.py
 from langchain.tools import BaseTool
 from datetime import datetime
+import logging
 
 
 class ApprovalRequiredTool(BaseTool):
-    """
-    Tool that requires explicit human approval before execution.
-    
-    Use this for any operation that modifies state:
-    - Configuration changes
-    - Service restarts
-    - Route changes
-    - Firewall rule modifications
-    """
-    
+    """Tool requiring human approval before execution."""
+
     name: str = "apply_config"
     description: str = """
     Apply configuration changes to network devices.
-    
-    IMPORTANT: This requires human approval before execution.
-    Use this when you've identified a fix and want to apply it.
+    REQUIRES human approval before execution.
+    Use when you've identified a fix and want to apply it.
     """
 
     def _run(self, config: str, target_device: str = "router") -> str:
-        """
-        Request approval and apply configuration if approved.
-        
-        Args:
-            config: Configuration commands to apply
-            target_device: Device to apply config to
-            
-        Returns:
-            Success/failure message
-        """
-        
+        """Request approval and apply if approved."""
+
         # Display proposed changes
         print(f"\n{'='*70}")
         print(f"⚠️  APPROVAL REQUIRED")
         print(f"{'='*70}")
-        print(f"\nTarget Device: {target_device}")
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"\nDevice: {target_device}")
+        print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"\nProposed Configuration:")
         print(f"{'-'*70}")
         print(config)
         print(f"{'-'*70}\n")
 
-        # Request approval (in production, this could be Slack/Teams/PagerDuty)
+        # Request approval
         approval = input("Apply this configuration? (yes/no): ").strip().lower()
 
         if approval == 'yes':
-            # Log the approval
-            print(f"\n✓ Approved by operator at {datetime.now()}")
-            
-            # Apply the configuration
-            # (In production: use Netmiko to apply)
+            logging.info(f"Config approved and applied to {target_device}")
+            print(f"\n✓ Approved at {datetime.now()}")
+
+            # Apply config (production: use Netmiko)
             result = self._apply_to_device(config, target_device)
-            
-            # Log the result
-            print(f"\n✓ Configuration applied successfully")
-            return f"Configuration applied to {target_device}:\n{result}"
-        
+
+            print(f"✓ Configuration applied")
+            return f"Applied to {target_device}: {result}"
         else:
-            # Log the rejection
-            print(f"\n✗ Configuration rejected by operator")
-            return f"Configuration change REJECTED by operator. No changes made."
+            logging.warning(f"Config rejected for {target_device}")
+            print(f"\n✗ Configuration rejected")
+            return "Configuration REJECTED. No changes made."
 
     def _apply_to_device(self, config: str, device: str) -> str:
-        """Apply configuration to device (production: use Netmiko)."""
-        
-        # Production code:
+        """Apply to device (production: Netmiko)."""
         # from netmiko import ConnectHandler
-        # 
         # device_conn = ConnectHandler(**device_params)
         # output = device_conn.send_config_set(config.split('\n'))
         # device_conn.save_config()
         # return output
-        
-        # Demo:
-        return f"[Simulated] Applied config to {device}"
 
+        return f"[Simulated] Applied to {device}"
+```
 
-# ============================================
-# Example: Agent Suggests Fix with Approval
-# ============================================
+**Example usage:**
 
-"""
-Troubleshooting conversation with approval workflow:
-
-You: Users can't reach VLAN 20
-
-Agent: Let me check...
-[runs diagnostics]
-
-Agent: Found the issue: GigabitEthernet0/1 is administratively shut down.
-
-The fix is to enable the interface. Would you like me to apply this fix?
-
-You: Yes, fix it
-
-Agent: [Prepares configuration]
-
+```
 ======================================================================
 ⚠️  APPROVAL REQUIRED
 ======================================================================
 
-Target Device: router-hq-01
-Timestamp: 2024-01-15 14:32:10
+Device: router-hq-01
+Time: 2024-01-15 14:32:10
 
 Proposed Configuration:
 ----------------------------------------------------------------------
@@ -2103,58 +1397,13 @@ interface GigabitEthernet0/1
 
 Apply this configuration? (yes/no): yes
 
-✓ Approved by operator at 2024-01-15 14:32:15
-✓ Configuration applied successfully
-
-Agent: Configuration has been applied. Interface Gi0/1 is now enabled.
-Please verify with: show ip interface brief | include Gi0/1
-"""
+✓ Approved at 2024-01-15 14:32:15
+✓ Configuration applied
 ```
 
-### Safety Layer 3: Read-Only Mode (Default)
+### Safety Layer 3: Audit Logging
 
-Make read-only the default; require explicit opt-in for changes:
-
-```python
-class TroubleshootingAgent:
-    """Agent with read-only default mode."""
-    
-    def __init__(self, api_key: str, allow_changes: bool = False):
-        """
-        Initialize agent.
-        
-        Args:
-            api_key: API key for LLM
-            allow_changes: If False (default), only diagnostic tools available.
-                          If True, configuration tools are enabled.
-        """
-        self.allow_changes = allow_changes
-        
-        # Base tools (always available)
-        self.tools = [
-            ShowCommandTool(),
-            PingTool(),
-            TraceRouteTool()
-        ]
-        
-        # Add change tools only if explicitly enabled
-        if allow_changes:
-            self.tools.append(ApprovalRequiredTool())
-            print("⚠️  WARNING: Configuration change tools are ENABLED")
-        else:
-            print("✓ Running in READ-ONLY mode (safe)")
-
-# Usage:
-# Read-only (safe for juniors, automation, exploration)
-agent = TroubleshootingAgent(api_key="...", allow_changes=False)
-
-# With changes allowed (for experienced engineers only)
-agent = TroubleshootingAgent(api_key="...", allow_changes=True)
-```
-
-### Safety Layer 4: Audit Logging
-
-Log EVERYTHING the agent does:
+**File: `audit_logger.py`**
 
 ```python
 import logging
@@ -2163,8 +1412,8 @@ from datetime import datetime
 
 
 class AuditLogger:
-    """Log all agent actions for compliance and troubleshooting."""
-    
+    """Log all agent actions for compliance."""
+
     def __init__(self, log_file="agent_audit.log"):
         """Initialize audit logger."""
         logging.basicConfig(
@@ -2175,7 +1424,7 @@ class AuditLogger:
         self.logger = logging.getLogger("AgentAudit")
 
     def log_command(self, command: str, device: str, result: str, user: str):
-        """Log a command execution."""
+        """Log command execution."""
         self.logger.info(json.dumps({
             "type": "command_execution",
             "user": user,
@@ -2186,7 +1435,7 @@ class AuditLogger:
         }))
 
     def log_blocked_command(self, command: str, reason: str, user: str):
-        """Log a blocked command attempt."""
+        """Log blocked command."""
         self.logger.warning(json.dumps({
             "type": "command_blocked",
             "user": user,
@@ -2196,7 +1445,7 @@ class AuditLogger:
         }))
 
     def log_config_change(self, config: str, device: str, approved: bool, user: str):
-        """Log a configuration change request."""
+        """Log config change request."""
         self.logger.info(json.dumps({
             "type": "config_change",
             "user": user,
@@ -2205,61 +1454,559 @@ class AuditLogger:
             "approved": approved,
             "timestamp": datetime.now().isoformat()
         }))
-
-
-# Integrate with tools:
-class SafeShowCommandTool(BaseTool):
-    """Tool with audit logging."""
-    
-    def __init__(self):
-        super().__init__()
-        self.audit = AuditLogger()
-
-    def _run(self, command: str) -> str:
-        is_safe, reason = SafeCommandValidator.is_safe(command)
-        
-        if not is_safe:
-            # Log blocked attempt
-            self.audit.log_blocked_command(
-                command=command,
-                reason=reason,
-                user=self.get_current_user()
-            )
-            return f"ERROR: {reason}"
-        
-        # Execute and log
-        result = self._execute(command)
-        self.audit.log_command(
-            command=command,
-            device="router-01",
-            result=result,
-            user=self.get_current_user()
-        )
-        return result
 ```
 
-### Safety Checklist for Production
+**Log output (agent_audit.log):**
 
-Before deploying your troubleshooting agent to production:
+```json
+2024-01-15 14:30:05 | INFO | {"type": "command_execution", "user": "jsmith", "device": "router-01", "command": "show ip interface brief", "result_preview": "Interface              IP-Address      OK? Method Status...", "timestamp": "2024-01-15T14:30:05"}
 
-- [ ] ✅ Command validation (whitelist + blacklist)
-- [ ] ✅ Human approval for all config changes
-- [ ] ✅ Read-only mode by default
-- [ ] ✅ Comprehensive audit logging
-- [ ] ✅ Rate limiting (max commands per minute)
-- [ ] ✅ Session timeouts (auto-disconnect idle agents)
-- [ ] ✅ Role-based access control (who can enable change mode?)
-- [ ] ✅ Alert on suspicious behavior (100 commands in 1 minute?)
-- [ ] ✅ Rollback capability (can you undo agent changes?)
-- [ ] ✅ Testing in lab environment first
+2024-01-15 14:30:12 | WARNING | {"type": "command_blocked", "user": "jsmith", "command": "reload", "reason": "Contains dangerous pattern: \\breload\\b", "timestamp": "2024-01-15T14:30:12"}
 
-**Remember: An unsecured agent with network access is more dangerous than no automation at all.**
+2024-01-15 14:32:15 | INFO | {"type": "config_change", "user": "jsmith", "device": "router-hq-01", "config": "interface Gi0/1\n no shutdown", "approved": true, "timestamp": "2024-01-15T14:32:15"}
+```
+
+### Safety Layer 4: Read-Only Default
+
+**File: `production_agent_v4.py`**
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from troubleshooting_tools import get_troubleshooting_tools
+from approval_tool import ApprovalRequiredTool
+from safe_command_validator import SafeCommandValidator
+from audit_logger import AuditLogger
+
+
+class ProductionTroubleshootingAgent:
+    """Production-ready agent with safety features."""
+
+    def __init__(self, api_key: str, allow_changes: bool = False, user: str = "unknown"):
+        """
+        Initialize production agent.
+
+        Args:
+            api_key: Anthropic API key
+            allow_changes: If False (default), read-only. If True, config tools enabled.
+            user: Username for audit logging
+        """
+        self.allow_changes = allow_changes
+        self.user = user
+        self.audit = AuditLogger()
+
+        self.llm = ChatAnthropic(
+            model="claude-sonnet-4-20250514",
+            api_key=api_key,
+            temperature=0.0
+        )
+
+        # Base tools (always available)
+        self.tools = get_troubleshooting_tools()
+
+        # Add change tools only if explicitly enabled
+        if allow_changes:
+            self.tools.append(ApprovalRequiredTool())
+            print("⚠️  WARNING: Configuration change tools ENABLED")
+            self.audit.logger.warning(f"Change mode enabled by {user}")
+        else:
+            print("✓ Running in READ-ONLY mode (safe)")
+
+        # Wrap tools with validation and logging
+        self.tools = [self._wrap_tool_with_safety(tool) for tool in self.tools]
+
+        self.prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a network troubleshooting assistant.
+
+Available tools: {tool_names}
+
+Troubleshoot systematically:
+1. Understand symptom
+2. Form hypothesis
+3. Run diagnostics
+4. Analyze results
+5. Identify root cause
+6. Suggest fix
+
+All commands are validated for safety and logged for audit."""),
+            ("human", "{input}"),
+            MessagesPlaceholder("agent_scratchpad")
+        ])
+
+        agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
+
+        self.agent_executor = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            verbose=True,
+            max_iterations=10,
+            handle_parsing_errors=True
+        )
+
+    def _wrap_tool_with_safety(self, tool):
+        """Wrap tool with validation and logging."""
+        original_run = tool._run
+
+        def safe_run(*args, **kwargs):
+            # Get command (first arg for show_command tool)
+            command = args[0] if args else kwargs.get('command', '')
+
+            # Validate
+            if hasattr(tool, 'name') and tool.name == 'show_command':
+                is_safe, reason = SafeCommandValidator.is_safe(command)
+                if not is_safe:
+                    self.audit.log_blocked_command(command, reason, self.user)
+                    return f"ERROR: {reason}"
+
+            # Execute
+            result = original_run(*args, **kwargs)
+
+            # Log
+            if hasattr(tool, 'name'):
+                self.audit.log_command(
+                    command=str(args[0]) if args else 'N/A',
+                    device="router-01",
+                    result=result,
+                    user=self.user
+                )
+
+            return result
+
+        tool._run = safe_run
+        return tool
+
+    def troubleshoot(self, problem: str) -> dict:
+        """Troubleshoot with full safety."""
+        result = self.agent_executor.invoke({"input": problem})
+
+        return {
+            "problem": problem,
+            "analysis": result['output'],
+            "steps": len(result.get('intermediate_steps', []))
+        }
+
+
+if __name__ == "__main__":
+    import os
+
+    # Read-only agent (safe for juniors, automation)
+    agent_readonly = ProductionTroubleshootingAgent(
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        allow_changes=False,
+        user="jsmith"
+    )
+
+    result = agent_readonly.troubleshoot(
+        "Users on VLAN 20 cannot access network"
+    )
+
+    print(f"\nAnalysis:\n{result['analysis']}")
+
+    # With changes allowed (requires senior engineer approval)
+    # agent_with_changes = ProductionTroubleshootingAgent(
+    #     api_key=os.getenv("ANTHROPIC_API_KEY"),
+    #     allow_changes=True,
+    #     user="admin"
+    # )
+```
+
+### V4 Production Safety Checklist
+
+Before deploying to production:
+
+- [x] Command validation (whitelist + blacklist)
+- [x] Human approval for config changes
+- [x] Read-only mode by default
+- [x] Comprehensive audit logging
+- [ ] Rate limiting (max commands/minute)
+- [ ] Session timeouts
+- [ ] Role-based access control
+- [ ] Alert on suspicious behavior
+- [ ] Rollback capability
+- [ ] Lab environment testing
+
+**Additional production hardening:**
+
+```python
+# Rate limiting
+from ratelimit import limits, sleep_and_retry
+
+@sleep_and_retry
+@limits(calls=20, period=60)  # Max 20 commands per minute
+def execute_command(command):
+    # ...
+
+# Session timeout
+import time
+
+class TimedSession:
+    def __init__(self, timeout_minutes=30):
+        self.start = time.time()
+        self.timeout = timeout_minutes * 60
+
+    def is_expired(self):
+        return (time.time() - self.start) > self.timeout
+
+# RBAC
+def check_permission(user, action):
+    permissions = {
+        "junior": ["show_command", "ping"],
+        "senior": ["show_command", "ping", "traceroute", "apply_config"],
+        "admin": ["*"]
+    }
+    user_role = get_user_role(user)
+    return action in permissions.get(user_role, [])
+```
+
+### V4 Cost Analysis
+
+**Same as V3** (~$19/month for 500 sessions) but with critical safety features:
+
+- $0 cost from prevented outages
+- $0 cost from blocked dangerous commands
+- Complete audit trail for compliance
+- Insurance against agent mistakes
+
+**ROI remains massive:** $15,600/month saved vs. $19 agent cost.
 
 ---
 
-## What Can Go Wrong (And How to Prevent It)
+## Lab 1: Build and Test V1 Basic Agent
 
-Even with safety features, things can still go wrong. Here are common issues and solutions:
+**Time: 45 minutes**
+
+**Objective:** Build a working troubleshooting agent that autonomously diagnoses network issues.
+
+### Lab Steps
+
+**1. Environment Setup (10 min)**
+
+```bash
+# Create project directory
+mkdir troubleshooting-agent
+cd troubleshooting-agent
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install anthropic langchain langchain-anthropic netmiko
+
+# Set API key
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+**2. Implement Tools (15 min)**
+
+Create `troubleshooting_tools.py` with ShowCommandTool, PingTool, TraceRouteTool (copy from V1 section above).
+
+**Verification:**
+
+```python
+# Test tools directly
+from troubleshooting_tools import ShowCommandTool
+
+tool = ShowCommandTool()
+result = tool._run("show ip interface brief")
+print(result)
+
+# Should print simulated interface status
+```
+
+**3. Build Agent (10 min)**
+
+Create `troubleshooting_agent_v1.py` (copy from V1 section).
+
+**4. Test Scenarios (10 min)**
+
+Run three test scenarios:
+
+**Scenario A: Interface Down**
+```python
+result = agent.troubleshoot(
+    "Users on VLAN 20 (10.2.2.0/24) cannot access the network"
+)
+```
+
+**Expected:** Agent identifies Gi0/1 line protocol down, suggests cable/switchport fix.
+
+**Scenario B: BGP Issue**
+```python
+result = agent.troubleshoot(
+    "Intermittent internet connectivity at branch office"
+)
+```
+
+**Expected:** Agent checks routing, identifies BGP neighbor in Idle state.
+
+**Scenario C: Ambiguous Problem**
+```python
+result = agent.troubleshoot(
+    "Network is slow"
+)
+```
+
+**Expected:** Agent asks clarifying questions or runs general diagnostics.
+
+### Success Criteria
+
+- [ ] Agent runs without errors
+- [ ] Agent autonomously selects appropriate commands
+- [ ] Agent correctly interprets "up/down" status
+- [ ] Agent provides specific fix recommendations
+- [ ] Total cost < $0.05 for all 3 scenarios
+
+### Common Issues
+
+**Problem:** "ModuleNotFoundError: No module named 'langchain'"
+**Fix:** `pip install langchain langchain-anthropic`
+
+**Problem:** Agent runs same command repeatedly
+**Fix:** Add to system prompt: "Don't repeat commands you've already run"
+
+**Problem:** "Context length exceeded"
+**Fix:** Truncate tool outputs to 5000 chars
+
+---
+
+## Lab 2: Add Multi-Stage Planning (V2)
+
+**Time: 60 minutes**
+
+**Objective:** Enhance agent with structured OSI-based investigation methodology.
+
+### Lab Steps
+
+**1. Implement Diagnostic Stages (20 min)**
+
+Create `multi_stage_agent_v2.py` with DiagnosticStage enum and DiagnosticPlan model (copy from V2 section).
+
+**2. Test Stage Planning (15 min)**
+
+```python
+troubleshooter = MultiStageTroubleshooter(api_key="...")
+
+# Test planning only (don't execute)
+plan = troubleshooter.plan_next_stage(
+    symptom="Intermittent connectivity",
+    previous_findings=None
+)
+
+print(f"Stage: {plan.stage}")
+print(f"Hypothesis: {plan.hypothesis}")
+print(f"Commands: {plan.commands_to_run}")
+print(f"Reasoning: {plan.reasoning}")
+```
+
+**Expected output:**
+```
+Stage: identify_layer
+Hypothesis: Need to determine if L1/2 or L3 issue
+Commands: ['show ip interface brief', 'show ip route']
+Reasoning: Check local vs WAN to narrow problem domain
+```
+
+**3. Run Full Investigation (15 min)**
+
+```python
+result = troubleshooter.troubleshoot_full(
+    symptom="Users report intermittent internet access",
+    max_stages=4
+)
+
+print(f"Stages completed: {result['stages_completed']}")
+print(f"\nFinal analysis:\n{result['final_analysis']}")
+```
+
+**4. Compare V1 vs V2 (10 min)**
+
+Run same scenario with both agents. Compare:
+- Number of commands run
+- Quality of analysis
+- Audit trail completeness
+- Explanation clarity
+
+### Success Criteria
+
+- [ ] Agent completes 2-3 stages before finding root cause
+- [ ] Each stage has clear hypothesis
+- [ ] Final analysis includes all 6 sections (root cause, evidence, impact, fix, prevention, verification)
+- [ ] Total investigation < 60 seconds
+- [ ] Cost < $0.10 per investigation
+
+### Challenge Exercise
+
+**Scenario:** "Branch office has slow connectivity to data center"
+
+**Question:** What stages should the agent go through?
+
+**Expected progression:**
+1. Stage 1: identify_layer → Check if local or WAN issue
+2. Stage 2: check_network → Verify routing, latency
+3. Stage 3: check_routing → BGP path selection, suboptimal routes
+4. Stage 4: root_cause_found → Identify traffic going through congested backup link
+
+---
+
+## Lab 3: Production Deployment with Safety (V4)
+
+**Time: 90 minutes**
+
+**Objective:** Deploy production-ready agent with comprehensive safety features.
+
+### Lab Steps
+
+**1. Implement Safety Validation (20 min)**
+
+Create `safe_command_validator.py` (copy from V4 section).
+
+**Test validation:**
+
+```python
+from safe_command_validator import SafeCommandValidator
+
+test_cases = [
+    ("show ip interface brief", True),
+    ("configure terminal", False),
+    ("reload", False),
+    ("show run | include no", False),  # Contains "no"
+]
+
+for cmd, should_pass in test_cases:
+    is_safe, reason = SafeCommandValidator.is_safe(cmd)
+    assert is_safe == should_pass, f"Failed: {cmd}"
+    print(f"✓ {cmd}: {'PASS' if is_safe else 'BLOCKED'}")
+```
+
+**2. Add Approval Workflow (20 min)**
+
+Create `approval_tool.py` (copy from V4 section).
+
+**Test approval:**
+
+```python
+tool = ApprovalRequiredTool()
+
+# This will prompt for approval
+result = tool._run(
+    config="interface GigabitEthernet0/1\n no shutdown",
+    target_device="router-hq-01"
+)
+
+# Try approving, then try rejecting
+```
+
+**3. Implement Audit Logging (15 min)**
+
+Create `audit_logger.py` (copy from V4 section).
+
+**Test logging:**
+
+```python
+audit = AuditLogger(log_file="test_audit.log")
+
+audit.log_command(
+    command="show ip route",
+    device="router-01",
+    result="Gateway of last resort...",
+    user="jsmith"
+)
+
+audit.log_blocked_command(
+    command="reload",
+    reason="Dangerous pattern",
+    user="jsmith"
+)
+
+# Check test_audit.log file
+with open("test_audit.log") as f:
+    print(f.read())
+```
+
+**4. Integration Testing (25 min)**
+
+Create `production_agent_v4.py` and test:
+
+```python
+# Test read-only mode
+agent_ro = ProductionTroubleshootingAgent(
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    allow_changes=False,
+    user="junior_engineer"
+)
+
+result = agent_ro.troubleshoot("VLAN 20 is down")
+# Should work fine
+
+# Test with changes enabled
+agent_rw = ProductionTroubleshootingAgent(
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    allow_changes=True,
+    user="senior_engineer"
+)
+
+# Agent can now suggest and apply fixes (with approval)
+```
+
+**5. Security Audit (10 min)**
+
+Review audit logs for:
+- All commands executed
+- All blocked attempts
+- All config changes (approved/rejected)
+
+```python
+import json
+
+with open("agent_audit.log") as f:
+    for line in f:
+        log_entry = json.loads(line.split(" | ")[-1])
+        if log_entry["type"] == "command_blocked":
+            print(f"⚠️  BLOCKED: {log_entry['command']} by {log_entry['user']}")
+```
+
+### Success Criteria
+
+- [ ] Validator blocks all dangerous commands
+- [ ] Approval workflow prompts before config changes
+- [ ] All actions logged to audit file
+- [ ] Read-only mode prevents config tools from loading
+- [ ] No false positives (safe commands not blocked)
+- [ ] No false negatives (dangerous commands not allowed)
+
+### Production Deployment Checklist
+
+Before deploying to production:
+
+**Security:**
+- [ ] Command validator tested with 50+ dangerous commands
+- [ ] Approval workflow integrated with Slack/Teams
+- [ ] Audit logs shipped to SIEM (Splunk, ELK)
+- [ ] RBAC integrated with LDAP/Active Directory
+
+**Reliability:**
+- [ ] Rate limiting configured (prevent abuse)
+- [ ] Session timeouts implemented
+- [ ] Error handling for network failures
+- [ ] Graceful degradation if LLM API down
+
+**Operations:**
+- [ ] Monitoring dashboard (command success rate, latency)
+- [ ] Alerting on blocked commands spike
+- [ ] Runbook for emergency agent shutdown
+- [ ] Backup manual troubleshooting procedures
+
+**Testing:**
+- [ ] Tested in lab with 20+ scenarios
+- [ ] Penetration test by security team
+- [ ] Junior engineer usability testing
+- [ ] Load testing (100 concurrent sessions)
+
+---
+
+## Common Problems and Solutions
 
 ### Problem 1: Agent Runs in Loops
 
@@ -2268,86 +2015,99 @@ Even with safety features, things can still go wrong. Here are common issues and
 Agent: Checking interface...
 Agent: Still checking interface...
 Agent: Checking interface again...
-[Repeats until max_iterations hit]
+[Repeats until max_iterations]
 ```
 
-**Cause:** Agent doesn't realize it already has the information
+**Cause:** Agent doesn't realize it already has the information.
 
 **Solution:**
+
 ```python
-# Add loop detection
 class LoopDetector:
     def __init__(self, max_repeats=2):
         self.command_history = []
         self.max_repeats = max_repeats
 
     def is_loop(self, command):
-        recent = self.command_history[-5:]  # Last 5 commands
+        recent = self.command_history[-5:]
         if recent.count(command) >= self.max_repeats:
             return True
         self.command_history.append(command)
         return False
+
+# In tool wrapper:
+def _run(self, command: str) -> str:
+    if self.loop_detector.is_loop(command):
+        return "ERROR: Already ran this command twice. Use previous results."
+    # ... execute command
 ```
 
 ### Problem 2: Agent Misinterprets Output
 
-**Symptom:** Agent says "BGP is working fine" when it's actually down
+**Symptom:** Agent says "BGP is fine" when it's actually down.
 
-**Cause:** Ambiguous output parsing
+**Cause:** Ambiguous parsing of CLI output.
 
 **Solution:**
+
 ```python
-# Structured output parsing
+# Structured parsing with TextFSM or Pydantic
 from pydantic import BaseModel
 
-class BGPStatus(BaseModel):
+class BGPNeighbor(BaseModel):
     neighbor: str
     state: str
     prefixes_received: int
 
-# Force agent to return structured data
-def parse_bgp_output(output: str) -> List[BGPStatus]:
+def parse_bgp_summary(output: str) -> List[BGPNeighbor]:
     # Use LLM to extract structured data
-    # Or use regex/TextFSM for known formats
-    pass
+    prompt = f"""
+Extract BGP neighbors from this output as JSON list:
+
+{output}
+
+Format: [{{"neighbor": "IP", "state": "State", "prefixes_received": N}}]
+"""
+    # ... call LLM with JSON mode
 ```
 
-### Problem 3: Expensive Token Usage
+### Problem 3: High Token Costs
 
-**Symptom:** $50 bill for troubleshooting a single issue
+**Symptom:** $50 bill for single troubleshooting session.
 
-**Cause:** Agent makes 25 tool calls, each with large outputs
+**Cause:** 25 tool calls with large outputs.
 
 **Solution:**
+
 ```python
-# Limit output size
 def _run(self, command: str) -> str:
     output = device.send_command(command)
-    
+
     # Truncate large outputs
     if len(output) > 5000:
-        output = output[:5000] + f"\n\n[Output truncated at 5000 chars]"
-    
+        output = output[:5000] + "\n\n[Truncated at 5000 chars]"
+
     return output
 
-# Set hard iteration limit
+# Set hard limits
 agent_executor = AgentExecutor(
     agent=agent,
     tools=tools,
-    max_iterations=8,  # Hard stop at 8 actions
-    max_execution_time=60  # Timeout after 60 seconds
+    max_iterations=8,          # Stop at 8 actions
+    max_execution_time=60,     # Timeout after 60 sec
 )
 ```
 
 ### Problem 4: Context Window Exceeded
 
-**Symptom:** Error: "Context length exceeded"
+**Symptom:** "Error: Context length exceeded"
 
-**Cause:** Long conversation + large command outputs fill the context window
+**Cause:** Long conversation fills context window.
 
 **Solution:**
+
 ```python
-# Summarize old messages
+# Option 1: Summarize old messages
 from langchain.memory import ConversationSummaryMemory
 
 memory = ConversationSummaryMemory(
@@ -2356,64 +2116,356 @@ memory = ConversationSummaryMemory(
     return_messages=True
 )
 
-# Or use ConversationBufferWindowMemory (keep last N messages)
+# Option 2: Keep last N messages
 from langchain.memory import ConversationBufferWindowMemory
 
 memory = ConversationBufferWindowMemory(
-    k=10,  # Keep last 10 messages
+    k=10,  # Last 10 messages only
     memory_key="chat_history",
     return_messages=True
 )
 ```
 
-### Problem 5: Agent Gets Confused
+### Problem 5: Agent Gives Up
 
-**Symptom:** Agent gives up: "I don't know how to proceed"
+**Symptom:** Agent says "I don't know how to proceed"
 
-**Cause:** Complex issue outside training data
+**Cause:** Complex issue outside training data.
 
 **Solution:**
+
 ```python
-# Give the agent an "ask for help" tool
+# Give agent "ask for help" tool
 class AskHumanTool(BaseTool):
     name: str = "ask_human_expert"
-    description: str = "Ask a human expert when stuck or unsure"
+    description: str = "Ask human expert when stuck"
 
     def _run(self, question: str) -> str:
         print(f"\n🤔 AGENT NEEDS HELP: {question}\n")
         return input("Expert response: ")
 
-# Agent can now escalate:
-# "I've checked interfaces and routing, but can't determine why 
-#  packets are being dropped. Should I check firewall rules?"
+# Agent can escalate:
+# "I've checked interfaces and routing but can't determine why packets
+#  are dropped. Should I check firewall rules?"
 ```
 
 ---
 
-## Key Takeaways
+## Check Your Understanding
 
-**What You've Learned:**
+### Question 1: Agent vs. Chatbot
 
-1. **Agent != Chatbot** - Agents take actions, not just answer questions
-2. **Tools are the hands** - Give agents capabilities (show commands, ping, etc.)
-3. **Memory enables conversation** - Context makes follow-ups natural
-4. **Multi-stage = systematic** - Structured investigation beats random checking
-5. **Safety is non-negotiable** - Validate, approve, log, and limit
+**Q:** What is the key difference between an AI agent and a chatbot?
 
-**Real-World Impact:**
+**A:** Agents take actions to achieve goals, chatbots just answer questions.
 
-- **Time saved:** 2 minutes vs. 30 minutes for typical issues
-- **Consistency:** Every investigation follows best practices
-- **Documentation:** Complete audit trail of what was checked
-- **Training:** Junior engineers learn by watching agent's logic
-- **Availability:** 24/7 troubleshooting without waking humans
+- Chatbot: "How do I configure OSPF?" → Returns information
+- Agent: "Fix OSPF on router1" → Investigates, identifies issue, suggests fix
 
-**Next Steps:**
+Key components of agents:
+1. Tools (capabilities to act in the world)
+2. Planning (break goals into steps)
+3. Memory (track state and progress)
+4. Iteration (act, observe, adjust, repeat)
 
-- Chapter 21: Automated configuration generation
-- Chapter 22: Log analysis with AI
-- Chapter 23: Predictive failure detection
-- Chapter 24: Self-healing networks
+### Question 2: Multi-Stage vs. Basic Agent
 
-**The future of network operations isn't replacing engineers—it's augmenting them with AI agents that handle the repetitive, systematic work so humans can focus on architecture, strategy, and complex problem-solving.**
+**Q:** When should you use multi-stage planning vs. basic reactive agent?
 
+**A:**
+
+**Use basic reactive agent when:**
+- Quick, simple issues ("Is interface up?")
+- Interactive with human (conversational)
+- Exploration/learning
+- Example: "Check status of Gi0/1"
+
+**Use multi-stage planning when:**
+- Complex multi-layer issues
+- Need documented audit trail
+- Production incident response
+- Training juniors (they follow the logic)
+- Example: "Intermittent connectivity affecting 100 users"
+
+**Key difference:** Multi-stage follows structured methodology (OSI model), basic agent reacts to each observation.
+
+### Question 3: Safety Features
+
+**Q:** Your agent is deployed to production. A junior engineer uses it and tries to run "reload" command. What happens with V4 production agent?
+
+**A:** The command is blocked at multiple safety layers:
+
+1. **Command Validator:** Regex pattern `\breload\b` matches → BLOCKED
+2. **Audit Logger:** Logs blocked attempt: `{"type": "command_blocked", "user": "junior", "command": "reload", "reason": "Dangerous pattern"}`
+3. **Agent returns:** "ERROR: Command blocked for safety. Reason: Contains dangerous pattern: \breload\b"
+4. **Alert:** Security team notified of dangerous command attempt
+
+The device is never touched. Junior engineer is safe.
+
+**Additional layers:**
+- Even if validator missed it, command doesn't start with "show" → blocked
+- Even if that failed, read-only mode means reload tool not loaded
+- Even if changes enabled, approval workflow requires human confirmation
+
+**Defense in depth.**
+
+### Question 4: Cost Optimization
+
+**Q:** You're running 1,000 troubleshooting sessions per month. Each session uses V2 multi-stage agent with 3 stages, 2 commands per stage. Average command output is 1,000 chars. How can you reduce costs by 50% without losing functionality?
+
+**A:** Three optimization strategies:
+
+**Strategy 1: Use Haiku for planning (60% cost reduction)**
+
+```python
+# Planning LLM (cheap, simple task)
+planning_llm = ChatAnthropic(
+    model="claude-haiku-4-5-20251001",  # $0.25/$1.25 per million
+    temperature=0.0
+)
+
+# Analysis LLM (expensive, complex task)
+analysis_llm = ChatAnthropic(
+    model="claude-sonnet-4-20250514",   # $3/$15 per million
+    temperature=0.0
+)
+```
+
+**Strategy 2: Truncate outputs (40% cost reduction)**
+
+```python
+def _run(self, command: str) -> str:
+    output = device.send_command(command)
+
+    # Keep first 2000 chars (usually enough)
+    if len(output) > 2000:
+        output = output[:2000] + "\n[Truncated]"
+
+    return output
+```
+
+**Strategy 3: Cache common outputs (80% cost reduction)**
+
+```python
+import hashlib
+from functools import lru_cache
+
+@lru_cache(maxsize=1000)
+def get_cached_output(device: str, command: str) -> str:
+    # Cache for 5 minutes
+    return device.send_command(command)
+```
+
+**Combined savings:**
+- Original cost: $31/month (1,000 sessions × $0.031)
+- With Haiku for planning: $12/month (60% reduction)
+- With output truncation: $18/month (40% reduction)
+- With caching (50% cache hit): $15/month (50% reduction)
+- **All three combined: $6/month (81% reduction)**
+
+**ROI still massive:** $0.006 per session vs. 25 min engineer time saved.
+
+---
+
+## Lab Time Budget
+
+### Time Investment
+
+**Learning (one-time):**
+- Read chapter: 90 min
+- Lab 1 (V1 Basic): 45 min
+- Lab 2 (V2 Multi-Stage): 60 min
+- Lab 3 (V4 Production): 90 min
+- **Total: 4.75 hours**
+
+**Implementation (per deployment):**
+- Adapt tools for your devices: 30 min
+- Connect to real network (Netmiko): 45 min
+- Test with 10 scenarios: 60 min
+- Security review: 45 min
+- Production deployment: 60 min
+- **Total: 4 hours**
+
+**Grand total: 8.75 hours** from zero to production.
+
+### Cost Analysis
+
+**Development costs:**
+- Learning: $0 (reading)
+- Lab API costs: $2 (experimentation)
+- Testing API costs: $5 (10 scenarios)
+- **Total: $7**
+
+**Monthly operational costs (500 incidents):**
+- V1 Basic: $7.50/month
+- V2 Multi-Stage: $15.50/month
+- V3 Conversational: $19.00/month
+- V4 Production (optimized): $10.00/month
+
+**Monthly savings:**
+- Manual troubleshooting: 500 incidents × 25 min = 208 hours
+- At $75/hour: $15,600/month
+- Agent cost: $10/month
+- **Net savings: $15,590/month**
+
+### ROI Calculation
+
+**Year 1:**
+- Development: 8.75 hours × $75 = $656
+- Operational: $10/month × 12 = $120
+- **Total cost: $776**
+
+**Savings:**
+- Monthly: $15,590
+- Annual: $187,080
+- **ROI: 24,000%**
+
+**Payback period: 0.3 hours** (first 2 incidents)
+
+---
+
+## Production Deployment Guide
+
+### Phase 1: Lab Testing (Week 1)
+
+**Day 1-2: Setup**
+- Deploy to lab environment
+- Connect to test devices (GNS3/EVE-NG)
+- Configure SSH access
+- Test basic connectivity
+
+**Day 3-4: Scenario Testing**
+- Test 20 common scenarios:
+  - Interface down
+  - BGP neighbor down
+  - OSPF adjacency issues
+  - VLAN misconfiguration
+  - Routing loop
+  - MTU mismatch
+  - Duplex mismatch
+  - Port security violation
+  - ACL blocking traffic
+  - NAT issues
+
+**Day 5: Safety Testing**
+- Attempt dangerous commands
+- Verify all blocks work
+- Test approval workflow
+- Review audit logs
+
+### Phase 2: Pilot (Week 2-3)
+
+**Week 2: Limited Rollout**
+- 5 senior engineers only
+- Read-only mode
+- Monitor for 1 week
+- Collect feedback
+
+**Week 3: Expand Pilot**
+- 15 engineers (mix of senior/mid-level)
+- Still read-only
+- Track metrics:
+  - Time saved per incident
+  - Accuracy of root cause identification
+  - User satisfaction
+
+### Phase 3: Production (Week 4)
+
+**Enable for all NOC engineers:**
+- Read-only by default
+- Changes require senior approval
+- Monitor closely for first week
+
+**Metrics to track:**
+- Incidents resolved by agent
+- Time saved (before/after)
+- False positives (agent wrong)
+- User adoption rate
+- Cost (API usage)
+
+### Phase 4: Optimization (Month 2+)
+
+**Continuous improvement:**
+- Analyze failed investigations
+- Add new tools for uncovered scenarios
+- Optimize prompts based on feedback
+- Reduce costs (caching, Haiku for planning)
+- Expand to new device types
+
+---
+
+## What You've Built
+
+**V1 - Basic Agent (150 lines):**
+- Natural language troubleshooting
+- Autonomous command execution
+- Root cause identification
+- $0.015 per incident
+
+**V2 - Multi-Stage Planning (+280 lines):**
+- OSI-based structured investigation
+- Hypothesis-driven testing
+- Comprehensive 6-section analysis
+- Complete audit trail
+- $0.031 per incident
+
+**V3 - Conversation Memory (+95 lines):**
+- Context-aware follow-ups
+- Natural conversational flow
+- Reference earlier findings
+- $0.038 per conversation
+
+**V4 - Production Safety (+220 lines):**
+- Command validation (whitelist/blacklist)
+- Human approval for changes
+- Complete audit logging
+- Read-only default
+- Role-based access control ready
+- $0.020 per incident (optimized)
+
+**Total: 745 lines production-ready code**
+
+**Real-world impact:**
+- **Time saved:** 25 min per incident
+- **Cost:** $10-20/month operational
+- **Savings:** $15,590/month ($187,080/year)
+- **ROI:** 24,000% in year 1
+- **Payback:** 0.3 hours (2 incidents)
+
+**Additional benefits:**
+- 24/7 troubleshooting without waking engineers
+- Consistent methodology (OSI model)
+- Complete audit trail for compliance
+- Training tool for junior engineers
+- Reduction in MTTR (mean time to resolution)
+
+---
+
+## Next Chapter Preview
+
+**Chapter 21: Network Change Automation**
+
+Build agents that:
+- Generate configuration changes from English descriptions
+- Validate changes before deployment
+- Execute changes with rollback capability
+- Document all changes automatically
+
+**Preview:**
+
+```
+You: "Add VLAN 50 for guest WiFi across all access switches"
+
+Agent:
+1. Identifies all access switches
+2. Generates configs for each
+3. Shows you the diff
+4. Applies to test switch first
+5. Validates
+6. Rolls out to remaining switches
+7. Documents the change
+
+All automated, all safe, all audited.
+```
+
+The future isn't replacing network engineers—it's augmenting them with AI agents that handle systematic work so humans focus on architecture, strategy, and complex problem-solving.
